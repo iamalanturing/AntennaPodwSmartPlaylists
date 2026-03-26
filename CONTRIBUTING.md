@@ -1,3 +1,4 @@
+# All of the following is for the original AntennaPod app, not this fork.  This is a work in progress.
 How to report a bug
 -------------------
 - Before anything else, please make sure you are on the latest version, the bug you are experiencing may have been fixed already!
