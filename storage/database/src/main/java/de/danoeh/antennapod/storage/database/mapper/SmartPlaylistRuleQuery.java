@@ -41,8 +41,9 @@ public class SmartPlaylistRuleQuery {
             for (String tag : tags) {
                 String trimmed = tag.trim();
                 if (!trimmed.isEmpty()) {
+                    String sanitized = android.database.DatabaseUtils.sqlEscapeString("%" + trimmed + "%");
                     tagConditions.add(PodDBAdapter.TABLE_NAME_FEEDS + "."
-                            + PodDBAdapter.KEY_FEED_TAGS + " LIKE '%" + trimmed + "%'");
+                            + PodDBAdapter.KEY_FEED_TAGS + " LIKE " + sanitized);
                 }
             }
             if (!tagConditions.isEmpty()) {
@@ -76,8 +77,9 @@ public class SmartPlaylistRuleQuery {
         // Media type filter
         String mediaType = rule.getMediaType();
         if (!TextUtils.isEmpty(mediaType)) {
+            String sanitizedMediaType = android.database.DatabaseUtils.sqlEscapeString(mediaType + "/%");
             conditions.add(PodDBAdapter.TABLE_NAME_FEED_MEDIA + "." + PodDBAdapter.KEY_MIME_TYPE
-                    + " LIKE '" + mediaType + "/%'");
+                    + " LIKE " + sanitizedMediaType);
         }
 
         if (conditions.isEmpty()) {
