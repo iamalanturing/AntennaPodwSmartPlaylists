@@ -1007,7 +1007,7 @@ public class DBWriter {
                 }
             }
             adapter.close();
-            EventBus.getDefault().post(new FeedListUpdateEvent());
+            EventBus.getDefault().post(new FeedListUpdateEvent(0L));
         });
     }
 
@@ -1028,7 +1028,7 @@ public class DBWriter {
                 }
             }
             adapter.close();
-            EventBus.getDefault().post(new FeedListUpdateEvent());
+            EventBus.getDefault().post(new FeedListUpdateEvent(0L));
         });
     }
 
@@ -1038,7 +1038,7 @@ public class DBWriter {
             adapter.open();
             adapter.deleteSmartPlaylist(playlistId);
             adapter.close();
-            EventBus.getDefault().post(new FeedListUpdateEvent());
+            EventBus.getDefault().post(new FeedListUpdateEvent(0L));
         });
     }
 
@@ -1091,7 +1091,7 @@ public class DBWriter {
             adapter.setSmartPlaylist(playlist);
 
             adapter.close();
-            EventBus.getDefault().post(new FeedListUpdateEvent());
+            EventBus.getDefault().post(new FeedListUpdateEvent(0L));
         });
     }
 
