@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AntennaPodSmartPlaylist - Prototype</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #e0e0e0; max-width: 420px; margin: 0 auto; min-height: 100vh; }
+.screen { display: none; padding: 16px; }
+.screen.active { display: block; }
+
+/* Header */
+.header { display: flex; align-items: center; padding: 12px 0; margin-bottom: 16px; }
+.header h1 { font-size: 20px; flex: 1; }
+.header .back-btn { background: none; border: none; color: #e0e0e0; font-size: 24px; cursor: pointer; margin-right: 12px; padding: 4px 8px; }
+
+/* Home Screen */
+.section-title { font-size: 14px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+.cards-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; scroll-snap-type: x mandatory; }
+.cards-scroll::-webkit-scrollbar { height: 4px; }
+.cards-scroll::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+
+.playlist-card { min-width: 150px; height: 120px; background: linear-gradient(135deg, #16213e, #0f3460); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; scroll-snap-align: start; transition: transform 0.15s, box-shadow 0.15s; border: 1px solid #1a3a6a; }
+.playlist-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+.playlist-card .card-name { font-size: 15px; font-weight: 600; }
+.playlist-card .card-meta { font-size: 12px; color: #8899aa; }
+.playlist-card .card-play { width: 32px; height: 32px; background: #e94560; border-radius: 50%; display: flex; align-items: center; justify-content: center; align-self: flex-end; }
+.playlist-card .card-play::after { content: ''; border-left: 10px solid white; border-top: 6px solid transparent; border-bottom: 6px solid transparent; margin-left: 2px; }
+
+.add-card { min-width: 150px; height: 120px; background: rgba(255,255,255,0.05); border: 2px dashed #444; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 36px; color: #666; transition: border-color 0.15s, color 0.15s; }
+.add-card:hover { border-color: #e94560; color: #e94560; }
+
+/* Continue Listening (placeholder) */
+.continue-section { margin-top: 24px; }
+.episode-row { display: flex; align-items: center; gap: 12px; padding: 10px; background: rgba(255,255,255,0.04); border-radius: 8px; margin-bottom: 8px; }
+.episode-row .ep-art { width: 48px; height: 48px; background: #2a2a4a; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.episode-row .ep-info { flex: 1; min-width: 0; }
+.episode-row .ep-title { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.episode-row .ep-feed { font-size: 12px; color: #888; }
+.episode-row .ep-dur { font-size: 11px; color: #666; white-space: nowrap; }
+
+/* Detail Screen */
+.detail-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.detail-header .playlist-icon { width: 56px; height: 56px; background: linear-gradient(135deg, #16213e, #0f3460); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+.detail-header .playlist-info { flex: 1; }
+.detail-header .playlist-info h2 { font-size: 18px; }
+.detail-header .playlist-info .meta { font-size: 13px; color: #888; }
+.detail-actions { display: flex; gap: 8px; margin-bottom: 16px; }
+.detail-actions button { padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; }
+.btn-primary { background: #e94560; color: white; }
+.btn-secondary { background: rgba(255,255,255,0.1); color: #e0e0e0; }
+.btn-secondary:hover { background: rgba(255,255,255,0.15); }
+
+.rule-group { margin-bottom: 16px; }
+.rule-group-header { font-size: 12px; color: #e94560; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 0; border-bottom: 1px solid rgba(233,69,96,0.2); margin-bottom: 8px; }
+
+.toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; }
+.toggle-row label { font-size: 14px; }
+.toggle { width: 44px; height: 24px; background: #444; border-radius: 12px; position: relative; cursor: pointer; transition: background 0.2s; }
+.toggle.on { background: #e94560; }
+.toggle::after { content: ''; position: absolute; width: 20px; height: 20px; background: white; border-radius: 50%; top: 2px; left: 2px; transition: left 0.2s; }
+.toggle.on::after { left: 22px; }
+
+/* Edit Screen */
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.form-group input[type="text"], .form-group input[type="number"], .form-group select { width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.08); border: 1px solid #333; border-radius: 8px; color: #e0e0e0; font-size: 14px; }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: #e94560; }
+
+.rule-card { background: rgba(255,255,255,0.04); border: 1px solid #333; border-radius: 12px; padding: 14px; margin-bottom: 12px; position: relative; }
+.rule-card .rule-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.rule-card .rule-num { font-size: 13px; font-weight: 600; color: #e94560; }
+.rule-card .rule-actions { display: flex; gap: 8px; }
+.rule-card .rule-actions button { background: none; border: none; color: #888; cursor: pointer; font-size: 16px; padding: 2px 6px; }
+.rule-card .rule-actions button:hover { color: #e94560; }
+.drag-handle { cursor: grab; color: #666; font-size: 18px; margin-right: 8px; }
+.drag-handle:active { cursor: grabbing; }
+
+.filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.filter-grid .full-width { grid-column: 1 / -1; }
+.filter-item label { font-size: 11px; color: #777; margin-bottom: 4px; display: block; }
+.filter-item select, .filter-item input { width: 100%; padding: 7px 8px; background: rgba(255,255,255,0.06); border: 1px solid #2a2a3e; border-radius: 6px; color: #e0e0e0; font-size: 13px; }
+.filter-item select:focus, .filter-item input:focus { outline: none; border-color: #e94560; }
+
+.chip-container { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 4px 10px; background: rgba(233,69,96,0.15); border: 1px solid rgba(233,69,96,0.3); border-radius: 14px; font-size: 12px; color: #e94560; cursor: pointer; transition: background 0.15s; }
+.chip.selected { background: #e94560; color: white; }
+.chip:hover { background: rgba(233,69,96,0.25); }
+.chip.selected:hover { background: #d63853; }
+
+.add-rule-btn { width: 100%; padding: 12px; background: rgba(255,255,255,0.04); border: 2px dashed #444; border-radius: 12px; color: #888; cursor: pointer; font-size: 14px; text-align: center; transition: border-color 0.15s, color 0.15s; }
+.add-rule-btn:hover { border-color: #e94560; color: #e94560; }
+
+.generate-btn { width: 100%; padding: 14px; background: #e94560; border: none; border-radius: 12px; color: white; cursor: pointer; font-size: 16px; font-weight: 600; margin-top: 16px; transition: background 0.15s; }
+.generate-btn:hover { background: #d63853; }
+
+/* Preview section */
+.preview-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid #333; }
+.preview-section h3 { font-size: 14px; color: #888; margin-bottom: 12px; }
+.preview-empty { text-align: center; color: #555; padding: 24px; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- HOME SCREEN -->
+<div id="home-screen" class="screen active">
+  <div class="header">
+    <h1>AntennaPodSmartPlaylist</h1>
+  </div>
+
+  <div class="section-title">Smart Playlists</div>
+  <div class="cards-scroll" id="playlist-cards"></div>
+
+  <div class="continue-section">
+    <div class="section-title">Continue Listening</div>
+    <div id="continue-episodes"></div>
+  </div>
+</div>
+
+<!-- DETAIL SCREEN -->
+<div id="detail-screen" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('home')">&larr;</button>
+    <h1 id="detail-title">Playlist</h1>
+  </div>
+  <div class="detail-header">
+    <div class="playlist-icon">&#9835;</div>
+    <div class="playlist-info">
+      <h2 id="detail-name"></h2>
+      <div class="meta" id="detail-meta"></div>
+    </div>
+  </div>
+  <div class="detail-actions">
+    <button class="btn-primary" onclick="editCurrentPlaylist()">Edit Rules</button>
+    <button class="btn-secondary" onclick="regenerateCurrentPlaylist()">Regenerate</button>
+    <button class="btn-secondary" onclick="deleteCurrentPlaylist()">Delete</button>
+  </div>
+  <div class="toggle-row">
+    <label>Auto-regenerate when finished</label>
+    <div class="toggle on" id="detail-auto-regen" onclick="this.classList.toggle('on')"></div>
+  </div>
+  <div id="detail-episodes"></div>
+</div>
+
+<!-- EDIT SCREEN -->
+<div id="edit-screen" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="cancelEdit()">&larr;</button>
+    <h1 id="edit-title">New Smart Playlist</h1>
+  </div>
+
+  <div class="form-group">
+    <label>Playlist Name</label>
+    <input type="text" id="edit-name" placeholder="e.g., Morning Drive, Kids Time">
+  </div>
+
+  <div class="toggle-row" style="margin-bottom:16px">
+    <label>Auto-regenerate when finished</label>
+    <div class="toggle on" id="edit-auto-regen" onclick="this.classList.toggle('on')"></div>
+  </div>
+
+  <div class="section-title">Rules (in priority order)</div>
+  <div id="rules-container"></div>
+  <div class="add-rule-btn" onclick="addRule()">+ Add Rule</div>
+
+  <button class="generate-btn" onclick="saveAndGenerate()">Save &amp; Generate Playlist</button>
+
+  <div class="preview-section">
+    <h3>Preview</h3>
+    <div id="preview-episodes"><div class="preview-empty">Add rules and click "Save & Generate" to preview</div></div>
+  </div>
+</div>
+
+<script>
+// ========== SAMPLE DATA ==========
+const TAGS = ['Security', 'Tech', 'News', 'Comedy', 'Finance', 'Kids'];
+
+const FEEDS = [
+  { id: 1, title: 'Darknet Diaries', tags: ['Security'] },
+  { id: 2, title: 'Security Now', tags: ['Security', 'Tech'] },
+  { id: 3, title: 'The Ramsey Show', tags: ['Finance'] },
+  { id: 4, title: 'NPR News Now', tags: ['News'] },
+  { id: 5, title: 'Wow in the World', tags: ['Kids'] },
+  { id: 6, title: 'Smash Boom Best', tags: ['Kids'] },
+  { id: 7, title: 'Syntax FM', tags: ['Tech'] },
+  { id: 8, title: 'Conan Needs a Friend', tags: ['Comedy'] },
+  { id: 9, title: 'Planet Money', tags: ['Finance', 'News'] },
+  { id: 10, title: 'Risky Business', tags: ['Security'] },
+];
+
+const EMOJIS = ['🔒','🛡️','💰','📰','👶','🎭','💻','😂','🏦','⚡'];
+
+function generateEpisodes() {
+  const eps = [];
+  const now = Date.now();
+  let id = 1;
+  for (const feed of FEEDS) {
+    for (let i = 0; i < 8; i++) {
+      eps.push({
+        id: id++,
+        feedId: feed.id,
+        feedTitle: feed.title,
+        feedTags: feed.tags,
+        title: `${feed.title} - Episode ${200 - i}`,
+        pubDate: now - (i * 86400000 * (1 + Math.random() * 2)),
+        duration: Math.floor(15 + Math.random() * 75) * 60000,
+        played: i > 4 ? true : (Math.random() > 0.7),
+        downloaded: Math.random() > 0.5,
+        favorited: Math.random() > 0.85,
+        mediaType: feed.id === 5 ? 'video' : 'audio',
+      });
+    }
+  }
+  return eps;
+}
+
+const ALL_EPISODES = generateEpisodes();
+
+// ========== STATE ==========
+let playlists = [
+  {
+    id: 1,
+    name: 'Morning Drive',
+    autoRegenerate: true,
+    rules: [
+      { feeds: [], tags: ['News'], playedStatus: 'unplayed', downloaded: 'any', favorited: 'any', mediaType: 'any', minDuration: 0, maxDuration: 15, maxAgeDays: 7, keyword: '', episodeLimit: 2, sortOrder: 'NEWEST' },
+      { feeds: [3], tags: [], playedStatus: 'unplayed', downloaded: 'any', favorited: 'any', mediaType: 'any', minDuration: 0, maxDuration: 0, maxAgeDays: 3, keyword: '', episodeLimit: 1, sortOrder: 'OLDEST' },
+      { feeds: [], tags: ['Security'], playedStatus: 'unplayed', downloaded: 'any', favorited: 'any', mediaType: 'audio', minDuration: 0, maxDuration: 0, maxAgeDays: 14, keyword: '', episodeLimit: 1, sortOrder: 'RANDOM' },
+    ],
+    generatedEpisodes: [],
+  },
+  {
+    id: 2,
+    name: 'Kids Time',
+    autoRegenerate: true,
+    rules: [
+      { feeds: [], tags: ['Kids'], playedStatus: 'unplayed', downloaded: 'any', favorited: 'any', mediaType: 'any', minDuration: 0, maxDuration: 30, maxAgeDays: 30, keyword: '', episodeLimit: 3, sortOrder: 'NEWEST' },
+    ],
+    generatedEpisodes: [],
+  },
+];
+let nextPlaylistId = 3;
+let currentPlaylistId = null;
+let editingPlaylistId = null;
+
+// Generate initial snapshots
+playlists.forEach(p => p.generatedEpisodes = generateSnapshot(p));
+
+// ========== QUERY ENGINE ==========
+function matchesRule(ep, rule) {
+  // Feed filter
+  if (rule.feeds.length > 0 && !rule.feeds.includes(ep.feedId)) {
+    // Check if any tag matches
+    if (rule.tags.length === 0) return false;
+    const hasMatchingTag = rule.tags.some(t => ep.feedTags.includes(t));
+    if (!hasMatchingTag) return false;
+  }
+  if (rule.feeds.length === 0 && rule.tags.length > 0) {
+    const hasMatchingTag = rule.tags.some(t => ep.feedTags.includes(t));
+    if (!hasMatchingTag) return false;
+  }
+
+  // Played status
+  if (rule.playedStatus === 'unplayed' && ep.played) return false;
+  if (rule.playedStatus === 'played' && !ep.played) return false;
+
+  // Downloaded
+  if (rule.downloaded === 'downloaded' && !ep.downloaded) return false;
+  if (rule.downloaded === 'not_downloaded' && ep.downloaded) return false;
+
+  // Favorited
+  if (rule.favorited === 'yes' && !ep.favorited) return false;
+  if (rule.favorited === 'no' && ep.favorited) return false;
+
+  // Media type
+  if (rule.mediaType === 'audio' && ep.mediaType !== 'audio') return false;
+  if (rule.mediaType === 'video' && ep.mediaType !== 'video') return false;
+
+  // Duration (in minutes)
+  const durMin = ep.duration / 60000;
+  if (rule.minDuration > 0 && durMin < rule.minDuration) return false;
+  if (rule.maxDuration > 0 && durMin > rule.maxDuration) return false;
+
+  // Age
+  if (rule.maxAgeDays > 0) {
+    const ageDays = (Date.now() - ep.pubDate) / 86400000;
+    if (ageDays > rule.maxAgeDays) return false;
+  }
+
+  // Keyword
+  if (rule.keyword && rule.keyword.trim()) {
+    const kw = rule.keyword.toLowerCase();
+    if (!ep.title.toLowerCase().includes(kw) && !ep.feedTitle.toLowerCase().includes(kw)) return false;
+  }
+
+  return true;
+}
+
+function sortEpisodes(eps, sortOrder) {
+  const sorted = [...eps];
+  switch (sortOrder) {
+    case 'NEWEST': sorted.sort((a, b) => b.pubDate - a.pubDate); break;
+    case 'OLDEST': sorted.sort((a, b) => a.pubDate - b.pubDate); break;
+    case 'SHORTEST': sorted.sort((a, b) => a.duration - b.duration); break;
+    case 'LONGEST': sorted.sort((a, b) => b.duration - a.duration); break;
+    case 'RANDOM': sorted.sort(() => Math.random() - 0.5); break;
+  }
+  return sorted;
+}
+
+function generateSnapshot(playlist) {
+  const usedIds = new Set();
+  const result = [];
+
+  for (const rule of playlist.rules) {
+    let matched = ALL_EPISODES.filter(ep => !usedIds.has(ep.id) && matchesRule(ep, rule));
+    matched = sortEpisodes(matched, rule.sortOrder);
+    if (rule.episodeLimit > 0) {
+      matched = matched.slice(0, rule.episodeLimit);
+    }
+    for (const ep of matched) {
+      usedIds.add(ep.id);
+      result.push({ ...ep, matchedRuleIndex: playlist.rules.indexOf(rule) });
+    }
+  }
+  return result;
+}
+
+// ========== RENDERING ==========
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(name + '-screen').classList.add('active');
+}
+
+function formatDuration(ms) {
+  const min = Math.floor(ms / 60000);
+  if (min >= 60) return Math.floor(min / 60) + 'h ' + (min % 60) + 'm';
+  return min + ' min';
+}
+
+function formatAge(pubDate) {
+  const days = Math.floor((Date.now() - pubDate) / 86400000);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return days + 'd ago';
+  return Math.floor(days / 7) + 'w ago';
+}
+
+function renderHome() {
+  const cardsDiv = document.getElementById('playlist-cards');
+  cardsDiv.innerHTML = '';
+
+  for (const pl of playlists) {
+    const card = document.createElement('div');
+    card.className = 'playlist-card';
+    card.innerHTML = `
+      <div class="card-name">${pl.name}</div>
+      <div class="card-meta">${pl.generatedEpisodes.length} episodes</div>
+      <div class="card-play"></div>
+    `;
+    card.onclick = () => showDetail(pl.id);
+    cardsDiv.appendChild(card);
+  }
+
+  const addCard = document.createElement('div');
+  addCard.className = 'add-card';
+  addCard.textContent = '+';
+  addCard.onclick = () => startNewPlaylist();
+  cardsDiv.appendChild(addCard);
+
+  // Continue listening placeholder
+  const contDiv = document.getElementById('continue-episodes');
+  contDiv.innerHTML = '';
+  const continuable = ALL_EPISODES.filter(e => !e.played).slice(0, 3);
+  for (const ep of continuable) {
+    const feedIdx = FEEDS.findIndex(f => f.id === ep.feedId);
+    contDiv.innerHTML += `
+      <div class="episode-row">
+        <div class="ep-art">${EMOJIS[feedIdx] || '🎧'}</div>
+        <div class="ep-info">
+          <div class="ep-title">${ep.title}</div>
+          <div class="ep-feed">${ep.feedTitle}</div>
+        </div>
+        <div class="ep-dur">${formatDuration(ep.duration)}</div>
+      </div>
+    `;
+  }
+}
+
+function showDetail(playlistId) {
+  const pl = playlists.find(p => p.id === playlistId);
+  if (!pl) return;
+  currentPlaylistId = playlistId;
+
+  document.getElementById('detail-title', pl.name);
+  document.getElementById('detail-name').textContent = pl.name;
+  document.getElementById('detail-meta').textContent =
+    pl.generatedEpisodes.length + ' episodes · ' +
+    formatDuration(pl.generatedEpisodes.reduce((s, e) => s + e.duration, 0)) + ' total';
+
+  const autoRegen = document.getElementById('detail-auto-regen');
+  autoRegen.classList.toggle('on', pl.autoRegenerate);
+
+  const epsDiv = document.getElementById('detail-episodes');
+  epsDiv.innerHTML = '';
+
+  // Group by rule index
+  let lastRuleIdx = -1;
+  for (const ep of pl.generatedEpisodes) {
+    if (ep.matchedRuleIndex !== lastRuleIdx) {
+      lastRuleIdx = ep.matchedRuleIndex;
+      const rule = pl.rules[lastRuleIdx];
+      const ruleDesc = describeRule(rule);
+      epsDiv.innerHTML += `<div class="rule-group-header">Rule ${lastRuleIdx + 1}: ${ruleDesc}</div>`;
+    }
+    const feedIdx = FEEDS.findIndex(f => f.id === ep.feedId);
+    epsDiv.innerHTML += `
+      <div class="episode-row">
+        <div class="ep-art">${EMOJIS[feedIdx] || '🎧'}</div>
+        <div class="ep-info">
+          <div class="ep-title">${ep.title}</div>
+          <div class="ep-feed">${ep.feedTitle} · ${formatAge(ep.pubDate)}</div>
+        </div>
+        <div class="ep-dur">${formatDuration(ep.duration)}</div>
+      </div>
+    `;
+  }
+
+  if (pl.generatedEpisodes.length === 0) {
+    epsDiv.innerHTML = '<div class="preview-empty">No episodes match the rules. Try editing the playlist.</div>';
+  }
+
+  showScreen('detail');
+}
+
+function describeRule(rule) {
+  const parts = [];
+  if (rule.tags.length > 0) parts.push(rule.tags.join(', '));
+  if (rule.feeds.length > 0) {
+    const names = rule.feeds.map(id => FEEDS.find(f => f.id === id)?.title || '?');
+    parts.push(names.join(', '));
+  }
+  if (rule.playedStatus !== 'any') parts.push(rule.playedStatus);
+  if (rule.episodeLimit > 0) parts.push(rule.episodeLimit + ' ep' + (rule.episodeLimit > 1 ? 's' : ''));
+  if (rule.sortOrder !== 'NEWEST') parts.push(rule.sortOrder.toLowerCase());
+  return parts.join(' · ') || 'All episodes';
+}
+
+function editCurrentPlaylist() {
+  startEditPlaylist(currentPlaylistId);
+}
+
+function regenerateCurrentPlaylist() {
+  const pl = playlists.find(p => p.id === currentPlaylistId);
+  if (pl) {
+    pl.generatedEpisodes = generateSnapshot(pl);
+    showDetail(currentPlaylistId);
+  }
+}
+
+function deleteCurrentPlaylist() {
+  if (confirm('Delete this playlist?')) {
+    playlists = playlists.filter(p => p.id !== currentPlaylistId);
+    renderHome();
+    showScreen('home');
+  }
+}
+
+// ========== EDIT SCREEN ==========
+let editRules = [];
+
+function startNewPlaylist() {
+  editingPlaylistId = null;
+  document.getElementById('edit-title').textContent = 'New Smart Playlist';
+  document.getElementById('edit-name').value = '';
+  document.getElementById('edit-auto-regen').classList.add('on');
+  editRules = [createDefaultRule()];
+  renderEditRules();
+  showScreen('edit');
+}
+
+function startEditPlaylist(playlistId) {
+  const pl = playlists.find(p => p.id === playlistId);
+  if (!pl) return;
+  editingPlaylistId = playlistId;
+  document.getElementById('edit-title').textContent = 'Edit: ' + pl.name;
+  document.getElementById('edit-name').value = pl.name;
+  const autoRegen = document.getElementById('edit-auto-regen');
+  autoRegen.classList.toggle('on', pl.autoRegenerate);
+  editRules = JSON.parse(JSON.stringify(pl.rules));
+  renderEditRules();
+  showScreen('edit');
+}
+
+function cancelEdit() {
+  if (editingPlaylistId) {
+    showDetail(editingPlaylistId);
+  } else {
+    showScreen('home');
+  }
+}
+
+function createDefaultRule() {
+  return {
+    feeds: [],
+    tags: [],
+    playedStatus: 'unplayed',
+    downloaded: 'any',
+    favorited: 'any',
+    mediaType: 'any',
+    minDuration: 0,
+    maxDuration: 0,
+    maxAgeDays: 0,
+    keyword: '',
+    episodeLimit: 0,
+    sortOrder: 'NEWEST',
+  };
+}
+
+function addRule() {
+  editRules.push(createDefaultRule());
+  renderEditRules();
+}
+
+function removeRule(idx) {
+  if (editRules.length <= 1) return;
+  editRules.splice(idx, 1);
+  renderEditRules();
+}
+
+function moveRule(idx, dir) {
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= editRules.length) return;
+  [editRules[idx], editRules[newIdx]] = [editRules[newIdx], editRules[idx]];
+  renderEditRules();
+}
+
+function renderEditRules() {
+  const container = document.getElementById('rules-container');
+  container.innerHTML = '';
+
+  editRules.forEach((rule, idx) => {
+    const card = document.createElement('div');
+    card.className = 'rule-card';
+    card.innerHTML = `
+      <div class="rule-header">
+        <div>
+          <span class="drag-handle" title="Drag to reorder">&#9776;</span>
+          <span class="rule-num">Rule ${idx + 1}</span>
+        </div>
+        <div class="rule-actions">
+          <button onclick="moveRule(${idx}, -1)" title="Move up">&uarr;</button>
+          <button onclick="moveRule(${idx}, 1)" title="Move down">&darr;</button>
+          <button onclick="removeRule(${idx})" title="Remove">&times;</button>
+        </div>
+      </div>
+
+      <div class="filter-grid">
+        <div class="filter-item full-width">
+          <label>Tags / Categories</label>
+          <div class="chip-container" id="rule-${idx}-tags">
+            ${TAGS.map(t => `<span class="chip ${rule.tags.includes(t) ? 'selected' : ''}"
+              onclick="toggleTag(${idx}, '${t}')">${t}</span>`).join('')}
+          </div>
+        </div>
+
+        <div class="filter-item full-width">
+          <label>Individual Feeds</label>
+          <div class="chip-container" id="rule-${idx}-feeds">
+            ${FEEDS.map(f => `<span class="chip ${rule.feeds.includes(f.id) ? 'selected' : ''}"
+              onclick="toggleFeed(${idx}, ${f.id})">${f.title}</span>`).join('')}
+          </div>
+        </div>
+
+        <div class="filter-item">
+          <label>Played Status</label>
+          <select onchange="editRules[${idx}].playedStatus=this.value">
+            <option value="unplayed" ${rule.playedStatus === 'unplayed' ? 'selected' : ''}>Unplayed</option>
+            <option value="played" ${rule.playedStatus === 'played' ? 'selected' : ''}>Played</option>
+            <option value="any" ${rule.playedStatus === 'any' ? 'selected' : ''}>Any</option>
+          </select>
+        </div>
+
+        <div class="filter-item">
+          <label>Downloaded</label>
+          <select onchange="editRules[${idx}].downloaded=this.value">
+            <option value="any" ${rule.downloaded === 'any' ? 'selected' : ''}>Any</option>
+            <option value="downloaded" ${rule.downloaded === 'downloaded' ? 'selected' : ''}>Downloaded</option>
+            <option value="not_downloaded" ${rule.downloaded === 'not_downloaded' ? 'selected' : ''}>Not Downloaded</option>
+          </select>
+        </div>
+
+        <div class="filter-item">
+          <label>Favorited</label>
+          <select onchange="editRules[${idx}].favorited=this.value">
+            <option value="any" ${rule.favorited === 'any' ? 'selected' : ''}>Any</option>
+            <option value="yes" ${rule.favorited === 'yes' ? 'selected' : ''}>Yes</option>
+            <option value="no" ${rule.favorited === 'no' ? 'selected' : ''}>No</option>
+          </select>
+        </div>
+
+        <div class="filter-item">
+          <label>Media Type</label>
+          <select onchange="editRules[${idx}].mediaType=this.value">
+            <option value="any" ${rule.mediaType === 'any' ? 'selected' : ''}>Any</option>
+            <option value="audio" ${rule.mediaType === 'audio' ? 'selected' : ''}>Audio</option>
+            <option value="video" ${rule.mediaType === 'video' ? 'selected' : ''}>Video</option>
+          </select>
+        </div>
+
+        <div class="filter-item">
+          <label>Min Duration (min)</label>
+          <input type="number" min="0" value="${rule.minDuration}" onchange="editRules[${idx}].minDuration=+this.value" placeholder="0 = any">
+        </div>
+
+        <div class="filter-item">
+          <label>Max Duration (min)</label>
+          <input type="number" min="0" value="${rule.maxDuration}" onchange="editRules[${idx}].maxDuration=+this.value" placeholder="0 = any">
+        </div>
+
+        <div class="filter-item">
+          <label>Max Age (days)</label>
+          <input type="number" min="0" value="${rule.maxAgeDays}" onchange="editRules[${idx}].maxAgeDays=+this.value" placeholder="0 = any">
+        </div>
+
+        <div class="filter-item">
+          <label>Episode Limit</label>
+          <input type="number" min="0" value="${rule.episodeLimit}" onchange="editRules[${idx}].episodeLimit=+this.value" placeholder="0 = all">
+        </div>
+
+        <div class="filter-item full-width">
+          <label>Keyword Search (title)</label>
+          <input type="text" value="${rule.keyword}" onchange="editRules[${idx}].keyword=this.value" placeholder="e.g., interview, hack">
+        </div>
+
+        <div class="filter-item full-width">
+          <label>Sort / Pick Order</label>
+          <select onchange="editRules[${idx}].sortOrder=this.value">
+            <option value="NEWEST" ${rule.sortOrder === 'NEWEST' ? 'selected' : ''}>Newest First</option>
+            <option value="OLDEST" ${rule.sortOrder === 'OLDEST' ? 'selected' : ''}>Oldest First (Catch-up)</option>
+            <option value="SHORTEST" ${rule.sortOrder === 'SHORTEST' ? 'selected' : ''}>Shortest First</option>
+            <option value="LONGEST" ${rule.sortOrder === 'LONGEST' ? 'selected' : ''}>Longest First</option>
+            <option value="RANDOM" ${rule.sortOrder === 'RANDOM' ? 'selected' : ''}>Random</option>
+          </select>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function toggleTag(ruleIdx, tag) {
+  const rule = editRules[ruleIdx];
+  const idx = rule.tags.indexOf(tag);
+  if (idx >= 0) rule.tags.splice(idx, 1);
+  else rule.tags.push(tag);
+  renderEditRules();
+}
+
+function toggleFeed(ruleIdx, feedId) {
+  const rule = editRules[ruleIdx];
+  const idx = rule.feeds.indexOf(feedId);
+  if (idx >= 0) rule.feeds.splice(idx, 1);
+  else rule.feeds.push(feedId);
+  renderEditRules();
+}
+
+function saveAndGenerate() {
+  const name = document.getElementById('edit-name').value.trim();
+  if (!name) { alert('Please enter a playlist name'); return; }
+
+  const autoRegen = document.getElementById('edit-auto-regen').classList.contains('on');
+
+  if (editingPlaylistId) {
+    const pl = playlists.find(p => p.id === editingPlaylistId);
+    pl.name = name;
+    pl.autoRegenerate = autoRegen;
+    pl.rules = JSON.parse(JSON.stringify(editRules));
+    pl.generatedEpisodes = generateSnapshot(pl);
+    renderHome();
+    showDetail(editingPlaylistId);
+  } else {
+    const pl = {
+      id: nextPlaylistId++,
+      name,
+      autoRegenerate: autoRegen,
+      rules: JSON.parse(JSON.stringify(editRules)),
+      generatedEpisodes: [],
+    };
+    pl.generatedEpisodes = generateSnapshot(pl);
+    playlists.push(pl);
+    renderHome();
+    showDetail(pl.id);
+  }
+}
+
+// ========== INIT ==========
+renderHome();
+</script>
+</body>
+</html>
