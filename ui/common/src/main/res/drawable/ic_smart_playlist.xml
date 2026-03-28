@@ -1,0 +1,20 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Playlist lines -->
+    <path
+        android:fillColor="?attr/action_icon_color"
+        android:pathData="M3,10h11v2h-11z" />
+    <path
+        android:fillColor="?attr/action_icon_color"
+        android:pathData="M3,6h11v2h-11z" />
+    <path
+        android:fillColor="?attr/action_icon_color"
+        android:pathData="M3,14h7v2h-7z" />
+    <!-- Star/magic indicator -->
+    <path
+        android:fillColor="?attr/action_icon_color"
+        android:pathData="M18,13l-1.06,2.15 -2.37,0.34 1.72,1.67 -0.41,2.37L18,18.27l2.12,1.26 -0.41,-2.37 1.72,-1.67 -2.37,-0.34z" />
+</vector>
