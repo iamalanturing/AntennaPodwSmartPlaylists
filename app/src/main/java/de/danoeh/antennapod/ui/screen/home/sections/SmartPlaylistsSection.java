@@ -18,6 +18,7 @@ import de.danoeh.antennapod.ui.screen.home.HomeSection;
 import de.danoeh.antennapod.ui.screen.smartplaylist.SmartPlaylistCardAdapter;
 import de.danoeh.antennapod.ui.screen.smartplaylist.SmartPlaylistDetailFragment;
 import de.danoeh.antennapod.ui.screen.smartplaylist.SmartPlaylistEditFragment;
+import de.danoeh.antennapod.ui.screen.smartplaylist.SmartPlaylistListFragment;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
@@ -31,6 +32,7 @@ public class SmartPlaylistsSection extends HomeSection {
     public static final String TAG = "SmartPlaylistsSection";
     private SmartPlaylistCardAdapter adapter;
     private Disposable disposable;
+    private boolean hasPlaylists = false;
 
     @Nullable
     @Override
@@ -63,7 +65,12 @@ public class SmartPlaylistsSection extends HomeSection {
 
     @Override
     protected void handleMoreClick() {
-        // No separate "more" screen for now; clicking a card opens it directly
+        if (hasPlaylists) {
+            ((MainActivity) requireActivity()).loadChildFragment(new SmartPlaylistListFragment());
+        } else {
+            SmartPlaylistEditFragment fragment = SmartPlaylistEditFragment.newInstance(0);
+            ((MainActivity) requireActivity()).loadChildFragment(fragment);
+        }
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -89,6 +96,7 @@ public class SmartPlaylistsSection extends HomeSection {
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(playlists -> {
+                    hasPlaylists = !playlists.isEmpty();
                     adapter.updateData(playlists);
                     viewBinding.emptyLabel.setVisibility(
                             playlists.isEmpty() ? View.VISIBLE : View.GONE);
