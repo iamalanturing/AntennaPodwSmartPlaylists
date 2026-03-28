@@ -15,6 +15,9 @@ import com.google.common.util.concurrent.Futures;
 import de.danoeh.antennapod.event.DownloadLogEvent;
 
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
+import de.danoeh.antennapod.model.feed.SmartPlaylist;
+import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
+import de.danoeh.antennapod.storage.database.mapper.FeedItemCursor;
 import de.danoeh.antennapod.net.download.serviceinterface.AutoDownloadManager;
 import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterface;
 import de.danoeh.antennapod.net.download.serviceinterface.FeedUpdateManager;
@@ -26,6 +29,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -985,6 +989,110 @@ public class DBWriter {
         } else {
             Log.w(TAG, "removeFeedWithDownloadUrl: Could not find feed with url: " + downloadUrl);
         }
+    }
+
+    // ---- Smart Playlists ----
+
+    public static Future<?> createSmartPlaylist(final SmartPlaylist playlist) {
+        return runOnDbThread(() -> {
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            adapter.setSmartPlaylist(playlist);
+            if (playlist.getRules() != null) {
+                for (int i = 0; i < playlist.getRules().size(); i++) {
+                    SmartPlaylistRule rule = playlist.getRules().get(i);
+                    rule.setPlaylistId(playlist.getId());
+                    rule.setPosition(i);
+                    adapter.setSmartPlaylistRule(rule);
+                }
+            }
+            adapter.close();
+            EventBus.getDefault().post(new FeedListUpdateEvent());
+        });
+    }
+
+    public static Future<?> updateSmartPlaylist(final SmartPlaylist playlist) {
+        return runOnDbThread(() -> {
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            adapter.setSmartPlaylist(playlist);
+            // Replace all rules
+            adapter.deleteSmartPlaylistRulesForPlaylist(playlist.getId());
+            if (playlist.getRules() != null) {
+                for (int i = 0; i < playlist.getRules().size(); i++) {
+                    SmartPlaylistRule rule = playlist.getRules().get(i);
+                    rule.setPlaylistId(playlist.getId());
+                    rule.setPosition(i);
+                    rule.setId(0); // Force insert since we deleted all
+                    adapter.setSmartPlaylistRule(rule);
+                }
+            }
+            adapter.close();
+            EventBus.getDefault().post(new FeedListUpdateEvent());
+        });
+    }
+
+    public static Future<?> deleteSmartPlaylist(final long playlistId) {
+        return runOnDbThread(() -> {
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            adapter.deleteSmartPlaylist(playlistId);
+            adapter.close();
+            EventBus.getDefault().post(new FeedListUpdateEvent());
+        });
+    }
+
+    /**
+     * Generates the snapshot for a smart playlist by executing each rule's query
+     * in priority order, deduplicating, and storing the result.
+     */
+    public static Future<?> generateSmartPlaylist(final SmartPlaylist playlist) {
+        return runOnDbThread(() -> {
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            // Clear existing snapshot
+            adapter.deleteSmartPlaylistEpisodes(playlist.getId());
+
+            // Load rules if not already loaded
+            List<SmartPlaylistRule> rules = playlist.getRules();
+            if (rules == null || rules.isEmpty()) {
+                rules = new ArrayList<>();
+                try (Cursor cursor = adapter.getSmartPlaylistRulesCursor(playlist.getId())) {
+                    while (cursor.moveToNext()) {
+                        rules.add(de.danoeh.antennapod.storage.database.mapper.SmartPlaylistRuleCursor.convert(cursor));
+                    }
+                }
+            }
+
+            // Execute each rule in priority order, collect episode IDs (dedup)
+            Set<Long> seenIds = new java.util.LinkedHashSet<>();
+            List<Long> orderedEpisodeIds = new ArrayList<>();
+
+            for (SmartPlaylistRule rule : rules) {
+                try (FeedItemCursor cursor = new FeedItemCursor(
+                        adapter.getSmartPlaylistRuleMatchesCursor(rule))) {
+                    while (cursor.moveToNext()) {
+                        FeedItem item = cursor.getFeedItem();
+                        if (!seenIds.contains(item.getId())) {
+                            seenIds.add(item.getId());
+                            orderedEpisodeIds.add(item.getId());
+                        }
+                    }
+                }
+            }
+
+            // Store the snapshot
+            for (int i = 0; i < orderedEpisodeIds.size(); i++) {
+                adapter.insertSmartPlaylistEpisode(playlist.getId(), orderedEpisodeIds.get(i), i);
+            }
+
+            // Update generated_at timestamp
+            playlist.setGeneratedAt(System.currentTimeMillis());
+            adapter.setSmartPlaylist(playlist);
+
+            adapter.close();
+            EventBus.getDefault().post(new FeedListUpdateEvent());
+        });
     }
 
     /**

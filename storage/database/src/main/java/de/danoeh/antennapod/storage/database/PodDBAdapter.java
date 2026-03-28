@@ -37,8 +37,11 @@ import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.FeedPreferences;
 import de.danoeh.antennapod.model.download.DownloadResult;
+import de.danoeh.antennapod.model.feed.SmartPlaylist;
+import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 import de.danoeh.antennapod.model.feed.SortOrder;
 import de.danoeh.antennapod.storage.database.mapper.FeedItemFilterQuery;
+import de.danoeh.antennapod.storage.database.mapper.SmartPlaylistRuleQuery;
 import de.danoeh.antennapod.storage.database.mapper.FeedItemSortQuery;
 
 import de.danoeh.antennapod.system.utils.ThreadUtils;
@@ -1552,6 +1555,131 @@ public class PodDBAdapter {
         sb.append(" ORDER BY " + KEY_TITLE + " ASC LIMIT 300");
 
         return db.rawQuery(sb.toString(), null);
+    }
+
+    // ---- Smart Playlist CRUD ----
+
+    public Cursor getAllSmartPlaylistsCursor() {
+        final String query = "SELECT * FROM " + TABLE_NAME_SMART_PLAYLISTS
+                + " ORDER BY " + KEY_SMART_PLAYLIST_CREATED_AT + " ASC";
+        return db.rawQuery(query, null);
+    }
+
+    public Cursor getSmartPlaylistCursor(long playlistId) {
+        final String query = "SELECT * FROM " + TABLE_NAME_SMART_PLAYLISTS
+                + " WHERE " + KEY_ID + " = " + playlistId;
+        return db.rawQuery(query, null);
+    }
+
+    public Cursor getSmartPlaylistRulesCursor(long playlistId) {
+        final String query = "SELECT * FROM " + TABLE_NAME_SMART_PLAYLIST_RULES
+                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = " + playlistId
+                + " ORDER BY " + KEY_SMART_PLAYLIST_POSITION + " ASC";
+        return db.rawQuery(query, null);
+    }
+
+    public Cursor getSmartPlaylistEpisodesCursor(long playlistId) {
+        final String query = "SELECT " + KEYS_FEED_ITEM_WITHOUT_DESCRIPTION + ", " + KEYS_FEED_MEDIA
+                + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
+                + " INNER JOIN " + TABLE_NAME_FEED_ITEMS
+                + " ON " + TABLE_NAME_FEED_ITEMS + "." + KEY_ID + " = "
+                + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_EPISODE_ID
+                + JOIN_FEED_ITEM_AND_MEDIA
+                + " WHERE " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_ID
+                + " = " + playlistId
+                + " ORDER BY " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_POSITION + " ASC";
+        return db.rawQuery(query, null);
+    }
+
+    /**
+     * Query episodes matching a smart playlist rule. Used during playlist generation.
+     * Joins FeedItems + FeedMedia + Feeds (for tag filtering).
+     */
+    public Cursor getSmartPlaylistRuleMatchesCursor(SmartPlaylistRule rule) {
+        String whereClause = SmartPlaylistRuleQuery.generateWhereClause(rule);
+        String orderClause = SmartPlaylistRuleQuery.generateOrderClause(rule);
+
+        String query = "SELECT " + KEYS_FEED_ITEM_WITHOUT_DESCRIPTION + ", " + KEYS_FEED_MEDIA
+                + " FROM " + TABLE_NAME_FEED_ITEMS
+                + JOIN_FEED_ITEM_AND_MEDIA
+                + " LEFT JOIN " + TABLE_NAME_FEEDS
+                + " ON " + TABLE_NAME_FEED_ITEMS + "." + KEY_FEED + " = "
+                + TABLE_NAME_FEEDS + "." + KEY_ID;
+
+        if (!TextUtils.isEmpty(whereClause)) {
+            query += " WHERE " + whereClause;
+        }
+        query += " ORDER BY " + orderClause;
+
+        if (rule.getEpisodeLimit() > 0) {
+            query += " LIMIT " + rule.getEpisodeLimit();
+        }
+
+        return db.rawQuery(query, null);
+    }
+
+    public long setSmartPlaylist(SmartPlaylist playlist) {
+        ContentValues values = new ContentValues();
+        values.put(KEY_SMART_PLAYLIST_NAME, playlist.getName());
+        values.put(KEY_SMART_PLAYLIST_AUTO_REGENERATE, playlist.isAutoRegenerate() ? 1 : 0);
+        values.put(KEY_SMART_PLAYLIST_GENERATED_AT, playlist.getGeneratedAt());
+        values.put(KEY_SMART_PLAYLIST_UPDATED_AT, System.currentTimeMillis());
+
+        if (playlist.getId() == 0) {
+            values.put(KEY_SMART_PLAYLIST_CREATED_AT, System.currentTimeMillis());
+            playlist.setId(db.insert(TABLE_NAME_SMART_PLAYLISTS, null, values));
+        } else {
+            db.update(TABLE_NAME_SMART_PLAYLISTS, values, KEY_ID + "=?",
+                    new String[]{String.valueOf(playlist.getId())});
+        }
+        return playlist.getId();
+    }
+
+    public long setSmartPlaylistRule(SmartPlaylistRule rule) {
+        ContentValues values = new ContentValues();
+        values.put(KEY_SMART_PLAYLIST_ID, rule.getPlaylistId());
+        values.put(KEY_SMART_PLAYLIST_POSITION, rule.getPosition());
+        values.put(KEY_SMART_PLAYLIST_FILTER_PROPERTIES, rule.getFilterProperties());
+        values.put(KEY_SMART_PLAYLIST_FEED_IDS, rule.getFeedIds());
+        values.put(KEY_SMART_PLAYLIST_FEED_TAGS, rule.getFeedTags());
+        values.put(KEY_SMART_PLAYLIST_MAX_AGE_DAYS, rule.getMaxAgeDays());
+        values.put(KEY_SMART_PLAYLIST_MIN_DURATION_MS, rule.getMinDurationMs());
+        values.put(KEY_SMART_PLAYLIST_MAX_DURATION_MS, rule.getMaxDurationMs());
+        values.put(KEY_SMART_PLAYLIST_MEDIA_TYPE, rule.getMediaType());
+        values.put(KEY_SMART_PLAYLIST_EPISODE_LIMIT, rule.getEpisodeLimit());
+        values.put(KEY_SMART_PLAYLIST_SORT_ORDER, rule.getSortOrder());
+
+        if (rule.getId() == 0) {
+            rule.setId(db.insert(TABLE_NAME_SMART_PLAYLIST_RULES, null, values));
+        } else {
+            db.update(TABLE_NAME_SMART_PLAYLIST_RULES, values, KEY_ID + "=?",
+                    new String[]{String.valueOf(rule.getId())});
+        }
+        return rule.getId();
+    }
+
+    public void deleteSmartPlaylistRulesForPlaylist(long playlistId) {
+        db.delete(TABLE_NAME_SMART_PLAYLIST_RULES, KEY_SMART_PLAYLIST_ID + "=?",
+                new String[]{String.valueOf(playlistId)});
+    }
+
+    public void deleteSmartPlaylistEpisodes(long playlistId) {
+        db.delete(TABLE_NAME_SMART_PLAYLIST_EPISODES, KEY_SMART_PLAYLIST_ID + "=?",
+                new String[]{String.valueOf(playlistId)});
+    }
+
+    public void insertSmartPlaylistEpisode(long playlistId, long episodeId, int position) {
+        ContentValues values = new ContentValues();
+        values.put(KEY_SMART_PLAYLIST_ID, playlistId);
+        values.put(KEY_SMART_PLAYLIST_EPISODE_ID, episodeId);
+        values.put(KEY_SMART_PLAYLIST_POSITION, position);
+        db.insert(TABLE_NAME_SMART_PLAYLIST_EPISODES, null, values);
+    }
+
+    public void deleteSmartPlaylist(long playlistId) {
+        // Cascading deletes will remove rules and episodes
+        db.delete(TABLE_NAME_SMART_PLAYLISTS, KEY_ID + "=?",
+                new String[]{String.valueOf(playlistId)});
     }
 
     /**

@@ -27,8 +27,12 @@ import de.danoeh.antennapod.model.feed.SubscriptionsFilter;
 import de.danoeh.antennapod.model.download.DownloadResult;
 import de.danoeh.antennapod.storage.database.mapper.ChapterCursor;
 import de.danoeh.antennapod.storage.database.mapper.DownloadResultCursor;
+import de.danoeh.antennapod.model.feed.SmartPlaylist;
+import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 import de.danoeh.antennapod.storage.database.mapper.FeedCursor;
 import de.danoeh.antennapod.storage.database.mapper.FeedItemCursor;
+import de.danoeh.antennapod.storage.database.mapper.SmartPlaylistCursor;
+import de.danoeh.antennapod.storage.database.mapper.SmartPlaylistRuleCursor;
 
 /**
  * Provides methods for reading data from the AntennaPod database.
@@ -805,6 +809,77 @@ public final class DBReader {
             while (cursor.moveToNext()) {
                 items.add(cursor.getFeed());
             }
+            return items;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    // ---- Smart Playlists ----
+
+    /**
+     * Returns all smart playlists with their rules loaded.
+     */
+    @NonNull
+    public static List<SmartPlaylist> getSmartPlaylists() {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try {
+            List<SmartPlaylist> playlists = new ArrayList<>();
+            try (Cursor cursor = adapter.getAllSmartPlaylistsCursor()) {
+                while (cursor.moveToNext()) {
+                    SmartPlaylist playlist = SmartPlaylistCursor.convert(cursor);
+                    playlist.setRules(getSmartPlaylistRules(adapter, playlist.getId()));
+                    playlists.add(playlist);
+                }
+            }
+            return playlists;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    /**
+     * Returns a single smart playlist with its rules loaded.
+     */
+    @Nullable
+    public static SmartPlaylist getSmartPlaylist(long playlistId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (Cursor cursor = adapter.getSmartPlaylistCursor(playlistId)) {
+            if (cursor.moveToFirst()) {
+                SmartPlaylist playlist = SmartPlaylistCursor.convert(cursor);
+                playlist.setRules(getSmartPlaylistRules(adapter, playlist.getId()));
+                return playlist;
+            }
+            return null;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    @NonNull
+    private static List<SmartPlaylistRule> getSmartPlaylistRules(PodDBAdapter adapter, long playlistId) {
+        List<SmartPlaylistRule> rules = new ArrayList<>();
+        try (Cursor cursor = adapter.getSmartPlaylistRulesCursor(playlistId)) {
+            while (cursor.moveToNext()) {
+                rules.add(SmartPlaylistRuleCursor.convert(cursor));
+            }
+        }
+        return rules;
+    }
+
+    /**
+     * Returns the snapshot episodes for a smart playlist (previously generated).
+     */
+    @NonNull
+    public static List<FeedItem> getSmartPlaylistEpisodes(long playlistId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (FeedItemCursor cursor = new FeedItemCursor(
+                adapter.getSmartPlaylistEpisodesCursor(playlistId))) {
+            List<FeedItem> items = extractItemlistFromCursor(cursor);
+            loadFeedDataOfFeedItemList(items);
             return items;
         } finally {
             adapter.close();
