@@ -66,8 +66,8 @@ public class SmartPlaylistDetailFragment extends Fragment {
                              @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_smart_playlist_detail, container, false);
 
-        playlistId = getArguments().getLong(ARG_PLAYLIST_ID);
-        String playlistName = getArguments().getString(ARG_PLAYLIST_NAME, "");
+        playlistId = getArguments() != null ? getArguments().getLong(ARG_PLAYLIST_ID) : 0;
+        String playlistName = getArguments() != null ? getArguments().getString(ARG_PLAYLIST_NAME, "") : "";
 
         toolbar = view.findViewById(R.id.toolbar);
         toolbar.setTitle(playlistName);

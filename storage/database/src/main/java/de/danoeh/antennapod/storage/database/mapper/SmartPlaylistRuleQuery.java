@@ -26,11 +26,23 @@ public class SmartPlaylistRuleQuery {
             }
         }
 
-        // Feed IDs filter
+        // Feed IDs filter (validate numeric to prevent SQL injection)
         String feedIds = rule.getFeedIds();
         if (!TextUtils.isEmpty(feedIds)) {
-            conditions.add(PodDBAdapter.TABLE_NAME_FEED_ITEMS + "." + PodDBAdapter.KEY_FEED
-                    + " IN (" + feedIds + ")");
+            String[] ids = feedIds.split(",");
+            List<String> validatedIds = new ArrayList<>();
+            for (String id : ids) {
+                try {
+                    Long.parseLong(id.trim());
+                    validatedIds.add(id.trim());
+                } catch (NumberFormatException e) {
+                    // Skip invalid IDs
+                }
+            }
+            if (!validatedIds.isEmpty()) {
+                conditions.add(PodDBAdapter.TABLE_NAME_FEED_ITEMS + "." + PodDBAdapter.KEY_FEED
+                        + " IN (" + TextUtils.join(",", validatedIds) + ")");
+            }
         }
 
         // Feed tags filter — requires joining with Feeds table to check tags
@@ -47,13 +59,7 @@ public class SmartPlaylistRuleQuery {
                 }
             }
             if (!tagConditions.isEmpty()) {
-                // If both feedIds and feedTags are set, feedIds are already applied above,
-                // and tags are an additional OR condition on the feed
-                if (!TextUtils.isEmpty(feedIds)) {
-                    // Already filtered by feedIds, tags are additive
-                } else {
-                    conditions.add("(" + TextUtils.join(" OR ", tagConditions) + ")");
-                }
+                conditions.add("(" + TextUtils.join(" OR ", tagConditions) + ")");
             }
         }
 
