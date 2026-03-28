@@ -54,7 +54,7 @@ public class PodDBAdapter {
 
     private static final String TAG = "PodDBAdapter";
     public static final String DATABASE_NAME = "Antennapod.db";
-    public static final int VERSION = 3110000;
+    public static final int VERSION = 3120000;
 
     /**
      * Maximum number of arguments for IN-operator.
@@ -137,6 +137,9 @@ public class PodDBAdapter {
     public static final String TABLE_NAME_QUEUE = "Queue";
     public static final String TABLE_NAME_SIMPLECHAPTERS = "SimpleChapters";
     public static final String TABLE_NAME_FAVORITES = "Favorites";
+    public static final String TABLE_NAME_SMART_PLAYLISTS = "SmartPlaylists";
+    public static final String TABLE_NAME_SMART_PLAYLIST_RULES = "SmartPlaylistRules";
+    public static final String TABLE_NAME_SMART_PLAYLIST_EPISODES = "SmartPlaylistEpisodes";
 
     // SQL Statements for creating new tables
     private static final String TABLE_PRIMARY_KEY = KEY_ID
@@ -250,6 +253,68 @@ public class PodDBAdapter {
             + TABLE_NAME_FAVORITES + "(" + KEY_ID + " INTEGER PRIMARY KEY,"
             + KEY_FEEDITEM + " INTEGER," + KEY_FEED + " INTEGER)";
 
+    // Smart Playlist keys
+    public static final String KEY_SMART_PLAYLIST_NAME = "name";
+    public static final String KEY_SMART_PLAYLIST_AUTO_REGENERATE = "auto_regenerate";
+    public static final String KEY_SMART_PLAYLIST_GENERATED_AT = "generated_at";
+    public static final String KEY_SMART_PLAYLIST_CREATED_AT = "created_at";
+    public static final String KEY_SMART_PLAYLIST_UPDATED_AT = "updated_at";
+    public static final String KEY_SMART_PLAYLIST_ID = "playlist_id";
+    public static final String KEY_SMART_PLAYLIST_POSITION = "position";
+    public static final String KEY_SMART_PLAYLIST_FILTER_PROPERTIES = "filter_properties";
+    public static final String KEY_SMART_PLAYLIST_FEED_IDS = "feed_ids";
+    public static final String KEY_SMART_PLAYLIST_FEED_TAGS = "feed_tags";
+    public static final String KEY_SMART_PLAYLIST_MAX_AGE_DAYS = "max_age_days";
+    public static final String KEY_SMART_PLAYLIST_MIN_DURATION_MS = "min_duration_ms";
+    public static final String KEY_SMART_PLAYLIST_MAX_DURATION_MS = "max_duration_ms";
+    public static final String KEY_SMART_PLAYLIST_MEDIA_TYPE = "media_type";
+    public static final String KEY_SMART_PLAYLIST_EPISODE_LIMIT = "episode_limit";
+    public static final String KEY_SMART_PLAYLIST_SORT_ORDER = "sort_order";
+    public static final String KEY_SMART_PLAYLIST_EPISODE_ID = "episode_id";
+
+    static final String CREATE_TABLE_SMART_PLAYLISTS = "CREATE TABLE "
+            + TABLE_NAME_SMART_PLAYLISTS + "("
+            + KEY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+            + KEY_SMART_PLAYLIST_NAME + " TEXT NOT NULL,"
+            + KEY_SMART_PLAYLIST_AUTO_REGENERATE + " INTEGER NOT NULL DEFAULT 1,"
+            + KEY_SMART_PLAYLIST_GENERATED_AT + " INTEGER DEFAULT 0,"
+            + KEY_SMART_PLAYLIST_CREATED_AT + " INTEGER NOT NULL,"
+            + KEY_SMART_PLAYLIST_UPDATED_AT + " INTEGER NOT NULL)";
+
+    static final String CREATE_TABLE_SMART_PLAYLIST_RULES = "CREATE TABLE "
+            + TABLE_NAME_SMART_PLAYLIST_RULES + "("
+            + KEY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+            + KEY_SMART_PLAYLIST_ID + " INTEGER NOT NULL,"
+            + KEY_SMART_PLAYLIST_POSITION + " INTEGER NOT NULL,"
+            + KEY_SMART_PLAYLIST_FILTER_PROPERTIES + " TEXT DEFAULT '',"
+            + KEY_SMART_PLAYLIST_FEED_IDS + " TEXT DEFAULT '',"
+            + KEY_SMART_PLAYLIST_FEED_TAGS + " TEXT DEFAULT '',"
+            + KEY_SMART_PLAYLIST_MAX_AGE_DAYS + " INTEGER DEFAULT 0,"
+            + KEY_SMART_PLAYLIST_MIN_DURATION_MS + " INTEGER DEFAULT 0,"
+            + KEY_SMART_PLAYLIST_MAX_DURATION_MS + " INTEGER DEFAULT 0,"
+            + KEY_SMART_PLAYLIST_MEDIA_TYPE + " TEXT DEFAULT '',"
+            + KEY_SMART_PLAYLIST_EPISODE_LIMIT + " INTEGER DEFAULT 0,"
+            + KEY_SMART_PLAYLIST_SORT_ORDER + " TEXT DEFAULT 'NEWEST',"
+            + "FOREIGN KEY (" + KEY_SMART_PLAYLIST_ID + ") REFERENCES "
+            + TABLE_NAME_SMART_PLAYLISTS + "(" + KEY_ID + ") ON DELETE CASCADE)";
+
+    static final String CREATE_TABLE_SMART_PLAYLIST_EPISODES = "CREATE TABLE "
+            + TABLE_NAME_SMART_PLAYLIST_EPISODES + "("
+            + KEY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+            + KEY_SMART_PLAYLIST_ID + " INTEGER NOT NULL,"
+            + KEY_SMART_PLAYLIST_EPISODE_ID + " INTEGER NOT NULL,"
+            + KEY_SMART_PLAYLIST_POSITION + " INTEGER NOT NULL,"
+            + "FOREIGN KEY (" + KEY_SMART_PLAYLIST_ID + ") REFERENCES "
+            + TABLE_NAME_SMART_PLAYLISTS + "(" + KEY_ID + ") ON DELETE CASCADE)";
+
+    static final String CREATE_INDEX_SMART_PLAYLIST_RULES = "CREATE INDEX "
+            + TABLE_NAME_SMART_PLAYLIST_RULES + "_" + KEY_SMART_PLAYLIST_ID
+            + " ON " + TABLE_NAME_SMART_PLAYLIST_RULES + " (" + KEY_SMART_PLAYLIST_ID + ")";
+
+    static final String CREATE_INDEX_SMART_PLAYLIST_EPISODES = "CREATE INDEX "
+            + TABLE_NAME_SMART_PLAYLIST_EPISODES + "_" + KEY_SMART_PLAYLIST_ID
+            + " ON " + TABLE_NAME_SMART_PLAYLIST_EPISODES + " (" + KEY_SMART_PLAYLIST_ID + ")";
+
     /**
      * All the tables in the database
      */
@@ -260,7 +325,10 @@ public class PodDBAdapter {
             TABLE_NAME_DOWNLOAD_LOG,
             TABLE_NAME_QUEUE,
             TABLE_NAME_SIMPLECHAPTERS,
-            TABLE_NAME_FAVORITES
+            TABLE_NAME_FAVORITES,
+            TABLE_NAME_SMART_PLAYLISTS,
+            TABLE_NAME_SMART_PLAYLIST_RULES,
+            TABLE_NAME_SMART_PLAYLIST_EPISODES
     };
 
     public static final String SELECT_KEY_ITEM_ID = "item_id";
@@ -1541,6 +1609,9 @@ public class PodDBAdapter {
             db.execSQL(CREATE_TABLE_QUEUE);
             db.execSQL(CREATE_TABLE_SIMPLECHAPTERS);
             db.execSQL(CREATE_TABLE_FAVORITES);
+            db.execSQL(CREATE_TABLE_SMART_PLAYLISTS);
+            db.execSQL(CREATE_TABLE_SMART_PLAYLIST_RULES);
+            db.execSQL(CREATE_TABLE_SMART_PLAYLIST_EPISODES);
 
             db.execSQL(CREATE_INDEX_FEEDITEMS_FEED);
             db.execSQL(CREATE_INDEX_FEEDITEMS_PUBDATE);
@@ -1548,6 +1619,8 @@ public class PodDBAdapter {
             db.execSQL(CREATE_INDEX_FEEDMEDIA_FEEDITEM);
             db.execSQL(CREATE_INDEX_QUEUE_FEEDITEM);
             db.execSQL(CREATE_INDEX_SIMPLECHAPTERS_FEEDITEM);
+            db.execSQL(CREATE_INDEX_SMART_PLAYLIST_RULES);
+            db.execSQL(CREATE_INDEX_SMART_PLAYLIST_EPISODES);
         }
 
         @Override
