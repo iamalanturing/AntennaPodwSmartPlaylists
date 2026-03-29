@@ -84,6 +84,13 @@ public abstract class PlaybackPreferences {
      */
     public static final int PLAYER_STATUS_OTHER = 3;
 
+    /**
+     * The ID of the currently active smart queue, or 0 if no smart queue is active.
+     * When set, PlaybackService uses the smart queue's episode list instead of the main queue.
+     */
+    private static final String PREF_ACTIVE_SMART_QUEUE_ID
+            = "de.danoeh.antennapod.preferences.activeSmartQueueId";
+
     private static SharedPreferences prefs;
 
     public static void init(Context context) {
@@ -170,5 +177,17 @@ public abstract class PlaybackPreferences {
         editor.remove(PREF_CURRENTLY_PLAYING_TEMPORARY_PLAYBACK_SPEED);
         editor.remove(PREF_CURRENTLY_PLAYING_TEMPORARY_SKIP_SILENCE);
         editor.apply();
+    }
+
+    public static void writeActiveSmartQueueId(long id) {
+        prefs.edit().putLong(PREF_ACTIVE_SMART_QUEUE_ID, id).apply();
+    }
+
+    public static long getActiveSmartQueueId() {
+        return prefs.getLong(PREF_ACTIVE_SMART_QUEUE_ID, 0);
+    }
+
+    public static void clearActiveSmartQueueId() {
+        prefs.edit().remove(PREF_ACTIVE_SMART_QUEUE_ID).apply();
     }
 }

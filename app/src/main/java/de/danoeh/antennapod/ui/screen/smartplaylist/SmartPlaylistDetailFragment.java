@@ -23,6 +23,7 @@ import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.playback.service.PlaybackServiceStarter;
+import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
 import de.danoeh.antennapod.ui.episodeslist.EpisodeItemListAdapter;
@@ -174,6 +175,9 @@ public class SmartPlaylistDetailFragment extends Fragment {
         if (media == null) {
             return;
         }
+
+        // Set this smart queue as active so PlaybackService uses it for sequential playback
+        PlaybackPreferences.writeActiveSmartQueueId(playlistId);
 
         boolean shouldStream = !media.isDownloaded();
         new PlaybackServiceStarter(requireContext(), media)

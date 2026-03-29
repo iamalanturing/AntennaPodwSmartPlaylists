@@ -1589,6 +1589,37 @@ public class PodDBAdapter {
         return 0;
     }
 
+    public boolean isItemInSmartQueue(long queueId, long itemId) {
+        final String query = "SELECT COUNT(*) FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
+                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = " + queueId
+                + " AND " + KEY_SMART_PLAYLIST_EPISODE_ID + " = " + itemId;
+        try (Cursor cursor = db.rawQuery(query, null)) {
+            if (cursor.moveToFirst()) {
+                return cursor.getInt(0) > 0;
+            }
+        }
+        return false;
+    }
+
+    public Cursor getNextInSmartQueueCursor(long queueId, long currentItemId) {
+        // Find the position of the current item, then return the episode at position + 1
+        final String query = "SELECT " + KEYS_FEED_ITEM_WITHOUT_DESCRIPTION + ", " + KEYS_FEED_MEDIA
+                + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
+                + " INNER JOIN " + TABLE_NAME_FEED_ITEMS
+                + " ON " + TABLE_NAME_FEED_ITEMS + "." + KEY_ID + " = "
+                + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_EPISODE_ID
+                + JOIN_FEED_ITEM_AND_MEDIA
+                + " WHERE " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_ID
+                + " = " + queueId
+                + " AND " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_POSITION
+                + " > (SELECT " + KEY_SMART_PLAYLIST_POSITION + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
+                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = " + queueId
+                + " AND " + KEY_SMART_PLAYLIST_EPISODE_ID + " = " + currentItemId + ")"
+                + " ORDER BY " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_POSITION + " ASC"
+                + " LIMIT 1";
+        return db.rawQuery(query, null);
+    }
+
     public Cursor getSmartPlaylistEpisodesCursor(long playlistId) {
         final String query = "SELECT " + KEYS_FEED_ITEM_WITHOUT_DESCRIPTION + ", " + KEYS_FEED_MEDIA
                 + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES

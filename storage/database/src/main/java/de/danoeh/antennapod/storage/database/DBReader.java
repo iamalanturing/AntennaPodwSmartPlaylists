@@ -886,4 +886,37 @@ public final class DBReader {
             adapter.close();
         }
     }
+
+    /**
+     * Checks if a feed item is in a smart queue's episode list.
+     */
+    public static boolean isItemInSmartQueue(long queueId, long itemId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try {
+            return adapter.isItemInSmartQueue(queueId, itemId);
+        } finally {
+            adapter.close();
+        }
+    }
+
+    /**
+     * Returns the next episode in a smart queue after the given item, or null if it's the last.
+     */
+    @Nullable
+    public static FeedItem getNextInSmartQueue(long queueId, long currentItemId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (FeedItemCursor cursor = new FeedItemCursor(
+                adapter.getNextInSmartQueueCursor(queueId, currentItemId))) {
+            List<FeedItem> list = extractItemlistFromCursor(cursor);
+            if (!list.isEmpty()) {
+                loadFeedDataOfFeedItemList(list);
+                return list.get(0);
+            }
+            return null;
+        } finally {
+            adapter.close();
+        }
+    }
 }

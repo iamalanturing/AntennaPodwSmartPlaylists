@@ -1047,9 +1047,17 @@ public class DBWriter {
      * in priority order, deduplicating, and storing the result.
      */
     public static Future<?> generateSmartPlaylist(final SmartPlaylist playlist) {
-        return runOnDbThread(() -> {
-            PodDBAdapter adapter = PodDBAdapter.getInstance();
-            adapter.open();
+        return runOnDbThread(() -> generateSmartPlaylistSync(playlist));
+    }
+
+    /**
+     * Synchronous version of generateSmartPlaylist. Can be called from any background thread
+     * (e.g., the playback thread when auto-rebuilding a smart queue).
+     */
+    public static void generateSmartPlaylistSync(final SmartPlaylist playlist) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try {
             // Clear existing snapshot
             adapter.deleteSmartPlaylistEpisodes(playlist.getId());
 
@@ -1089,10 +1097,10 @@ public class DBWriter {
             // Update generated_at timestamp
             playlist.setGeneratedAt(System.currentTimeMillis());
             adapter.setSmartPlaylist(playlist);
-
+        } finally {
             adapter.close();
-            EventBus.getDefault().post(new FeedListUpdateEvent(0L));
-        });
+        }
+        EventBus.getDefault().post(new FeedListUpdateEvent(0L));
     }
 
     /**

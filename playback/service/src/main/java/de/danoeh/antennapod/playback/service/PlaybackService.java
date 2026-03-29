@@ -103,6 +103,7 @@ import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.model.feed.FeedMedia;
+import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.model.feed.FeedPreferences;
 import de.danoeh.antennapod.model.playback.MediaType;
 import de.danoeh.antennapod.model.playback.Playable;
@@ -1083,6 +1084,21 @@ public class PlaybackService extends MediaBrowserServiceCompat {
             PlaybackPreferences.writeNoMediaPlaying();
             return null;
         }
+
+        // Check if we're playing from a smart queue
+        long activeSmartQueueId = PlaybackPreferences.getActiveSmartQueueId();
+        if (activeSmartQueueId > 0) {
+            // Validate current item is actually in this smart queue
+            if (!DBReader.isItemInSmartQueue(activeSmartQueueId, item.getId())) {
+                Log.d(TAG, "Current item not in active smart queue, clearing smart queue mode");
+                PlaybackPreferences.clearActiveSmartQueueId();
+                // Fall through to normal queue behavior below
+            } else {
+                return getNextInSmartQueue(activeSmartQueueId, item);
+            }
+        }
+
+        // Normal queue behavior
         FeedItem nextItem;
         nextItem = DBReader.getNextInQueue(item);
 
@@ -1111,6 +1127,56 @@ public class PlaybackService extends MediaBrowserServiceCompat {
             stateManager.stopService();
             return null;
         }
+        return nextItem.getMedia();
+    }
+
+    /**
+     * Get the next episode from a smart queue. If we've reached the end and auto-regenerate
+     * is enabled, rebuild the queue and return the first episode of the new queue.
+     */
+    private Playable getNextInSmartQueue(long smartQueueId, FeedItem currentItem) {
+        FeedItem nextItem = DBReader.getNextInSmartQueue(smartQueueId, currentItem.getId());
+
+        if (nextItem == null) {
+            // Last episode in smart queue — check if we should rebuild
+            Log.d(TAG, "Reached end of smart queue " + smartQueueId + ", checking auto-regenerate");
+            SmartPlaylist queue = DBReader.getSmartPlaylist(smartQueueId);
+            if (queue != null && queue.isAutoRegenerate()) {
+                Log.d(TAG, "Auto-regenerating smart queue " + smartQueueId);
+                DBWriter.generateSmartPlaylistSync(queue);
+                java.util.List<FeedItem> newEpisodes = DBReader.getSmartPlaylistEpisodes(smartQueueId);
+                if (!newEpisodes.isEmpty()) {
+                    nextItem = newEpisodes.get(0);
+                    Log.d(TAG, "Smart queue regenerated with " + newEpisodes.size() + " episodes");
+                }
+            }
+        }
+
+        if (nextItem == null || nextItem.getMedia() == null) {
+            Log.d(TAG, "No more episodes in smart queue, clearing smart queue mode");
+            PlaybackPreferences.clearActiveSmartQueueId();
+            PlaybackPreferences.writeNoMediaPlaying();
+            return null;
+        }
+
+        // For smart queues, always continue (skip isFollowQueue check) unless sleep timer says no
+        if (!shouldContinueToNextEpisode()) {
+            PlaybackPreferences.writeMediaPlaying(nextItem.getMedia());
+            updateNotificationAndMediaSession(nextItem.getMedia());
+            return null;
+        }
+
+        // Check network for streaming
+        if (!nextItem.getMedia().localFileAvailable() && !NetworkUtils.isStreamingAllowed()
+                && !nextItem.getFeed().isLocalFeed()) {
+            displayStreamingNotAllowedNotification(
+                    new PlaybackServiceStarter(this, nextItem.getMedia())
+                            .getIntent());
+            PlaybackPreferences.writeNoMediaPlaying();
+            stateManager.stopService();
+            return null;
+        }
+
         return nextItem.getMedia();
     }
 
