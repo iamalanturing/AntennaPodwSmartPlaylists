@@ -18,6 +18,7 @@ import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.android.material.textfield.TextInputEditText;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
+import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 import de.danoeh.antennapod.storage.database.DBReader;
@@ -28,6 +29,9 @@ import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class SmartPlaylistEditFragment extends Fragment {
     private static final String TAG = "SmartPlaylistEdit";
@@ -117,6 +121,8 @@ public class SmartPlaylistEditFragment extends Fragment {
                 : getString(R.string.smart_playlist_save));
         generateButton.setOnClickListener(v -> savePlaylist());
 
+        loadFeedNames();
+
         if (playlistId > 0) {
             loadPlaylist();
         }
@@ -130,6 +136,21 @@ public class SmartPlaylistEditFragment extends Fragment {
         if (disposable != null) {
             disposable.dispose();
         }
+    }
+
+    private void loadFeedNames() {
+        Observable.fromCallable(() -> {
+            List<Feed> feeds = DBReader.getFeedList();
+            Map<Long, String> map = new HashMap<>();
+            for (Feed feed : feeds) {
+                map.put(feed.getId(), feed.getTitle() != null ? feed.getTitle() : "Unknown");
+            }
+            return map;
+        })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(map -> ruleAdapter.setFeedNameMap(map),
+                        error -> Log.e(TAG, Log.getStackTraceString(error)));
     }
 
     private void loadPlaylist() {

@@ -12,6 +12,7 @@ public class SmartPlaylist implements Serializable {
     private long createdAt;
     private long updatedAt;
     private List<SmartPlaylistRule> rules;
+    private int episodeCount;
 
     public SmartPlaylist() {
         this.rules = new ArrayList<>();
@@ -74,5 +75,13 @@ public class SmartPlaylist implements Serializable {
 
     public void setRules(List<SmartPlaylistRule> rules) {
         this.rules = rules != null ? rules : new ArrayList<>();
+    }
+
+    public int getEpisodeCount() {
+        return episodeCount;
+    }
+
+    public void setEpisodeCount(int episodeCount) {
+        this.episodeCount = episodeCount;
     }
 }

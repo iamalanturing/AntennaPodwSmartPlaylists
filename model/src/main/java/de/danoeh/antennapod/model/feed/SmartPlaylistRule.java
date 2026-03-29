@@ -24,7 +24,7 @@ public class SmartPlaylistRule implements Serializable {
         this.minDurationMs = 0;
         this.maxDurationMs = 0;
         this.mediaType = "";
-        this.episodeLimit = 0;
+        this.episodeLimit = 1;
         this.sortOrder = "NEWEST";
     }
 

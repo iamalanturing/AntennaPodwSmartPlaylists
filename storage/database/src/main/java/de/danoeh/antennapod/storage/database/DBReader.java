@@ -830,6 +830,7 @@ public final class DBReader {
                 while (cursor.moveToNext()) {
                     SmartPlaylist playlist = SmartPlaylistCursor.convert(cursor);
                     playlist.setRules(getSmartPlaylistRules(adapter, playlist.getId()));
+                    playlist.setEpisodeCount(adapter.getSmartPlaylistEpisodeCount(playlist.getId()));
                     playlists.add(playlist);
                 }
             }

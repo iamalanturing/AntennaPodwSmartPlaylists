@@ -196,12 +196,12 @@ public class SmartPlaylistRuleEditDialog extends DialogFragment {
     private void populateFromRule() {
         if (rule == null) return;
 
-        // Status from filterProperties
+        // Status from filterProperties (check "unplayed" before "played" to avoid substring match)
         String filter = rule.getFilterProperties();
-        if (filter != null && filter.contains("played")) {
-            statusSpinner.setSelection(2); // Played
-        } else if (filter != null && filter.contains("unplayed")) {
+        if (filter != null && filter.contains("unplayed")) {
             statusSpinner.setSelection(1); // Unplayed
+        } else if (filter != null && filter.contains("played")) {
+            statusSpinner.setSelection(2); // Played
         } else {
             statusSpinner.setSelection(0); // Any
         }

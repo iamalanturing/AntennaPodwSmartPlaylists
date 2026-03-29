@@ -13,10 +13,13 @@ import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylistRuleAdapter.RuleViewHolder> {
     private final List<SmartPlaylistRule> rules = new ArrayList<>();
+    private final Map<Long, String> feedNameMap = new HashMap<>();
     private OnRuleActionListener listener;
 
     public interface OnRuleActionListener {
@@ -26,6 +29,12 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
 
     public void setOnRuleActionListener(OnRuleActionListener listener) {
         this.listener = listener;
+    }
+
+    public void setFeedNameMap(Map<Long, String> map) {
+        feedNameMap.clear();
+        feedNameMap.putAll(map);
+        notifyDataSetChanged();
     }
 
     public void setRules(List<SmartPlaylistRule> newRules) {
@@ -104,22 +113,39 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
 
     private String buildRuleSummary(RuleViewHolder holder, SmartPlaylistRule rule) {
         List<String> parts = new ArrayList<>();
-        if (!TextUtils.isEmpty(rule.getFilterProperties())) {
-            parts.add(rule.getFilterProperties().replace(",", ", "));
-        }
-        if (!TextUtils.isEmpty(rule.getFeedTags())) {
-            parts.add("Tags: " + rule.getFeedTags());
-        }
+
+        // Show feed name if a specific feed is selected
         if (!TextUtils.isEmpty(rule.getFeedIds())) {
-            parts.add("Specific feeds");
+            try {
+                long feedId = Long.parseLong(rule.getFeedIds().split(",")[0].trim());
+                String feedName = feedNameMap.get(feedId);
+                if (feedName != null) {
+                    parts.add(feedName);
+                } else {
+                    parts.add("Feed #" + feedId);
+                }
+            } catch (NumberFormatException e) {
+                parts.add("Specific feeds");
+            }
         }
+
+        // Show tag name if a tag is selected
+        if (!TextUtils.isEmpty(rule.getFeedTags())) {
+            parts.add("Tag: " + rule.getFeedTags());
+        }
+
+        // Show "All feeds" if neither feed nor tag is specified
+        if (TextUtils.isEmpty(rule.getFeedIds()) && TextUtils.isEmpty(rule.getFeedTags())) {
+            parts.add("All feeds");
+        }
+
         if (rule.getEpisodeLimit() > 0) {
             parts.add("Limit: " + rule.getEpisodeLimit());
         }
         if (rule.getSortOrder() != null) {
             parts.add(rule.getSortOrder());
         }
-        return parts.isEmpty() ? "No filters" : TextUtils.join(" | ", parts);
+        return TextUtils.join(" | ", parts);
     }
 
     static class RuleViewHolder extends RecyclerView.ViewHolder {

@@ -1578,6 +1578,17 @@ public class PodDBAdapter {
         return db.rawQuery(query, null);
     }
 
+    public int getSmartPlaylistEpisodeCount(long playlistId) {
+        final String query = "SELECT COUNT(*) FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
+                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = " + playlistId;
+        try (Cursor cursor = db.rawQuery(query, null)) {
+            if (cursor.moveToFirst()) {
+                return cursor.getInt(0);
+            }
+        }
+        return 0;
+    }
+
     public Cursor getSmartPlaylistEpisodesCursor(long playlistId) {
         final String query = "SELECT " + KEYS_FEED_ITEM_WITHOUT_DESCRIPTION + ", " + KEYS_FEED_MEDIA
                 + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES

@@ -75,7 +75,7 @@ public class SmartPlaylistCardAdapter extends RecyclerView.Adapter<RecyclerView.
             PlaylistViewHolder pvh = (PlaylistViewHolder) holder;
             pvh.playlistName.setText(playlist.getName());
             String countText = holder.itemView.getContext().getString(
-                    R.string.smart_playlist_episodes_count, 0);
+                    R.string.smart_playlist_episodes_count, playlist.getEpisodeCount());
             pvh.episodeCount.setText(countText);
             pvh.itemView.setOnClickListener(v -> {
                 if (clickListener != null) {

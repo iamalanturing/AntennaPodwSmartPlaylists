@@ -20,7 +20,9 @@ import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.event.FeedListUpdateEvent;
 import de.danoeh.antennapod.model.feed.FeedItem;
+import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
+import de.danoeh.antennapod.playback.service.PlaybackServiceStarter;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
 import de.danoeh.antennapod.ui.episodeslist.EpisodeItemListAdapter;
@@ -41,6 +43,8 @@ public class SmartPlaylistDetailFragment extends Fragment {
     private static final String ARG_AUTO_PLAY = "auto_play";
 
     private long playlistId;
+    private boolean autoPlay;
+    private boolean hasAutoPlayed;
     private SmartPlaylist playlist;
     private EpisodeItemListAdapter episodeAdapter;
     private Disposable disposable;
@@ -67,6 +71,7 @@ public class SmartPlaylistDetailFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_smart_playlist_detail, container, false);
 
         playlistId = getArguments() != null ? getArguments().getLong(ARG_PLAYLIST_ID) : 0;
+        autoPlay = getArguments() != null && getArguments().getBoolean(ARG_AUTO_PLAY, false);
         String playlistName = getArguments() != null ? getArguments().getString(ARG_PLAYLIST_NAME, "") : "";
 
         toolbar = view.findViewById(R.id.toolbar);
@@ -152,6 +157,31 @@ public class SmartPlaylistDetailFragment extends Fragment {
                 .show();
     }
 
+    private void startPlayback(List<FeedItem> episodes) {
+        // Find an episode with a saved position (in-progress), or fall back to the first episode
+        FeedItem toPlay = null;
+        for (FeedItem item : episodes) {
+            if (item.getMedia() != null && item.getMedia().getPosition() > 0) {
+                toPlay = item;
+                break;
+            }
+        }
+        if (toPlay == null) {
+            toPlay = episodes.get(0);
+        }
+
+        FeedMedia media = toPlay.getMedia();
+        if (media == null) {
+            return;
+        }
+
+        boolean shouldStream = !media.isDownloaded();
+        new PlaybackServiceStarter(requireContext(), media)
+                .callEvenIfRunning(true)
+                .shouldStreamThisTime(shouldStream)
+                .start();
+    }
+
     private void loadPlaylist() {
         if (disposable != null) {
             disposable.dispose();
@@ -180,6 +210,11 @@ public class SmartPlaylistDetailFragment extends Fragment {
                         emptyLabel.setVisibility(View.GONE);
                         recyclerView.setVisibility(View.VISIBLE);
                         episodeAdapter.updateItems(episodes);
+
+                        if (autoPlay && !hasAutoPlayed) {
+                            hasAutoPlayed = true;
+                            startPlayback(episodes);
+                        }
                     }
                 }, error -> Log.e(TAG, Log.getStackTraceString(error)));
     }
