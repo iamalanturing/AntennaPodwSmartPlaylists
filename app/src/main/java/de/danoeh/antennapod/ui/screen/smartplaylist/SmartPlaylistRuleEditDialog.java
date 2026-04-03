@@ -18,6 +18,7 @@ import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 import de.danoeh.antennapod.storage.database.DBReader;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
 import java.util.ArrayList;
@@ -29,6 +30,7 @@ import java.util.Set;
 public class SmartPlaylistRuleEditDialog extends DialogFragment {
     private SmartPlaylistRule rule;
     private OnRuleSavedListener listener;
+    private Disposable feedsTagsDisposable;
 
     private Spinner feedsSpinner;
     private Spinner tagsSpinner;
@@ -138,8 +140,16 @@ public class SmartPlaylistRuleEditDialog extends DialogFragment {
                 android.R.layout.simple_spinner_dropdown_item, sortOptions));
     }
 
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (feedsTagsDisposable != null) {
+            feedsTagsDisposable.dispose();
+        }
+    }
+
     private void loadFeedsAndTags() {
-        Observable.fromCallable(() -> {
+        feedsTagsDisposable = Observable.fromCallable(() -> {
             List<Feed> feeds = DBReader.getFeedList();
             Set<String> tags = new LinkedHashSet<>();
             for (Feed feed : feeds) {

@@ -41,6 +41,7 @@ public class SmartPlaylistEditFragment extends Fragment {
     private SmartPlaylist playlist;
     private SmartPlaylistRuleAdapter ruleAdapter;
     private Disposable disposable;
+    private Disposable feedNamesDisposable;
 
     private TextInputEditText playlistNameEdit;
     private SwitchMaterial autoRegenerateSwitch;
@@ -136,10 +137,16 @@ public class SmartPlaylistEditFragment extends Fragment {
         if (disposable != null) {
             disposable.dispose();
         }
+        if (feedNamesDisposable != null) {
+            feedNamesDisposable.dispose();
+        }
     }
 
     private void loadFeedNames() {
-        Observable.fromCallable(() -> {
+        if (feedNamesDisposable != null) {
+            feedNamesDisposable.dispose();
+        }
+        feedNamesDisposable = Observable.fromCallable(() -> {
             List<Feed> feeds = DBReader.getFeedList();
             Map<Long, String> map = new HashMap<>();
             for (Feed feed : feeds) {

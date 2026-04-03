@@ -112,6 +112,7 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
     }
 
     private String buildRuleSummary(RuleViewHolder holder, SmartPlaylistRule rule) {
+        android.content.Context ctx = holder.itemView.getContext();
         List<String> parts = new ArrayList<>();
 
         // Show feed name if a specific feed is selected
@@ -122,25 +123,24 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
                 if (feedName != null) {
                     parts.add(feedName);
                 } else {
-                    parts.add("Feed #" + feedId);
+                    parts.add(ctx.getString(R.string.smart_playlist_rule_feed_unknown, feedId));
                 }
-            } catch (NumberFormatException e) {
-                parts.add("Specific feeds");
+            } catch (NumberFormatException ignored) {
             }
         }
 
         // Show tag name if a tag is selected
         if (!TextUtils.isEmpty(rule.getFeedTags())) {
-            parts.add("Tag: " + rule.getFeedTags());
+            parts.add(ctx.getString(R.string.smart_playlist_rule_tag_prefix, rule.getFeedTags()));
         }
 
         // Show "All feeds" if neither feed nor tag is specified
         if (TextUtils.isEmpty(rule.getFeedIds()) && TextUtils.isEmpty(rule.getFeedTags())) {
-            parts.add("All feeds");
+            parts.add(ctx.getString(R.string.smart_playlist_all_feeds));
         }
 
         if (rule.getEpisodeLimit() > 0) {
-            parts.add("Limit: " + rule.getEpisodeLimit());
+            parts.add(ctx.getString(R.string.smart_playlist_rule_limit_prefix, rule.getEpisodeLimit()));
         }
         if (rule.getSortOrder() != null) {
             parts.add(rule.getSortOrder());

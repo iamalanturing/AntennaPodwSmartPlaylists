@@ -136,6 +136,9 @@
     <string name="smart_playlist_all_feeds">All feeds</string>
     <string name="smart_playlist_all_tags">All tags</string>
     <string name="smart_playlist_no_limit">No limit</string>
+    <string name="smart_playlist_rule_tag_prefix">Tag: %1$s</string>
+    <string name="smart_playlist_rule_limit_prefix">Limit: %1$d</string>
+    <string name="smart_playlist_rule_feed_unknown">Feed #%1$d</string>
     <string name="smart_playlist_new_playlist">New Smart Queue</string>
     <string name="drag_handle">Drag to reorder</string>
     <string name="smart_playlist_created">Smart queue created</string>
