@@ -35,6 +35,7 @@ import de.danoeh.antennapod.model.feed.Chapter;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.FeedPreferences;
+import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.model.feed.VolumeAdaptionSetting;
 import de.danoeh.antennapod.net.common.NetworkUtils;
 import de.danoeh.antennapod.net.sync.serviceinterface.SynchronizationQueue;
@@ -575,9 +576,48 @@ public class Media3PlaybackService extends MediaLibraryService {
             return;
         }
         queueLoaderDisposable = Maybe.fromCallable(() -> {
-            FeedItem nextItem = DBReader.getNextInQueue(item);
+            FeedItem nextItem = null;
+            long activeSmartQueueId = PlaybackPreferences.getActiveSmartQueueId();
+
+            if (activeSmartQueueId > 0) {
+                // Validate current item is in the smart queue
+                if (!DBReader.isItemInSmartQueue(activeSmartQueueId, item.getId())) {
+                    Log.d(TAG, "Current item not in active smart queue, clearing smart queue mode");
+                    PlaybackPreferences.clearActiveSmartQueueId();
+                    activeSmartQueueId = 0;
+                } else {
+                    nextItem = DBReader.getNextInSmartQueue(activeSmartQueueId, item.getId());
+
+                    // Auto-rebuild: if end of queue and auto-regenerate is on
+                    if (nextItem == null) {
+                        Log.d(TAG, "Reached end of smart queue " + activeSmartQueueId);
+                        SmartPlaylist queue = DBReader.getSmartPlaylist(activeSmartQueueId);
+                        if (queue != null && queue.isAutoRegenerate()) {
+                            Log.d(TAG, "Auto-regenerating smart queue " + activeSmartQueueId);
+                            DBWriter.generateSmartPlaylistSync(queue);
+                            java.util.List<FeedItem> newEpisodes =
+                                    DBReader.getSmartPlaylistEpisodes(activeSmartQueueId);
+                            if (!newEpisodes.isEmpty()) {
+                                nextItem = newEpisodes.get(0);
+                                Log.d(TAG, "Smart queue regenerated with " + newEpisodes.size() + " episodes");
+                            }
+                        }
+                    }
+
+                    if (nextItem == null) {
+                        PlaybackPreferences.clearActiveSmartQueueId();
+                    }
+                }
+            }
+
+            // Fall back to normal queue if not in smart queue mode
+            if (nextItem == null && activeSmartQueueId <= 0) {
+                nextItem = DBReader.getNextInQueue(item);
+            }
+
             if (nextItem != null && nextItem.getMedia() != null) {
-                return new Pair<>(nextItem.getMedia(), MediaItemAdapter.fromPlayable(Media3PlaybackService.this, nextItem.getMedia()));
+                return new Pair<>(nextItem.getMedia(),
+                        MediaItemAdapter.fromPlayable(Media3PlaybackService.this, nextItem.getMedia()));
             }
             return null;
         })
@@ -588,9 +628,12 @@ public class Media3PlaybackService extends MediaLibraryService {
                             final FeedMedia nextMedia = pair.first;
                             final MediaItem nextMediaItem = pair.second;
                             if (needsStreaming(nextMedia) && !NetworkUtils.isStreamingAllowed()
-                                    && !allowStreamingThisTime && UserPreferences.isFollowQueue()) {
-                                showStreamingConfirmation(nextMedia);
-                                return;
+                                    && !allowStreamingThisTime) {
+                                boolean isSmartQueue = PlaybackPreferences.getActiveSmartQueueId() > 0;
+                                if (isSmartQueue || UserPreferences.isFollowQueue()) {
+                                    showStreamingConfirmation(nextMedia);
+                                    return;
+                                }
                             }
                             allowStreamingThisTime = false;
 
@@ -602,7 +645,8 @@ public class Media3PlaybackService extends MediaLibraryService {
                                         .getPreferences().getVolumeAdaptionSetting().getAdaptionFactor();
                                 applyVolumeAdaption(1.0f);
                             }
-                            player.setPlayWhenReady(UserPreferences.isFollowQueue());
+                            boolean isSmartQueue = PlaybackPreferences.getActiveSmartQueueId() > 0;
+                            player.setPlayWhenReady(isSmartQueue || UserPreferences.isFollowQueue());
                             player.setMediaItem(nextMediaItem);
                             player.seekTo(SkipUtils.skipIntroIfNecessary(this, nextMedia));
                             player.prepare();
