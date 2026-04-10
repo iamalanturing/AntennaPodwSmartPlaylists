@@ -128,7 +128,7 @@ public class GpodderAuthenticationFragment extends DialogFragment {
                 GpodderAuthenticationFragment.this.username = usernameStr;
                 GpodderAuthenticationFragment.this.password = passwordStr;
             })
-                    .subscribeOn(Schedulers.io())
+                    .subscribeOn(Schedulers.computation())
                     .observeOn(AndroidSchedulers.mainThread())
                     .subscribe(() -> {
                         login.setEnabled(true);
@@ -182,7 +182,7 @@ public class GpodderAuthenticationFragment extends DialogFragment {
             service.configureDevice(deviceId, deviceNameStr, GpodnetDevice.DeviceType.MOBILE);
             return new GpodnetDevice(deviceId, deviceNameStr, GpodnetDevice.DeviceType.MOBILE.toString(), 0);
         })
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(device -> {
                     progBarCreateDevice.setVisibility(View.GONE);

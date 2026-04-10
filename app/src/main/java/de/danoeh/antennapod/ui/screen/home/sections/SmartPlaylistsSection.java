@@ -101,7 +101,7 @@ public class SmartPlaylistsSection extends HomeSection {
             disposable.dispose();
         }
         disposable = Observable.fromCallable(DBReader::getSmartPlaylists)
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(playlists -> {
                     hasPlaylists = !playlists.isEmpty();

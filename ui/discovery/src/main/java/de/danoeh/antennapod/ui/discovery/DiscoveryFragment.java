@@ -185,7 +185,7 @@ public class DiscoveryFragment extends Fragment implements Toolbar.OnMenuItemCli
         ItunesTopListLoader loader = new ItunesTopListLoader(getContext());
         disposable = Observable.fromCallable(() ->
                         loader.loadToplist(country, NUM_OF_TOP_PODCASTS, DBReader.getFeedList()))
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                     podcasts -> {

@@ -182,8 +182,8 @@ public class OnlineFeedViewActivity extends AppCompatActivity {
 
     private void lookupUrlAndDownload(String url) {
         download = PodcastSearcherRegistry.lookupUrl(url)
-                .subscribeOn(Schedulers.io())
-                .observeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
+                .observeOn(Schedulers.computation())
                 .subscribe(this::downloadIfNotAlreadySubscribed,
                         error -> {
                             if (error instanceof FeedUrlNotFoundException) {
@@ -232,7 +232,7 @@ public class OnlineFeedViewActivity extends AppCompatActivity {
             }
             return null;
         })
-        .subscribeOn(Schedulers.io())
+        .subscribeOn(Schedulers.computation())
         .observeOn(AndroidSchedulers.mainThread())
         .subscribe(subscribedFeed -> {
             if (subscribedFeed.getState() == Feed.STATE_NOT_SUBSCRIBED) {
@@ -257,7 +257,7 @@ public class OnlineFeedViewActivity extends AppCompatActivity {
             downloader.call();
             return downloader.getResult();
         })
-        .subscribeOn(Schedulers.io())
+        .subscribeOn(Schedulers.computation())
         .observeOn(AndroidSchedulers.mainThread())
         .subscribe(status -> checkDownloadResult(status, request.getDestination()),
                 error -> Log.e(TAG, Log.getStackTraceString(error)));

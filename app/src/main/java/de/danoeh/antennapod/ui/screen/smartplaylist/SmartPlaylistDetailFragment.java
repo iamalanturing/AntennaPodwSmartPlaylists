@@ -195,7 +195,7 @@ public class SmartPlaylistDetailFragment extends Fragment {
             List<FeedItem> episodes = DBReader.getSmartPlaylistEpisodes(playlistId);
             return new Object[]{p, episodes};
         })
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(result -> {
                     playlist = (SmartPlaylist) result[0];

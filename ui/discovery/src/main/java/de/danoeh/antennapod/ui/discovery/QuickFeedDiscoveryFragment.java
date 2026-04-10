@@ -131,7 +131,7 @@ public class QuickFeedDiscoveryFragment extends Fragment implements AdapterView.
 
         disposable = Observable.fromCallable(() ->
                         loader.loadToplist(countryCode, NUM_SUGGESTIONS, DBReader.getFeedList()))
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                     podcasts -> {

@@ -41,6 +41,7 @@ import de.danoeh.antennapod.net.common.NetworkUtils;
 import de.danoeh.antennapod.net.sync.serviceinterface.SynchronizationQueue;
 import de.danoeh.antennapod.playback.base.MediaItemAdapter;
 import de.danoeh.antennapod.playback.base.PlayerStatus;
+import de.danoeh.antennapod.playback.base.RewindAfterPauseUtils;
 import de.danoeh.antennapod.playback.cast.CastPlayerWrapper;
 import de.danoeh.antennapod.playback.service.internal.ExoPlayerUtils;
 import de.danoeh.antennapod.playback.service.internal.MediaLibrarySessionCallback;
@@ -129,6 +130,15 @@ public class Media3PlaybackService extends MediaLibraryService {
                 } else if (shouldBlockForStreamingConfirmation()) {
                     showStreamingConfirmation(currentPlayable);
                     return;
+                }
+                if (currentPlayable != null && !getPlayWhenReady()) {
+                    long savedPosition = getCurrentPosition();
+                    long startPosition = RewindAfterPauseUtils
+                            .calculatePositionWithRewind((int) savedPosition,
+                                    currentPlayable.getLastPlayedTimeStatistics());
+                    if (startPosition != savedPosition) {
+                        seekTo(startPosition);
+                    }
                 }
                 super.play();
             }
@@ -371,7 +381,7 @@ public class Media3PlaybackService extends MediaLibraryService {
                     mediaLoaderDisposable.dispose();
                 }
                 mediaLoaderDisposable = Single.fromCallable(() -> DBReader.getFeedMedia(mediaId))
-                        .subscribeOn(Schedulers.io())
+                        .subscribeOn(Schedulers.computation())
                         .observeOn(AndroidSchedulers.mainThread())
                         .subscribe(media -> {
                             currentPlayable = media;
@@ -621,7 +631,7 @@ public class Media3PlaybackService extends MediaLibraryService {
             }
             return null;
         })
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                         pair -> {

@@ -278,7 +278,7 @@ public class ProxyDialog {
                 emitter.onError(e);
             }
         })
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                         () -> {

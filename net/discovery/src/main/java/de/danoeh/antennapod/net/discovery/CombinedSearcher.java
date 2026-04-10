@@ -57,7 +57,7 @@ public class CombinedSearcher implements PodcastSearcher {
                         }
                     }
                 })
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread());
     }
 

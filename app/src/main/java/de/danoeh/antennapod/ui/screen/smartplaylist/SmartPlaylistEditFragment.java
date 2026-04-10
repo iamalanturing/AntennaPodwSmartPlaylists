@@ -154,7 +154,7 @@ public class SmartPlaylistEditFragment extends Fragment {
             }
             return map;
         })
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(map -> ruleAdapter.setFeedNameMap(map),
                         error -> Log.e(TAG, Log.getStackTraceString(error)));
@@ -162,7 +162,7 @@ public class SmartPlaylistEditFragment extends Fragment {
 
     private void loadPlaylist() {
         disposable = Observable.fromCallable(() -> DBReader.getSmartPlaylist(playlistId))
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(result -> {
                     if (result != null) {
@@ -212,7 +212,7 @@ public class SmartPlaylistEditFragment extends Fragment {
                 DBWriter.generateSmartPlaylist(playlist).get();
                 return playlist;
             })
-                    .subscribeOn(Schedulers.io())
+                    .subscribeOn(Schedulers.computation())
                     .observeOn(AndroidSchedulers.mainThread())
                     .subscribe(result -> {
                         Toast.makeText(getContext(), R.string.smart_playlist_created, Toast.LENGTH_SHORT).show();
@@ -230,7 +230,7 @@ public class SmartPlaylistEditFragment extends Fragment {
                 DBWriter.generateSmartPlaylist(playlist).get();
                 return playlist;
             })
-                    .subscribeOn(Schedulers.io())
+                    .subscribeOn(Schedulers.computation())
                     .observeOn(AndroidSchedulers.mainThread())
                     .subscribe(result -> {
                         Toast.makeText(getContext(), R.string.smart_playlist_updated, Toast.LENGTH_SHORT).show();

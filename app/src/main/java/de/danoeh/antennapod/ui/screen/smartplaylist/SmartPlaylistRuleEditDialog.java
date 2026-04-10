@@ -170,7 +170,7 @@ public class SmartPlaylistRuleEditDialog extends DialogFragment {
             });
             return new Object[]{feeds, sortedTags};
         })
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(result -> {
                     @SuppressWarnings("unchecked")

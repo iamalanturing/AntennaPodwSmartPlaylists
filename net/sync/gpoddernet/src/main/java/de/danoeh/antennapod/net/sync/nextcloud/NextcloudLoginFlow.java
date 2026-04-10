@@ -76,7 +76,7 @@ public class NextcloudLoginFlow {
             this.endpoint = result.getJSONObject("poll").getString("endpoint");
             return loginUrl;
         })
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                     result -> {
@@ -95,7 +95,7 @@ public class NextcloudLoginFlow {
         pollDisposable = Observable.fromCallable(() -> doRequest(URI.create(endpoint).toURL(), "token=" + token))
                 .retryWhen(t -> t.delay(1, TimeUnit.SECONDS))
                 .timeout(5, TimeUnit.MINUTES)
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(result -> callback.onNextcloudAuthenticated(
                         result.getString("server"), result.getString("loginName"), result.getString("appPassword")),

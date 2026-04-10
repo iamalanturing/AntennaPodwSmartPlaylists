@@ -71,7 +71,7 @@ public class PodcastIndexPodcastSearcher implements PodcastSearcher {
             }
             subscriber.onSuccess(podcasts);
         })
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread());
     }
 

@@ -93,7 +93,7 @@ public class SmartPlaylistListFragment extends Fragment {
             disposable.dispose();
         }
         disposable = Observable.fromCallable(DBReader::getSmartPlaylists)
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(playlists -> {
                     adapter.updateData(playlists);

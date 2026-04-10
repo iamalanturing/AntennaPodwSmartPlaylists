@@ -261,7 +261,7 @@ public class Media3VideoPlayerActivity extends AppCompatActivity implements Tool
         }
         mediaLoadDisposable = Maybe.fromCallable(() -> DBReader.getFeedMedia(
                         PlaybackPreferences.getCurrentlyPlayingFeedMediaId()))
-                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(media -> {
                     currentMedia = media;
