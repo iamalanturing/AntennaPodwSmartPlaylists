@@ -159,6 +159,9 @@ public class SmartPlaylistDetailFragment extends Fragment {
     }
 
     private void startPlayback(List<FeedItem> episodes) {
+        if (episodes == null || episodes.isEmpty()) {
+            return;
+        }
         // Find an episode with a saved position (in-progress), or fall back to the first episode
         FeedItem toPlay = null;
         for (FeedItem item : episodes) {

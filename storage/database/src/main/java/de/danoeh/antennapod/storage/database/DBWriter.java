@@ -997,16 +997,19 @@ public class DBWriter {
         return runOnDbThread(() -> {
             PodDBAdapter adapter = PodDBAdapter.getInstance();
             adapter.open();
-            adapter.setSmartPlaylist(playlist);
-            if (playlist.getRules() != null) {
-                for (int i = 0; i < playlist.getRules().size(); i++) {
-                    SmartPlaylistRule rule = playlist.getRules().get(i);
-                    rule.setPlaylistId(playlist.getId());
-                    rule.setPosition(i);
-                    adapter.setSmartPlaylistRule(rule);
+            try {
+                adapter.setSmartPlaylist(playlist);
+                if (playlist.getRules() != null) {
+                    for (int i = 0; i < playlist.getRules().size(); i++) {
+                        SmartPlaylistRule rule = playlist.getRules().get(i);
+                        rule.setPlaylistId(playlist.getId());
+                        rule.setPosition(i);
+                        adapter.setSmartPlaylistRule(rule);
+                    }
                 }
+            } finally {
+                adapter.close();
             }
-            adapter.close();
             EventBus.getDefault().post(new FeedListUpdateEvent(0L));
         });
     }
@@ -1015,19 +1018,22 @@ public class DBWriter {
         return runOnDbThread(() -> {
             PodDBAdapter adapter = PodDBAdapter.getInstance();
             adapter.open();
-            adapter.setSmartPlaylist(playlist);
-            // Replace all rules
-            adapter.deleteSmartPlaylistRulesForPlaylist(playlist.getId());
-            if (playlist.getRules() != null) {
-                for (int i = 0; i < playlist.getRules().size(); i++) {
-                    SmartPlaylistRule rule = playlist.getRules().get(i);
-                    rule.setPlaylistId(playlist.getId());
-                    rule.setPosition(i);
-                    rule.setId(0); // Force insert since we deleted all
-                    adapter.setSmartPlaylistRule(rule);
+            try {
+                adapter.setSmartPlaylist(playlist);
+                // Replace all rules
+                adapter.deleteSmartPlaylistRulesForPlaylist(playlist.getId());
+                if (playlist.getRules() != null) {
+                    for (int i = 0; i < playlist.getRules().size(); i++) {
+                        SmartPlaylistRule rule = playlist.getRules().get(i);
+                        rule.setPlaylistId(playlist.getId());
+                        rule.setPosition(i);
+                        rule.setId(0); // Force insert since we deleted all
+                        adapter.setSmartPlaylistRule(rule);
+                    }
                 }
+            } finally {
+                adapter.close();
             }
-            adapter.close();
             EventBus.getDefault().post(new FeedListUpdateEvent(0L));
         });
     }
@@ -1036,8 +1042,11 @@ public class DBWriter {
         return runOnDbThread(() -> {
             PodDBAdapter adapter = PodDBAdapter.getInstance();
             adapter.open();
-            adapter.deleteSmartPlaylist(playlistId);
-            adapter.close();
+            try {
+                adapter.deleteSmartPlaylist(playlistId);
+            } finally {
+                adapter.close();
+            }
             EventBus.getDefault().post(new FeedListUpdateEvent(0L));
         });
     }
