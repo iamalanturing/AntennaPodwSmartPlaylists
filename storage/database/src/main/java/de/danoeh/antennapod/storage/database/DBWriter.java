@@ -564,6 +564,32 @@ public class DBWriter {
         });
     }
 
+    public static Future<?> addFavoriteItems(final List<FeedItem> items) {
+        return runOnDbThread(() -> {
+            final PodDBAdapter adapter = PodDBAdapter.getInstance().open();
+            for (FeedItem item : items) {
+                adapter.addFavoriteItem(item);
+                item.addTag(FeedItem.TAG_FAVORITE);
+            }
+            adapter.close();
+            EventBus.getDefault().post(new FavoritesEvent());
+            EventBus.getDefault().post(FeedItemEvent.updated(items));
+        });
+    }
+
+    public static Future<?> removeFavoriteItems(final List<FeedItem> items) {
+        return runOnDbThread(() -> {
+            final PodDBAdapter adapter = PodDBAdapter.getInstance().open();
+            for (FeedItem item : items) {
+                adapter.removeFavoriteItem(item);
+                item.removeTag(FeedItem.TAG_FAVORITE);
+            }
+            adapter.close();
+            EventBus.getDefault().post(new FavoritesEvent());
+            EventBus.getDefault().post(FeedItemEvent.updated(items));
+        });
+    }
+
     /**
      * Changes the position of a FeedItem in the queue.
      *
@@ -664,6 +690,18 @@ public class DBWriter {
             adapter.close();
 
             EventBus.getDefault().post(new UnreadItemsUpdateEvent());
+        });
+    }
+
+    @NonNull
+    public static Future<?> markItemsPlayed(int played, boolean resetMediaPosition, List<FeedItem> items) {
+        return runOnDbThread(() -> {
+            final PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            adapter.setFeedItemRead(played, resetMediaPosition, items.toArray(new FeedItem[0]));
+            adapter.close();
+
+            EventBus.getDefault().post(new FeedItemEvent(items, true));
         });
     }
 
@@ -785,12 +823,18 @@ public class DBWriter {
      * @param item The FeedItem object.
      */
     public static Future<?> setFeedItem(final FeedItem item) {
+        return setFeedItem(item, true);
+    }
+
+    public static Future<?> setFeedItem(final FeedItem item, boolean sendEvent) {
         return runOnDbThread(() -> {
             PodDBAdapter adapter = PodDBAdapter.getInstance();
             adapter.open();
             adapter.setSingleFeedItem(item);
             adapter.close();
-            EventBus.getDefault().post(FeedItemEvent.updated(item));
+            if (sendEvent) {
+                EventBus.getDefault().post(FeedItemEvent.updated(item));
+            }
         });
     }
 

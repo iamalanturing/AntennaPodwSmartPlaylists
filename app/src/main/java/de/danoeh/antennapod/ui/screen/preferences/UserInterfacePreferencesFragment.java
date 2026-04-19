@@ -51,6 +51,9 @@ public class UserInterfacePreferencesFragment extends AnimatedPreferenceFragment
         if (Build.VERSION.SDK_INT < 31) {
             findPreference(UserPreferences.PREF_TINTED_COLORS).setVisible(false);
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            findPreference(UserPreferences.PREF_PERSISTENT_NOTIFICATION).setVisible(false);
+        }
 
         findPreference(UserPreferences.PREF_SHOW_TIME_LEFT)
                 .setOnPreferenceChangeListener(

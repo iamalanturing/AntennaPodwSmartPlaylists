@@ -86,7 +86,10 @@ public class MediaItemAdapter {
 
     private static Bitmap loadArtworkBitmap(Context context, Playable playable, int iconSize) {
         try {
-            return Glide.with(context).asBitmap().load(playable.getImageLocation())
+            return Glide.with(context)
+                    .asBitmap()
+                    .onlyRetrieveFromCache(true)
+                    .load(playable.getImageLocation())
                     .submit(iconSize, iconSize).get(500, TimeUnit.MILLISECONDS);
         } catch (Exception tr1) {
             // fall through to try feed image
@@ -103,7 +106,10 @@ public class MediaItemAdapter {
             return null;
         }
         try {
-            return Glide.with(context).asBitmap().load(fallback)
+            return Glide.with(context)
+                    .asBitmap()
+                    .onlyRetrieveFromCache(true)
+                    .load(fallback)
                     .submit(iconSize, iconSize).get(500, TimeUnit.MILLISECONDS);
         } catch (Exception tr2) {
             Log.e(TAG, "Error loading artwork bitmap", tr2);
@@ -112,15 +118,29 @@ public class MediaItemAdapter {
     }
 
 
-    public static MediaItem fromFeed(Feed feed) {
+    public static MediaItem fromFeed(Context context, Feed feed) {
         MediaMetadata.Builder metadataBuilder = new MediaMetadata.Builder();
         metadataBuilder.setTitle(feed.getTitle());
-        if (feed.getImageUrl() != null && feed.getImageUrl().startsWith("http")) {
-            metadataBuilder.setArtworkUri(Uri.parse(feed.getImageUrl()));
-        }
         metadataBuilder.setSubtitle(feed.getAuthor());
         metadataBuilder.setIsBrowsable(true);
         metadataBuilder.setIsPlayable(false);
+        int iconSize = (int) (128 * context.getResources().getDisplayMetrics().density);
+        try {
+            Bitmap bitmap = Glide.with(context)
+                    .asBitmap()
+                    .onlyRetrieveFromCache(true)
+                    .load(feed.getImageUrl())
+                    .submit(iconSize, iconSize).get(500, TimeUnit.MILLISECONDS);
+            if (bitmap != null) {
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, bos);
+                metadataBuilder.setArtworkData(bos.toByteArray(), MediaMetadata.PICTURE_TYPE_FRONT_COVER);
+            }
+        } catch (Exception e) {
+            if (feed.getImageUrl() != null && feed.getImageUrl().startsWith("http")) {
+                metadataBuilder.setArtworkUri(Uri.parse(feed.getImageUrl()));
+            }
+        }
         return new MediaItem.Builder()
                 .setMediaId(MEDIA_ID_FEED_PREFIX + feed.getId())
                 .setMediaMetadata(metadataBuilder.build())

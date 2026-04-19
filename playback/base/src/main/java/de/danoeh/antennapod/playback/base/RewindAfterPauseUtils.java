@@ -14,6 +14,7 @@ public abstract class RewindAfterPauseUtils {
     public static final long ELAPSED_TIME_FOR_LONG_REWIND = TimeUnit.DAYS.toMillis(1);
 
     public static final long SHORT_REWIND =  TimeUnit.SECONDS.toMillis(3);
+    public static final long MINIMUM_REWIND = TimeUnit.MILLISECONDS.toMillis(800);
     public static final long MEDIUM_REWIND = TimeUnit.SECONDS.toMillis(10);
     public static final long LONG_REWIND = TimeUnit.SECONDS.toMillis(20);
 
@@ -33,6 +34,8 @@ public abstract class RewindAfterPauseUtils {
                 rewindTime = MEDIUM_REWIND;
             } else if (elapsedTime > ELAPSED_TIME_FOR_SHORT_REWIND) {
                 rewindTime = SHORT_REWIND;
+            } else if (elapsedTime > 0) {
+                rewindTime = MINIMUM_REWIND;
             }
 
             int newPosition = currentPosition - (int) rewindTime;

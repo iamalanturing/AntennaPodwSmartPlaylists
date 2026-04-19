@@ -10,9 +10,16 @@ import de.danoeh.antennapod.model.feed.FeedItem;
 
 public class FeedItemEvent {
     @NonNull public final List<FeedItem> items;
+    public final boolean unreadStatusChanged;
 
     public FeedItemEvent(@NonNull List<FeedItem> items) {
         this.items = items;
+        this.unreadStatusChanged = false;
+    }
+
+    public FeedItemEvent(@NonNull List<FeedItem> items, boolean unreadStatusChanged) {
+        this.items = items;
+        this.unreadStatusChanged = unreadStatusChanged;
     }
 
     public static FeedItemEvent updated(List<FeedItem> items) {

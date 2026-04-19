@@ -91,6 +91,7 @@ public class Media3PlaybackService extends MediaLibraryService {
     @Nullable
     private LoudnessEnhancer loudnessEnhancer = null;
     private float volumeAdaptionFactor = 1.0f;
+    private boolean wasTemporarilySuspended = false;
 
     @UnstableApi
     @Override
@@ -237,6 +238,25 @@ public class Media3PlaybackService extends MediaLibraryService {
                 startNextInQueue(media.getItem());
             }
             EventBus.getDefault().post(new PlayerStatusEvent());
+        }
+
+        @Override
+        public void onPlaybackSuppressionReasonChanged(int playbackSuppressionReason) {
+            if (playbackSuppressionReason
+                    == Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS) {
+                wasTemporarilySuspended = true;
+            } else if (playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_NONE
+                    && wasTemporarilySuspended && currentPlayable != null) {
+                wasTemporarilySuspended = false;
+                long savedPosition = player.getCurrentPosition();
+                long startPosition = RewindAfterPauseUtils.calculatePositionWithRewind(
+                        (int) savedPosition, currentPlayable.getLastPlayedTimeStatistics());
+                if (startPosition != savedPosition) {
+                    player.seekTo(startPosition);
+                }
+            } else {
+                wasTemporarilySuspended = false;
+            }
         }
 
         @Override
