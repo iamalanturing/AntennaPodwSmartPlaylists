@@ -820,6 +820,7 @@ public final class DBReader {
     /**
      * Returns all smart playlists with their rules loaded.
      */
+    // FORK: Smart Queue — all methods below are fork additions
     @NonNull
     public static List<SmartPlaylist> getSmartPlaylists() {
         PodDBAdapter adapter = PodDBAdapter.getInstance();

@@ -28,6 +28,7 @@ import de.danoeh.antennapod.ui.screen.home.sections.EchoSection;
 import de.danoeh.antennapod.ui.screen.home.sections.EpisodesSurpriseSection;
 import de.danoeh.antennapod.ui.screen.home.sections.InboxSection;
 import de.danoeh.antennapod.ui.screen.home.sections.QueueSection;
+// FORK: Smart Queue
 import de.danoeh.antennapod.ui.screen.home.sections.SmartPlaylistsSection;
 import de.danoeh.antennapod.ui.screen.home.sections.SubscriptionsSection;
 import de.danoeh.antennapod.ui.screen.home.settingsdialog.HomePreferences;
@@ -102,6 +103,7 @@ public class HomeFragment extends Fragment implements Toolbar.OnMenuItemClickLis
 
     private Fragment getSection(String tag) {
         switch (tag) {
+            // FORK: Smart Queue - home screen section
             case SmartPlaylistsSection.TAG:
                 return new SmartPlaylistsSection();
             case QueueSection.TAG:

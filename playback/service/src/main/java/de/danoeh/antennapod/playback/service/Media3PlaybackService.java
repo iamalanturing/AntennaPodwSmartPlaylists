@@ -35,6 +35,7 @@ import de.danoeh.antennapod.model.feed.Chapter;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.FeedPreferences;
+// FORK: Smart Queue
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.model.feed.VolumeAdaptionSetting;
 import de.danoeh.antennapod.net.common.NetworkUtils;
@@ -91,6 +92,7 @@ public class Media3PlaybackService extends MediaLibraryService {
     @Nullable
     private LoudnessEnhancer loudnessEnhancer = null;
     private float volumeAdaptionFactor = 1.0f;
+    // FORK: Auto-rewind after transient audio focus loss
     private boolean wasTemporarilySuspended = false;
 
     @UnstableApi
@@ -132,6 +134,7 @@ public class Media3PlaybackService extends MediaLibraryService {
                     showStreamingConfirmation(currentPlayable);
                     return;
                 }
+                // FORK: Auto-rewind on play after pause
                 if (currentPlayable != null && !getPlayWhenReady()) {
                     long savedPosition = getCurrentPosition();
                     long startPosition = RewindAfterPauseUtils
@@ -247,6 +250,7 @@ public class Media3PlaybackService extends MediaLibraryService {
             }
         }
 
+        // FORK: Auto-rewind after transient audio focus loss
         @Override
         public void onPlaybackSuppressionReasonChanged(int playbackSuppressionReason) {
             if (playbackSuppressionReason
@@ -621,6 +625,7 @@ public class Media3PlaybackService extends MediaLibraryService {
         }
         queueLoaderDisposable = Maybe.fromCallable(() -> {
             FeedItem nextItem = null;
+            // FORK: Smart Queue - check active smart queue for next episode
             long activeSmartQueueId = PlaybackPreferences.getActiveSmartQueueId();
 
             if (activeSmartQueueId > 0) {
@@ -673,7 +678,8 @@ public class Media3PlaybackService extends MediaLibraryService {
                             final MediaItem nextMediaItem = pair.second;
                             if (needsStreaming(nextMedia) && !NetworkUtils.isStreamingAllowed()
                                     && !allowStreamingThisTime) {
-                                boolean isSmartQueue = PlaybackPreferences.getActiveSmartQueueId() > 0;
+                                // FORK: Smart Queue - auto-play next in smart queue
+                            boolean isSmartQueue = PlaybackPreferences.getActiveSmartQueueId() > 0;
                                 if (isSmartQueue || UserPreferences.isFollowQueue()) {
                                     showStreamingConfirmation(nextMedia);
                                     return;
@@ -689,6 +695,7 @@ public class Media3PlaybackService extends MediaLibraryService {
                                         .getPreferences().getVolumeAdaptionSetting().getAdaptionFactor();
                                 applyVolumeAdaption(1.0f);
                             }
+                            // FORK: Smart Queue - auto-play if in smart queue mode
                             boolean isSmartQueue = PlaybackPreferences.getActiveSmartQueueId() > 0;
                             player.setPlayWhenReady(isSmartQueue || UserPreferences.isFollowQueue());
                             player.setMediaItem(nextMediaItem);

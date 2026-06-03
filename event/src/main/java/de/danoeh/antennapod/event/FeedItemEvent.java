@@ -10,6 +10,7 @@ import de.danoeh.antennapod.model.feed.FeedItem;
 
 public class FeedItemEvent {
     @NonNull public final List<FeedItem> items;
+    // FORK: Batch events - track whether unread status changed
     public final boolean unreadStatusChanged;
 
     public FeedItemEvent(@NonNull List<FeedItem> items) {
@@ -17,6 +18,7 @@ public class FeedItemEvent {
         this.unreadStatusChanged = false;
     }
 
+    // FORK: Batch events - constructor with unread status flag
     public FeedItemEvent(@NonNull List<FeedItem> items, boolean unreadStatusChanged) {
         this.items = items;
         this.unreadStatusChanged = unreadStatusChanged;

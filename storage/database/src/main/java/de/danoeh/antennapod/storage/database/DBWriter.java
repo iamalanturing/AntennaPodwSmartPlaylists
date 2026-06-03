@@ -564,6 +564,7 @@ public class DBWriter {
         });
     }
 
+    // FORK: Batch events — batch favorites/played to reduce event spam
     public static Future<?> addFavoriteItems(final List<FeedItem> items) {
         return runOnDbThread(() -> {
             final PodDBAdapter adapter = PodDBAdapter.getInstance().open();
@@ -1035,7 +1036,7 @@ public class DBWriter {
         }
     }
 
-    // ---- Smart Playlists ----
+    // FORK: Smart Queue — all methods below are fork additions
 
     public static Future<?> createSmartPlaylist(final SmartPlaylist playlist) {
         return runOnDbThread(() -> {

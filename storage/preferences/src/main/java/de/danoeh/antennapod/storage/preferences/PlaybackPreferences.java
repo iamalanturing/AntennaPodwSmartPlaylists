@@ -84,6 +84,7 @@ public abstract class PlaybackPreferences {
      */
     public static final int PLAYER_STATUS_OTHER = 3;
 
+    // FORK: Smart Queue - preference key for active smart queue
     /**
      * The ID of the currently active smart queue, or 0 if no smart queue is active.
      * When set, PlaybackService uses the smart queue's episode list instead of the main queue.
@@ -179,6 +180,7 @@ public abstract class PlaybackPreferences {
         editor.apply();
     }
 
+    // FORK: Smart Queue - active smart queue preference methods
     public static void writeActiveSmartQueueId(long id) {
         prefs.edit().putLong(PREF_ACTIVE_SMART_QUEUE_ID, id).apply();
     }

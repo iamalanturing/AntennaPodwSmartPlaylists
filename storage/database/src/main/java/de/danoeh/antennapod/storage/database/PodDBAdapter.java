@@ -140,6 +140,7 @@ public class PodDBAdapter {
     public static final String TABLE_NAME_QUEUE = "Queue";
     public static final String TABLE_NAME_SIMPLECHAPTERS = "SimpleChapters";
     public static final String TABLE_NAME_FAVORITES = "Favorites";
+    // FORK: Smart Queue — tables, schema, and CRUD methods below
     public static final String TABLE_NAME_SMART_PLAYLISTS = "SmartPlaylists";
     public static final String TABLE_NAME_SMART_PLAYLIST_RULES = "SmartPlaylistRules";
     public static final String TABLE_NAME_SMART_PLAYLIST_EPISODES = "SmartPlaylistEpisodes";

@@ -38,9 +38,10 @@ public class PodcastApp extends Application {
         DynamicColors.applyToActivitiesIfAvailable(this);
         ClientConfigurator.initialize(this);
         PreferenceUpgrader.checkUpgrades(this);
-        registerMediaBrowserService();
+        registerMediaBrowserService(); // FORK: Bluetooth registration
     }
 
+    // FORK: Bluetooth registration - eagerly register media browser service
     private void registerMediaBrowserService() {
         try {
             SessionToken token = new SessionToken(this,
