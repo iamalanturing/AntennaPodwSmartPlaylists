@@ -274,6 +274,15 @@ public class FeedInfoFragment extends Fragment implements MaterialToolbar.OnMenu
     }
 
     @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        viewBinding = null;
+        if (disposable != null) {
+            disposable.dispose();
+        }
+    }
+
+    @Override
     public void onDestroy() {
         super.onDestroy();
         if (disposable != null) {

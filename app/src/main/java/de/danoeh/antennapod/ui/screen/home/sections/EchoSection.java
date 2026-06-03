@@ -63,6 +63,15 @@ public class EchoSection extends Fragment {
             }, Throwable::printStackTrace);
     }
 
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        viewBinding = null;
+        if (disposable != null) {
+            disposable.dispose();
+        }
+    }
+
     void hideThisYear() {
         getContext().getSharedPreferences(HomeFragment.PREF_NAME, Context.MODE_PRIVATE)
                 .edit().putInt(HomeFragment.PREF_HIDE_ECHO, EchoConfig.RELEASE_YEAR).apply();

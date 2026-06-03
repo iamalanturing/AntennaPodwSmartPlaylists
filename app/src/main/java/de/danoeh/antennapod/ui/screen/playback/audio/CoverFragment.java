@@ -77,9 +77,8 @@ public class CoverFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         viewBinding = CoverFragmentBinding.inflate(inflater);
         viewBinding.imgvCover.setOnClickListener(v -> {
-            if (PlaybackService.isRunning
-                    && PlaybackPreferences.getCurrentPlayerStatus() == PlaybackPreferences.PLAYER_STATUS_PLAYING) {
-                getContext().sendBroadcast(MediaButtonStarter.createIntent(getContext(), KeyEvent.KEYCODE_MEDIA_PAUSE));
+            if (PlaybackService.isRunning) {
+                PlaybackController.bindToMedia3Service(getContext(), controller -> controller.pause());
             } else if (media != null) {
                 new PlaybackServiceStarter(getContext(), media)
                         .callEvenIfRunning(true)
@@ -237,15 +236,15 @@ public class CoverFragment extends Fragment {
             return;
         }
 
-        PlaybackController.bindToService(getActivity(), playbackService -> {
+        PlaybackController.bindToMedia3Service(getActivity(), controller -> {
             if (displayedChapterIndex < 1) {
-                playbackService.seekTo(0);
-            } else if ((playbackService.getCurrentPosition() - 10000 * playbackService.getCurrentPlaybackSpeed())
+                controller.seekTo(0);
+            } else if ((controller.getCurrentPosition() - 10000 * controller.getPlaybackParameters().speed)
                     < curr.getStart()) {
                 refreshChapterData(displayedChapterIndex - 1);
-                playbackService.seekTo((int) media.getChapters().get(displayedChapterIndex).getStart());
+                controller.seekTo(media.getChapters().get(displayedChapterIndex).getStart());
             } else {
-                playbackService.seekTo((int) curr.getStart());
+                controller.seekTo(curr.getStart());
             }
         });
     }
@@ -257,8 +256,8 @@ public class CoverFragment extends Fragment {
         }
 
         refreshChapterData(displayedChapterIndex + 1);
-        PlaybackController.bindToService(getActivity(), playbackService ->
-                playbackService.seekTo((int) media.getChapters().get(displayedChapterIndex).getStart()));
+        PlaybackController.bindToMedia3Service(getActivity(), controller ->
+                controller.seekTo(media.getChapters().get(displayedChapterIndex).getStart()));
     }
 
     @Override
@@ -276,6 +275,15 @@ public class CoverFragment extends Fragment {
             disposable.dispose();
         }
         EventBus.getDefault().unregister(this);
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        viewBinding = null;
+        if (disposable != null) {
+            disposable.dispose();
+        }
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)

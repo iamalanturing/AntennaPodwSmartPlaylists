@@ -30,6 +30,7 @@ import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.model.feed.FeedMedia;
+import de.danoeh.antennapod.model.feed.SortOrder;
 import de.danoeh.antennapod.playback.base.MediaItemAdapter;
 import de.danoeh.antennapod.playback.base.RewindAfterPauseUtils;
 import de.danoeh.antennapod.playback.service.R;
@@ -136,6 +137,11 @@ public class MediaLibrarySessionCallback implements MediaLibraryService.MediaLib
     @Override
     @UnstableApi
     public void onPostConnect(@NonNull MediaSession session, @NonNull MediaSession.ControllerInfo controller) {
+        session.setCustomLayout(buildCustomLayout());
+    }
+
+    @UnstableApi
+    public void refreshNotification(MediaLibraryService.MediaLibrarySession session) {
         session.setCustomLayout(buildCustomLayout());
     }
 
@@ -298,8 +304,23 @@ public class MediaLibrarySessionCallback implements MediaLibraryService.MediaLib
     public ListenableFuture<MediaSession.MediaItemsWithStartPosition> onPlaybackResumption(
             @NonNull MediaSession mediaSession, @NonNull MediaSession.ControllerInfo controller) {
         SettableFuture<MediaSession.MediaItemsWithStartPosition> future = SettableFuture.create();
-        disposables.add(Single.fromCallable(() ->
-                        DBReader.getFeedMedia(PlaybackPreferences.getCurrentlyPlayingFeedMediaId()))
+        disposables.add(Single.fromCallable(() -> {
+                    FeedMedia media = DBReader.getFeedMedia(PlaybackPreferences.getCurrentlyPlayingFeedMediaId());
+                    if (media == null) {
+                        List<FeedItem> recentQueue = DBReader.getPausedQueue(1);
+                        if (!recentQueue.isEmpty()) {
+                            media = recentQueue.get(0).getMedia();
+                        }
+                    }
+                    if (media == null) {
+                        List<FeedItem> items = DBReader.getEpisodes(0, 1,
+                                FeedItemFilter.unfiltered(), SortOrder.DATE_NEW_OLD);
+                        if (!items.isEmpty()) {
+                            media = items.get(0).getMedia();
+                        }
+                    }
+                    return media;
+                })
                 .subscribeOn(Schedulers.computation())
                 .subscribe(
                         media -> {

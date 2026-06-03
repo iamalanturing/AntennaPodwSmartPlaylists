@@ -70,6 +70,14 @@ public class QueueSection extends HomeSection {
     }
 
     @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (disposable != null) {
+            disposable.dispose();
+        }
+    }
+
+    @Override
     protected void handleMoreClick() {
         ((MainActivity) requireActivity()).loadChildFragment(new QueueFragment());
     }

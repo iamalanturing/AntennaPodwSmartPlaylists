@@ -152,6 +152,13 @@ public class Media3PlaybackService extends MediaLibraryService {
             }
 
             @Override
+            public void seekTo(long positionMs) {
+                super.seekTo(positionMs);
+                EventBus.getDefault().post(new PlaybackPositionEvent(
+                        (int) positionMs, (int) getDuration()));
+            }
+
+            @Override
             public void seekBack() {
                 seekTo(Math.max(0, getCurrentPosition() - UserPreferences.getRewindSecs() * 1000L));
             }
@@ -192,7 +199,7 @@ public class Media3PlaybackService extends MediaLibraryService {
                 exoPlayer.setSkipSilenceEnabled(enabled);
                 return Futures.immediateFuture(new SessionResult(SessionResult.RESULT_SUCCESS));
             } else if (customCommand.customAction.equals(SESSION_COMMAND_SET_SLEEP_TIMER.customAction)) {
-                startSleepTimer(MediaLibrarySessionCallback.getLong(args, 0));
+                startSleepTimer(SleepTimerPreferences.timerMillisOrEpisodes());
                 return Futures.immediateFuture(new SessionResult(SessionResult.RESULT_SUCCESS));
             } else if (customCommand.customAction.equals(SESSION_COMMAND_DISABLE_SLEEP_TIMER.customAction)) {
                 disableSleepTimer();
@@ -211,12 +218,13 @@ public class Media3PlaybackService extends MediaLibraryService {
         public void onPlaybackStateChanged(int playbackState) {
             if (playbackState == Player.STATE_BUFFERING) {
                 EventBus.getDefault().post(BufferUpdateEvent.started());
-                PlaybackService.isRunning = true; // Immediately show as playing
+                PlaybackService.isRunning = player.getPlayWhenReady();
                 updatePlaybackPreferences();
             } else {
                 EventBus.getDefault().post(BufferUpdateEvent.ended());
             }
-            if (playbackState == Player.STATE_READY || playbackState == Player.STATE_ENDED) {
+            if ((playbackState == Player.STATE_READY && player.getPlayWhenReady())
+                    || playbackState == Player.STATE_ENDED) {
                 saveCurrentPosition();
             }
             if (playbackState == Player.STATE_ENDED && currentPlayable != null) {
@@ -237,7 +245,6 @@ public class Media3PlaybackService extends MediaLibraryService {
                 }
                 startNextInQueue(media.getItem());
             }
-            EventBus.getDefault().post(new PlayerStatusEvent());
         }
 
         @Override
@@ -278,7 +285,6 @@ public class Media3PlaybackService extends MediaLibraryService {
                     player.getPlaybackParameters().speed);
             WidgetUpdater.updateWidget(Media3PlaybackService.this, widgetState);
             updatePlaybackPreferences();
-            EventBus.getDefault().post(new PlayerStatusEvent());
 
             // Auto-enable sleep timer when playback starts
             if (PlaybackService.isRunning && sleepTimer == null && SleepTimerPreferences.autoEnable()) {
@@ -294,12 +300,18 @@ public class Media3PlaybackService extends MediaLibraryService {
 
         @Override
         public void onMediaItemTransition(@Nullable MediaItem mediaItem, int reason) {
+            if (mediaItem == null) {
+                currentPlayable = null;
+                PlaybackPreferences.writeNoMediaPlaying();
+                return;
+            }
             ensureCurrentMediaLoaded();
             EventBus.getDefault().post(new PlayerStatusEvent());
         }
 
         @Override
         public void onPlayerError(@NonNull PlaybackException error) {
+            PlaybackService.isRunning = false;
             EventBus.getDefault().post(new PlayerErrorEvent(
                     ExoPlayerUtils.translateErrorReason(error, Media3PlaybackService.this)));
         }
@@ -433,7 +445,6 @@ public class Media3PlaybackService extends MediaLibraryService {
                                 applyVolumeAdaption(1.0f);
                             }
                             updatePlaybackPreferences();
-                            EventBus.getDefault().post(new PlayerStatusEvent());
                         },
                                 error -> Log.e(TAG, "Failed to load current media", error));
 
@@ -452,7 +463,10 @@ public class Media3PlaybackService extends MediaLibraryService {
         PlaybackPreferences.writeMediaPlaying(currentPlayable);
         int status = Util.shouldShowPlayButton(player) ? PlaybackPreferences.PLAYER_STATUS_PAUSED
                 : PlaybackPreferences.PLAYER_STATUS_PLAYING;
-        PlaybackPreferences.setCurrentPlayerStatus(status);
+        if (status != PlaybackPreferences.getCurrentPlayerStatus()) {
+            PlaybackPreferences.setCurrentPlayerStatus(status);
+            EventBus.getDefault().post(new PlayerStatusEvent());
+        }
     }
 
     private void saveCurrentPosition() {
@@ -700,8 +714,10 @@ public class Media3PlaybackService extends MediaLibraryService {
                 player.pause();
             }
             sleepTimer = null;
+            sessionCallback.refreshNotification(mediaSession);
         } else if (event.isCancelled()) {
             applyVolumeAdaption(1.0f);
+            sessionCallback.refreshNotification(mediaSession);
         } else if (!event.wasJustEnabled()) {
             long millisLeft = event.getMillisTimeLeft();
             if (millisLeft < SleepTimer.NOTIFICATION_THRESHOLD && millisLeft > 0) {
@@ -713,6 +729,7 @@ public class Media3PlaybackService extends MediaLibraryService {
         }
     }
 
+    @UnstableApi
     private void startSleepTimer(long timeOrEpisodes) {
         if (sleepTimer != null) {
             sleepTimer.stop();
@@ -723,8 +740,10 @@ public class Media3PlaybackService extends MediaLibraryService {
             sleepTimer = new ClockSleepTimer(this);
         }
         sleepTimer.start(timeOrEpisodes);
+        sessionCallback.refreshNotification(mediaSession);
     }
 
+    @UnstableApi
     private void disableSleepTimer() {
         if (sleepTimer != null) {
             sleepTimer.stop();
@@ -733,6 +752,7 @@ public class Media3PlaybackService extends MediaLibraryService {
         if (player != null) {
             applyVolumeAdaption(1.0f);
         }
+        sessionCallback.refreshNotification(mediaSession);
     }
 
     private void extendSleepTimer(long additionalTime) {
