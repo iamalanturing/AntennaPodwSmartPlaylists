@@ -28,6 +28,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -1058,23 +1059,23 @@ public class DBWriter {
         try {
             adapter.deleteSmartPlaylistEpisodes(playlist.getId());
 
-            // Collect episodes from each rule and merge by position
-            List<Long> episodeIds = new ArrayList<>();
+            // Collect episodes from each rule and merge by position. LinkedHashSet preserves the
+            // first-matched order while deduplicating in O(1) per item across large playlists.
+            LinkedHashSet<Long> episodeIds = new LinkedHashSet<>();
             for (SmartPlaylistRule rule : playlist.getRules()) {
                 rule.setPlaylistId(playlist.getId());
                 try (android.database.Cursor cursor = adapter.getSmartPlaylistRuleMatchesCursor(rule)) {
                     while (cursor.moveToNext()) {
                         long itemId = cursor.getLong(
                                 cursor.getColumnIndexOrThrow(PodDBAdapter.SELECT_KEY_ITEM_ID));
-                        if (!episodeIds.contains(itemId)) {
-                            episodeIds.add(itemId);
-                        }
+                        episodeIds.add(itemId);
                     }
                 }
             }
 
-            for (int i = 0; i < episodeIds.size(); i++) {
-                adapter.insertSmartPlaylistEpisode(playlist.getId(), episodeIds.get(i), i);
+            int position = 0;
+            for (Long itemId : episodeIds) {
+                adapter.insertSmartPlaylistEpisode(playlist.getId(), itemId, position++);
             }
 
             // Update generatedAt timestamp

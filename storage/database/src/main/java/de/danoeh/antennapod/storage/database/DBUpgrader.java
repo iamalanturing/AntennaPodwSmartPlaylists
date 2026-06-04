@@ -361,6 +361,7 @@ class DBUpgrader {
             db.execSQL(PodDBAdapter.CREATE_TABLE_SMART_PLAYLIST_RULES);
             db.execSQL(PodDBAdapter.CREATE_TABLE_SMART_PLAYLIST_EPISODES);
             db.execSQL(PodDBAdapter.CREATE_INDEX_SMART_PLAYLIST_EPISODES_PLAYLIST);
+            db.execSQL(PodDBAdapter.CREATE_INDEX_SMART_PLAYLIST_RULES_PLAYLIST);
         }
     }
 

@@ -280,11 +280,11 @@ public class PodDBAdapter {
     // FORK: Smart Playlist CREATE TABLE statements
     static final String CREATE_TABLE_SMART_PLAYLISTS = "CREATE TABLE "
             + TABLE_NAME_SMART_PLAYLISTS + " (" + KEY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
-            + KEY_SMART_PLAYLIST_NAME + " TEXT,"
+            + KEY_SMART_PLAYLIST_NAME + " TEXT NOT NULL,"
             + KEY_SMART_PLAYLIST_AUTO_REGENERATE + " INTEGER DEFAULT 1,"
             + KEY_SMART_PLAYLIST_GENERATED_AT + " INTEGER DEFAULT 0,"
-            + KEY_SMART_PLAYLIST_CREATED_AT + " INTEGER,"
-            + KEY_SMART_PLAYLIST_UPDATED_AT + " INTEGER)";
+            + KEY_SMART_PLAYLIST_CREATED_AT + " INTEGER NOT NULL,"
+            + KEY_SMART_PLAYLIST_UPDATED_AT + " INTEGER NOT NULL)";
 
     static final String CREATE_TABLE_SMART_PLAYLIST_RULES = "CREATE TABLE "
             + TABLE_NAME_SMART_PLAYLIST_RULES + " (" + KEY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -309,6 +309,10 @@ public class PodDBAdapter {
     static final String CREATE_INDEX_SMART_PLAYLIST_EPISODES_PLAYLIST =
             "CREATE INDEX " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "_playlist ON "
             + TABLE_NAME_SMART_PLAYLIST_EPISODES + " (" + KEY_SMART_PLAYLIST_ID + ")";
+
+    static final String CREATE_INDEX_SMART_PLAYLIST_RULES_PLAYLIST =
+            "CREATE INDEX " + TABLE_NAME_SMART_PLAYLIST_RULES + "_playlist ON "
+            + TABLE_NAME_SMART_PLAYLIST_RULES + " (" + KEY_SMART_PLAYLIST_ID + ")";
 
     /**
      * All the tables in the database
@@ -1807,6 +1811,7 @@ public class PodDBAdapter {
             db.execSQL(CREATE_INDEX_SIMPLECHAPTERS_FEEDITEM);
             // FORK: Smart Playlist index
             db.execSQL(CREATE_INDEX_SMART_PLAYLIST_EPISODES_PLAYLIST);
+            db.execSQL(CREATE_INDEX_SMART_PLAYLIST_RULES_PLAYLIST);
         }
 
         @Override
