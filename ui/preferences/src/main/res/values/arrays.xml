@@ -238,7 +238,17 @@
         <item>3</item>
     </string-array>
 
+    <!-- FORK: Smart Queue sort order entries -->
+    <string-array name="smart_queue_sort_order_entries">
+        <item>@string/smart_queue_sort_newest</item>
+        <item>@string/smart_queue_sort_oldest</item>
+        <item>@string/smart_queue_sort_shortest</item>
+        <item>@string/smart_queue_sort_longest</item>
+        <item>@string/smart_queue_sort_random</item>
+    </string-array>
+
     <string-array name="home_section_titles">
+        <item>@string/smart_queue_home_section_title</item>
         <item>@string/home_continue_title</item>
         <item>@string/home_new_title</item>
         <item>@string/home_surprise_title</item>
@@ -247,6 +257,7 @@
     </string-array>
 
     <string-array name="home_section_tags">
+        <item>SmartPlaylistsSection</item>
         <item>QueueSection</item>
         <item>InboxSection</item>
         <item>EpisodesSurpriseSection</item>
