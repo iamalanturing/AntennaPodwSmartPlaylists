@@ -34,6 +34,7 @@ import de.danoeh.antennapod.event.playback.SpeedChangedEvent;
 import de.danoeh.antennapod.model.feed.Chapter;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
+import de.danoeh.antennapod.model.feed.SmartPlaylist; // FORK: Smart Queue
 import de.danoeh.antennapod.model.feed.FeedPreferences;
 import de.danoeh.antennapod.model.feed.VolumeAdaptionSetting;
 import de.danoeh.antennapod.net.common.NetworkUtils;
@@ -608,7 +609,39 @@ public class Media3PlaybackService extends MediaLibraryService {
             return;
         }
         queueLoaderDisposable = Maybe.fromCallable(() -> {
-            FeedItem nextItem = DBReader.getNextInQueue(item);
+            // FORK: Smart Queue — check if a smart queue is active before falling back to normal queue
+            FeedItem nextItem = null;
+            long activeSmartQueueId = PlaybackPreferences.getActiveSmartQueueId();
+            if (activeSmartQueueId != 0) {
+                if (item.getMedia() != null
+                        && DBReader.isItemInSmartQueue(activeSmartQueueId, item.getId())) {
+                    nextItem = DBReader.getNextInSmartQueue(activeSmartQueueId, item.getId());
+                    if (nextItem == null) {
+                        // End of smart queue — auto-regenerate or stop smart queue mode
+                        SmartPlaylist queue = DBReader.getSmartPlaylist(activeSmartQueueId);
+                        if (queue != null && queue.isAutoRegenerate()) {
+                            DBWriter.generateSmartPlaylistSync(queue);
+                            java.util.List<FeedItem> newEpisodes =
+                                    DBReader.getSmartPlaylistEpisodes(activeSmartQueueId);
+                            if (!newEpisodes.isEmpty()) {
+                                nextItem = newEpisodes.get(0);
+                            }
+                        } else {
+                            PlaybackPreferences.clearActiveSmartQueueId();
+                        }
+                    }
+                } else {
+                    // Current item not in smart queue — user switched away; exit smart queue mode
+                    PlaybackPreferences.clearActiveSmartQueueId();
+                }
+            }
+
+            if (nextItem == null) {
+                // Fall back to normal AntennaPod queue
+                nextItem = DBReader.getNextInQueue(item);
+            }
+            // FORK end
+
             if (nextItem != null && nextItem.getMedia() != null) {
                 return new Pair<>(nextItem.getMedia(), MediaItemAdapter.fromPlayable(Media3PlaybackService.this, nextItem.getMedia()));
             }
