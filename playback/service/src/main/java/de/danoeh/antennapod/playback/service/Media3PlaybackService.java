@@ -77,6 +77,8 @@ import java.util.concurrent.TimeUnit;
 
 public class Media3PlaybackService extends MediaLibraryService {
     private static final String TAG = "M3PlaybackService";
+    // FORK: Smart Queue — flip to true to log smart queue transitions while debugging
+    private static final boolean DEBUG_SMART_QUEUE = false;
     private static final long POSITION_SAVE_INTERVAL_MS = 5000;
     private ExoPlayer exoPlayer;
     private Player player;
@@ -84,6 +86,9 @@ public class Media3PlaybackService extends MediaLibraryService {
     private FeedMedia currentPlayable;
     private String pendingStreamMediaId;
     private boolean allowStreamingThisTime = false;
+    // FORK: Smart Queue — set in startNextInQueue's loader so the main-thread subscriber knows the
+    // next item came from an active smart queue and should advance regardless of the follow-queue setting
+    private boolean nextItemFromSmartQueue = false;
     private Disposable mediaLoaderDisposable;
     private Disposable positionObserverDisposable;
     private Disposable queueLoaderDisposable;
@@ -611,6 +616,7 @@ public class Media3PlaybackService extends MediaLibraryService {
         queueLoaderDisposable = Maybe.fromCallable(() -> {
             // FORK: Smart Queue — check if a smart queue is active before falling back to normal queue
             FeedItem nextItem = null;
+            nextItemFromSmartQueue = false;
             long activeSmartQueueId = PlaybackPreferences.getActiveSmartQueueId();
             if (activeSmartQueueId != 0) {
                 if (item.getMedia() != null
@@ -620,6 +626,9 @@ public class Media3PlaybackService extends MediaLibraryService {
                         // End of smart queue — auto-regenerate or stop smart queue mode
                         SmartPlaylist queue = DBReader.getSmartPlaylist(activeSmartQueueId);
                         if (queue != null && queue.isAutoRegenerate()) {
+                            if (DEBUG_SMART_QUEUE) {
+                                Log.d(TAG, "Auto-regenerating smart queue " + activeSmartQueueId);
+                            }
                             DBWriter.generateSmartPlaylistSync(queue);
                             java.util.List<FeedItem> newEpisodes =
                                     DBReader.getSmartPlaylistEpisodes(activeSmartQueueId);
@@ -627,11 +636,19 @@ public class Media3PlaybackService extends MediaLibraryService {
                                 nextItem = newEpisodes.get(0);
                             }
                         } else {
+                            if (DEBUG_SMART_QUEUE) {
+                                Log.d(TAG, "Reached end of smart queue " + activeSmartQueueId
+                                        + ", clearing smart queue mode");
+                            }
                             PlaybackPreferences.clearActiveSmartQueueId();
                         }
                     }
+                    nextItemFromSmartQueue = nextItem != null;
                 } else {
                     // Current item not in smart queue — user switched away; exit smart queue mode
+                    if (DEBUG_SMART_QUEUE) {
+                        Log.d(TAG, "Current item not in active smart queue, clearing smart queue mode");
+                    }
                     PlaybackPreferences.clearActiveSmartQueueId();
                 }
             }
@@ -653,8 +670,11 @@ public class Media3PlaybackService extends MediaLibraryService {
                         pair -> {
                             final FeedMedia nextMedia = pair.first;
                             final MediaItem nextMediaItem = pair.second;
+                            // FORK: Smart Queue advances regardless of the follow-queue preference
+                            final boolean continuePlayback =
+                                    nextItemFromSmartQueue || UserPreferences.isFollowQueue();
                             if (needsStreaming(nextMedia) && !NetworkUtils.isStreamingAllowed()
-                                    && !allowStreamingThisTime && UserPreferences.isFollowQueue()) {
+                                    && !allowStreamingThisTime && continuePlayback) {
                                 showStreamingConfirmation(nextMedia);
                                 return;
                             }
@@ -668,7 +688,7 @@ public class Media3PlaybackService extends MediaLibraryService {
                                         .getPreferences().getVolumeAdaptionSetting().getAdaptionFactor();
                                 applyVolumeAdaption(1.0f);
                             }
-                            player.setPlayWhenReady(UserPreferences.isFollowQueue());
+                            player.setPlayWhenReady(continuePlayback);
                             player.setMediaItem(nextMediaItem);
                             player.seekTo(SkipUtils.skipIntroIfNecessary(this, nextMedia));
                             player.prepare();
