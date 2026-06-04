@@ -1,0 +1,74 @@
+package de.danoeh.antennapod.ui.screen.smartplaylist;
+
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import de.danoeh.antennapod.R;
+import de.danoeh.antennapod.activity.MainActivity;
+import de.danoeh.antennapod.model.feed.SmartPlaylist;
+import de.danoeh.antennapod.storage.database.DBReader;
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class SmartPlaylistListFragment extends Fragment {
+    public static final String TAG = "SmartPlaylistListFragment";
+
+    private RecyclerView recyclerView;
+    private SmartPlaylistListAdapter adapter;
+    private Disposable disposable;
+    private List<SmartPlaylist> playlists = new ArrayList<>();
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_smart_playlist_list, container, false);
+        recyclerView = view.findViewById(R.id.smart_playlist_list);
+        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+
+        adapter = new SmartPlaylistListAdapter(playlists, playlist -> {
+            ((MainActivity) requireActivity()).loadChildFragment(
+                    SmartPlaylistDetailFragment.newInstance(playlist.getId()));
+        });
+        recyclerView.setAdapter(adapter);
+
+        FloatingActionButton fab = view.findViewById(R.id.smart_playlist_fab);
+        fab.setOnClickListener(v ->
+                ((MainActivity) requireActivity()).loadChildFragment(
+                        SmartPlaylistEditFragment.newInstance(0)));
+
+        loadPlaylists();
+        return view;
+    }
+
+    private void loadPlaylists() {
+        disposable = Observable.fromCallable(DBReader::getSmartPlaylists)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(result -> {
+                    playlists.clear();
+                    playlists.addAll(result);
+                    adapter.notifyDataSetChanged();
+                }, error -> {});
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (disposable != null) {
+            disposable.dispose();
+        }
+    }
+}
