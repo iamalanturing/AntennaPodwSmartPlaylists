@@ -171,4 +171,20 @@ public abstract class PlaybackPreferences {
         editor.remove(PREF_CURRENTLY_PLAYING_TEMPORARY_SKIP_SILENCE);
         editor.apply();
     }
+
+    // FORK: Smart Queue — tracks which smart queue is currently driving playback
+    private static final String PREF_ACTIVE_SMART_QUEUE_ID =
+            "de.danoeh.antennapod.preferences.currently_active_smart_queue_id";
+
+    public static void writeActiveSmartQueueId(long id) {
+        prefs.edit().putLong(PREF_ACTIVE_SMART_QUEUE_ID, id).apply();
+    }
+
+    public static long getActiveSmartQueueId() {
+        return prefs.getLong(PREF_ACTIVE_SMART_QUEUE_ID, 0);
+    }
+
+    public static void clearActiveSmartQueueId() {
+        prefs.edit().remove(PREF_ACTIVE_SMART_QUEUE_ID).apply();
+    }
 }

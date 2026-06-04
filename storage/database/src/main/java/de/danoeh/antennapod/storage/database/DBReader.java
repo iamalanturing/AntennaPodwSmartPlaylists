@@ -22,9 +22,13 @@ import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.FeedOrder;
 import de.danoeh.antennapod.model.feed.FeedPreferences;
+import de.danoeh.antennapod.model.feed.SmartPlaylist;
+import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 import de.danoeh.antennapod.model.feed.SortOrder;
 import de.danoeh.antennapod.model.feed.SubscriptionsFilter;
 import de.danoeh.antennapod.model.download.DownloadResult;
+import de.danoeh.antennapod.storage.database.mapper.SmartPlaylistCursor;
+import de.danoeh.antennapod.storage.database.mapper.SmartPlaylistRuleCursor;
 import de.danoeh.antennapod.storage.database.mapper.ChapterCursor;
 import de.danoeh.antennapod.storage.database.mapper.DownloadResultCursor;
 import de.danoeh.antennapod.storage.database.mapper.FeedCursor;
@@ -809,6 +813,107 @@ public final class DBReader {
                 items.add(cursor.getFeed());
             }
             return items;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    // FORK: Smart Playlist read methods
+
+    @NonNull
+    public static synchronized List<SmartPlaylist> getSmartPlaylists() {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (SmartPlaylistCursor cursor = new SmartPlaylistCursor(adapter.getAllSmartPlaylistsCursor())) {
+            List<SmartPlaylist> playlists = new ArrayList<>();
+            while (cursor.moveToNext()) {
+                SmartPlaylist playlist = cursor.extractSmartPlaylist();
+                playlist.setEpisodeCount(adapter.getSmartPlaylistEpisodeCount(playlist.getId()));
+                playlists.add(playlist);
+            }
+            return playlists;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    @Nullable
+    public static synchronized SmartPlaylist getSmartPlaylist(long playlistId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (SmartPlaylistCursor cursor = new SmartPlaylistCursor(adapter.getSmartPlaylistCursor(playlistId))) {
+            if (cursor.moveToFirst()) {
+                SmartPlaylist playlist = cursor.extractSmartPlaylist();
+                playlist.setEpisodeCount(adapter.getSmartPlaylistEpisodeCount(playlistId));
+                List<SmartPlaylistRule> rules = getSmartPlaylistRulesInternal(adapter, playlistId);
+                playlist.setRules(rules);
+                return playlist;
+            }
+            return null;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    @NonNull
+    public static synchronized List<SmartPlaylistRule> getSmartPlaylistRules(long playlistId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try {
+            return getSmartPlaylistRulesInternal(adapter, playlistId);
+        } finally {
+            adapter.close();
+        }
+    }
+
+    private static List<SmartPlaylistRule> getSmartPlaylistRulesInternal(PodDBAdapter adapter, long playlistId) {
+        try (SmartPlaylistRuleCursor cursor =
+                     new SmartPlaylistRuleCursor(adapter.getSmartPlaylistRulesCursor(playlistId))) {
+            List<SmartPlaylistRule> rules = new ArrayList<>();
+            while (cursor.moveToNext()) {
+                rules.add(cursor.extractRule());
+            }
+            return rules;
+        }
+    }
+
+    @NonNull
+    public static synchronized List<FeedItem> getSmartPlaylistEpisodes(long playlistId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (FeedItemCursor cursor = new FeedItemCursor(adapter.getSmartPlaylistEpisodesCursor(playlistId))) {
+            List<FeedItem> items = extractItemlistFromCursor(cursor);
+            loadFeedDataOfFeedItemList(items);
+            return items;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    @Nullable
+    public static synchronized FeedItem getNextInSmartQueue(long queueId, long currentItemId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (FeedItemCursor cursor = new FeedItemCursor(
+                adapter.getNextInSmartQueueCursor(queueId, currentItemId))) {
+            List<FeedItem> list = extractItemlistFromCursor(cursor);
+            if (!list.isEmpty()) {
+                loadFeedDataOfFeedItemList(list);
+                return list.get(0);
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    public static synchronized boolean isItemInSmartQueue(long queueId, long itemId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try {
+            return adapter.isItemInSmartQueue(queueId, itemId);
         } finally {
             adapter.close();
         }

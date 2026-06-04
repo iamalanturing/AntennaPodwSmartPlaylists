@@ -39,8 +39,11 @@ import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.FeedPreferences;
 import de.danoeh.antennapod.model.download.DownloadResult;
 import de.danoeh.antennapod.model.feed.SortOrder;
+import de.danoeh.antennapod.model.feed.SmartPlaylist;
+import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 import de.danoeh.antennapod.storage.database.mapper.FeedItemFilterQuery;
 import de.danoeh.antennapod.storage.database.mapper.FeedItemSortQuery;
+import de.danoeh.antennapod.storage.database.mapper.SmartPlaylistRuleQuery;
 
 import de.danoeh.antennapod.system.utils.ThreadUtils;
 import org.apache.commons.io.FileUtils;
@@ -55,7 +58,7 @@ public class PodDBAdapter {
 
     private static final String TAG = "PodDBAdapter";
     public static final String DATABASE_NAME = "Antennapod.db";
-    public static final int VERSION = 3110000;
+    public static final int VERSION = 3120000; // FORK: bumped for SmartPlaylist tables
 
     /**
      * Maximum number of arguments for IN-operator.
@@ -129,6 +132,25 @@ public class PodDBAdapter {
     public static final String KEY_PODCASTINDEX_TRANSCRIPT_URL = "podcastindex_transcript_url";
     public static final String KEY_PODCASTINDEX_TRANSCRIPT_TYPE = "podcastindex_transcript_type";
 
+    // FORK: Smart Playlist column keys
+    public static final String KEY_SMART_PLAYLIST_NAME = "sp_name";
+    public static final String KEY_SMART_PLAYLIST_AUTO_REGENERATE = "sp_auto_regenerate";
+    public static final String KEY_SMART_PLAYLIST_GENERATED_AT = "sp_generated_at";
+    public static final String KEY_SMART_PLAYLIST_CREATED_AT = "sp_created_at";
+    public static final String KEY_SMART_PLAYLIST_UPDATED_AT = "sp_updated_at";
+    public static final String KEY_SMART_PLAYLIST_ID = "sp_playlist_id";
+    public static final String KEY_SMART_PLAYLIST_POSITION = "sp_position";
+    public static final String KEY_SMART_PLAYLIST_FILTER_PROPERTIES = "sp_filter_properties";
+    public static final String KEY_SMART_PLAYLIST_FEED_IDS = "sp_feed_ids";
+    public static final String KEY_SMART_PLAYLIST_FEED_TAGS = "sp_feed_tags";
+    public static final String KEY_SMART_PLAYLIST_MAX_AGE_DAYS = "sp_max_age_days";
+    public static final String KEY_SMART_PLAYLIST_MIN_DURATION_MS = "sp_min_duration_ms";
+    public static final String KEY_SMART_PLAYLIST_MAX_DURATION_MS = "sp_max_duration_ms";
+    public static final String KEY_SMART_PLAYLIST_MEDIA_TYPE = "sp_media_type";
+    public static final String KEY_SMART_PLAYLIST_EPISODE_LIMIT = "sp_episode_limit";
+    public static final String KEY_SMART_PLAYLIST_SORT_ORDER = "sp_sort_order";
+    public static final String KEY_SMART_PLAYLIST_EPISODE_ID = "sp_episode_id";
+
     // Table names
     public static final String TABLE_NAME_FEEDS = "Feeds";
     public static final String TABLE_NAME_FEED_ITEMS = "FeedItems";
@@ -138,6 +160,10 @@ public class PodDBAdapter {
     public static final String TABLE_NAME_QUEUE = "Queue";
     public static final String TABLE_NAME_SIMPLECHAPTERS = "SimpleChapters";
     public static final String TABLE_NAME_FAVORITES = "Favorites";
+    // FORK: Smart Playlist tables
+    public static final String TABLE_NAME_SMART_PLAYLISTS = "SmartPlaylists";
+    public static final String TABLE_NAME_SMART_PLAYLIST_RULES = "SmartPlaylistRules";
+    public static final String TABLE_NAME_SMART_PLAYLIST_EPISODES = "SmartPlaylistEpisodes";
 
     // SQL Statements for creating new tables
     private static final String TABLE_PRIMARY_KEY = KEY_ID
@@ -251,6 +277,39 @@ public class PodDBAdapter {
             + TABLE_NAME_FAVORITES + "(" + KEY_ID + " INTEGER PRIMARY KEY,"
             + KEY_FEEDITEM + " INTEGER," + KEY_FEED + " INTEGER)";
 
+    // FORK: Smart Playlist CREATE TABLE statements
+    static final String CREATE_TABLE_SMART_PLAYLISTS = "CREATE TABLE "
+            + TABLE_NAME_SMART_PLAYLISTS + " (" + KEY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+            + KEY_SMART_PLAYLIST_NAME + " TEXT,"
+            + KEY_SMART_PLAYLIST_AUTO_REGENERATE + " INTEGER DEFAULT 1,"
+            + KEY_SMART_PLAYLIST_GENERATED_AT + " INTEGER DEFAULT 0,"
+            + KEY_SMART_PLAYLIST_CREATED_AT + " INTEGER,"
+            + KEY_SMART_PLAYLIST_UPDATED_AT + " INTEGER)";
+
+    static final String CREATE_TABLE_SMART_PLAYLIST_RULES = "CREATE TABLE "
+            + TABLE_NAME_SMART_PLAYLIST_RULES + " (" + KEY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+            + KEY_SMART_PLAYLIST_ID + " INTEGER REFERENCES " + TABLE_NAME_SMART_PLAYLISTS + "(" + KEY_ID + ") ON DELETE CASCADE,"
+            + KEY_SMART_PLAYLIST_POSITION + " INTEGER DEFAULT 0,"
+            + KEY_SMART_PLAYLIST_FILTER_PROPERTIES + " TEXT DEFAULT '',"
+            + KEY_SMART_PLAYLIST_FEED_IDS + " TEXT DEFAULT '',"
+            + KEY_SMART_PLAYLIST_FEED_TAGS + " TEXT DEFAULT '',"
+            + KEY_SMART_PLAYLIST_MAX_AGE_DAYS + " INTEGER DEFAULT 0,"
+            + KEY_SMART_PLAYLIST_MIN_DURATION_MS + " INTEGER DEFAULT 0,"
+            + KEY_SMART_PLAYLIST_MAX_DURATION_MS + " INTEGER DEFAULT 0,"
+            + KEY_SMART_PLAYLIST_MEDIA_TYPE + " TEXT DEFAULT '',"
+            + KEY_SMART_PLAYLIST_EPISODE_LIMIT + " INTEGER DEFAULT 0,"
+            + KEY_SMART_PLAYLIST_SORT_ORDER + " TEXT DEFAULT 'NEWEST')";
+
+    static final String CREATE_TABLE_SMART_PLAYLIST_EPISODES = "CREATE TABLE "
+            + TABLE_NAME_SMART_PLAYLIST_EPISODES + " (" + KEY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+            + KEY_SMART_PLAYLIST_ID + " INTEGER REFERENCES " + TABLE_NAME_SMART_PLAYLISTS + "(" + KEY_ID + ") ON DELETE CASCADE,"
+            + KEY_SMART_PLAYLIST_EPISODE_ID + " INTEGER REFERENCES " + TABLE_NAME_FEED_ITEMS + "(" + KEY_ID + "),"
+            + KEY_SMART_PLAYLIST_POSITION + " INTEGER DEFAULT 0)";
+
+    static final String CREATE_INDEX_SMART_PLAYLIST_EPISODES_PLAYLIST =
+            "CREATE INDEX " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "_playlist ON "
+            + TABLE_NAME_SMART_PLAYLIST_EPISODES + " (" + KEY_SMART_PLAYLIST_ID + ")";
+
     /**
      * All the tables in the database
      */
@@ -261,7 +320,11 @@ public class PodDBAdapter {
             TABLE_NAME_DOWNLOAD_LOG,
             TABLE_NAME_QUEUE,
             TABLE_NAME_SIMPLECHAPTERS,
-            TABLE_NAME_FAVORITES
+            TABLE_NAME_FAVORITES,
+            // FORK: Smart Playlist tables
+            TABLE_NAME_SMART_PLAYLISTS,
+            TABLE_NAME_SMART_PLAYLIST_RULES,
+            TABLE_NAME_SMART_PLAYLIST_EPISODES
     };
 
     public static final String SELECT_KEY_ITEM_ID = "item_id";
@@ -1522,6 +1585,169 @@ public class PodDBAdapter {
         db.insert(table, null, values);
     }
 
+    // FORK: Smart Playlist CRUD methods
+
+    public Cursor getAllSmartPlaylistsCursor() {
+        final String query = "SELECT * FROM " + TABLE_NAME_SMART_PLAYLISTS
+                + " ORDER BY " + KEY_SMART_PLAYLIST_CREATED_AT + " ASC";
+        return db.rawQuery(query, null);
+    }
+
+    public Cursor getSmartPlaylistCursor(long playlistId) {
+        final String query = "SELECT * FROM " + TABLE_NAME_SMART_PLAYLISTS
+                + " WHERE " + KEY_ID + " = ?";
+        return db.rawQuery(query, new String[]{String.valueOf(playlistId)});
+    }
+
+    public Cursor getSmartPlaylistRulesCursor(long playlistId) {
+        final String query = "SELECT * FROM " + TABLE_NAME_SMART_PLAYLIST_RULES
+                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = ?"
+                + " ORDER BY " + KEY_SMART_PLAYLIST_POSITION + " ASC";
+        return db.rawQuery(query, new String[]{String.valueOf(playlistId)});
+    }
+
+    public int getSmartPlaylistEpisodeCount(long playlistId) {
+        final String query = "SELECT COUNT(*) FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
+                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = ?";
+        try (Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(playlistId)})) {
+            if (cursor.moveToFirst()) {
+                return cursor.getInt(0);
+            }
+        }
+        return 0;
+    }
+
+    public boolean isItemInSmartQueue(long queueId, long itemId) {
+        final String query = "SELECT COUNT(*) FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
+                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = ?"
+                + " AND " + KEY_SMART_PLAYLIST_EPISODE_ID + " = ?";
+        try (Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(queueId), String.valueOf(itemId)})) {
+            if (cursor.moveToFirst()) {
+                return cursor.getInt(0) > 0;
+            }
+        }
+        return false;
+    }
+
+    public Cursor getNextInSmartQueueCursor(long queueId, long currentItemId) {
+        final String query = "SELECT " + KEYS_FEED_ITEM_WITHOUT_DESCRIPTION + ", " + KEYS_FEED_MEDIA
+                + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
+                + " INNER JOIN " + TABLE_NAME_FEED_ITEMS
+                + " ON " + TABLE_NAME_FEED_ITEMS + "." + KEY_ID + " = "
+                + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_EPISODE_ID
+                + JOIN_FEED_ITEM_AND_MEDIA
+                + " WHERE " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_ID
+                + " = ?"
+                + " AND " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_POSITION
+                + " > (SELECT " + KEY_SMART_PLAYLIST_POSITION + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
+                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = ?"
+                + " AND " + KEY_SMART_PLAYLIST_EPISODE_ID + " = ?)"
+                + " ORDER BY " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_POSITION + " ASC"
+                + " LIMIT 1";
+        String queueIdStr = String.valueOf(queueId);
+        return db.rawQuery(query, new String[]{queueIdStr, queueIdStr, String.valueOf(currentItemId)});
+    }
+
+    public Cursor getSmartPlaylistEpisodesCursor(long playlistId) {
+        final String query = "SELECT " + KEYS_FEED_ITEM_WITHOUT_DESCRIPTION + ", " + KEYS_FEED_MEDIA
+                + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
+                + " INNER JOIN " + TABLE_NAME_FEED_ITEMS
+                + " ON " + TABLE_NAME_FEED_ITEMS + "." + KEY_ID + " = "
+                + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_EPISODE_ID
+                + JOIN_FEED_ITEM_AND_MEDIA
+                + " WHERE " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_ID
+                + " = ?"
+                + " ORDER BY " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_POSITION + " ASC";
+        return db.rawQuery(query, new String[]{String.valueOf(playlistId)});
+    }
+
+    public Cursor getSmartPlaylistRuleMatchesCursor(SmartPlaylistRule rule) {
+        String whereClause = SmartPlaylistRuleQuery.generateWhereClause(rule);
+        String orderClause = SmartPlaylistRuleQuery.generateOrderClause(rule);
+
+        String query = "SELECT " + KEYS_FEED_ITEM_WITHOUT_DESCRIPTION + ", " + KEYS_FEED_MEDIA
+                + " FROM " + TABLE_NAME_FEED_ITEMS
+                + JOIN_FEED_ITEM_AND_MEDIA
+                + " LEFT JOIN " + TABLE_NAME_FEEDS
+                + " ON " + TABLE_NAME_FEED_ITEMS + "." + KEY_FEED + " = "
+                + TABLE_NAME_FEEDS + "." + KEY_ID;
+
+        if (!android.text.TextUtils.isEmpty(whereClause)) {
+            query += " WHERE " + whereClause;
+        }
+        query += " ORDER BY " + orderClause;
+
+        if (rule.getEpisodeLimit() > 0) {
+            query += " LIMIT " + rule.getEpisodeLimit();
+        }
+
+        return db.rawQuery(query, null);
+    }
+
+    public long setSmartPlaylist(SmartPlaylist playlist) {
+        ContentValues values = new ContentValues();
+        values.put(KEY_SMART_PLAYLIST_NAME, playlist.getName());
+        values.put(KEY_SMART_PLAYLIST_AUTO_REGENERATE, playlist.isAutoRegenerate() ? 1 : 0);
+        values.put(KEY_SMART_PLAYLIST_GENERATED_AT, playlist.getGeneratedAt());
+        values.put(KEY_SMART_PLAYLIST_UPDATED_AT, System.currentTimeMillis());
+
+        if (playlist.getId() == 0) {
+            values.put(KEY_SMART_PLAYLIST_CREATED_AT, System.currentTimeMillis());
+            playlist.setId(db.insert(TABLE_NAME_SMART_PLAYLISTS, null, values));
+        } else {
+            db.update(TABLE_NAME_SMART_PLAYLISTS, values, KEY_ID + "=?",
+                    new String[]{String.valueOf(playlist.getId())});
+        }
+        return playlist.getId();
+    }
+
+    public long setSmartPlaylistRule(SmartPlaylistRule rule) {
+        ContentValues values = new ContentValues();
+        values.put(KEY_SMART_PLAYLIST_ID, rule.getPlaylistId());
+        values.put(KEY_SMART_PLAYLIST_POSITION, rule.getPosition());
+        values.put(KEY_SMART_PLAYLIST_FILTER_PROPERTIES, rule.getFilterProperties());
+        values.put(KEY_SMART_PLAYLIST_FEED_IDS, rule.getFeedIds());
+        values.put(KEY_SMART_PLAYLIST_FEED_TAGS, rule.getFeedTags());
+        values.put(KEY_SMART_PLAYLIST_MAX_AGE_DAYS, rule.getMaxAgeDays());
+        values.put(KEY_SMART_PLAYLIST_MIN_DURATION_MS, rule.getMinDurationMs());
+        values.put(KEY_SMART_PLAYLIST_MAX_DURATION_MS, rule.getMaxDurationMs());
+        values.put(KEY_SMART_PLAYLIST_MEDIA_TYPE, rule.getMediaType());
+        values.put(KEY_SMART_PLAYLIST_EPISODE_LIMIT, rule.getEpisodeLimit());
+        values.put(KEY_SMART_PLAYLIST_SORT_ORDER, rule.getSortOrder());
+
+        if (rule.getId() == 0) {
+            rule.setId(db.insert(TABLE_NAME_SMART_PLAYLIST_RULES, null, values));
+        } else {
+            db.update(TABLE_NAME_SMART_PLAYLIST_RULES, values, KEY_ID + "=?",
+                    new String[]{String.valueOf(rule.getId())});
+        }
+        return rule.getId();
+    }
+
+    public void deleteSmartPlaylistRulesForPlaylist(long playlistId) {
+        db.delete(TABLE_NAME_SMART_PLAYLIST_RULES, KEY_SMART_PLAYLIST_ID + "=?",
+                new String[]{String.valueOf(playlistId)});
+    }
+
+    public void deleteSmartPlaylistEpisodes(long playlistId) {
+        db.delete(TABLE_NAME_SMART_PLAYLIST_EPISODES, KEY_SMART_PLAYLIST_ID + "=?",
+                new String[]{String.valueOf(playlistId)});
+    }
+
+    public void insertSmartPlaylistEpisode(long playlistId, long episodeId, int position) {
+        ContentValues values = new ContentValues();
+        values.put(KEY_SMART_PLAYLIST_ID, playlistId);
+        values.put(KEY_SMART_PLAYLIST_EPISODE_ID, episodeId);
+        values.put(KEY_SMART_PLAYLIST_POSITION, position);
+        db.insert(TABLE_NAME_SMART_PLAYLIST_EPISODES, null, values);
+    }
+
+    public void deleteSmartPlaylist(long playlistId) {
+        // Cascading deletes remove rules and episodes automatically
+        db.delete(TABLE_NAME_SMART_PLAYLISTS, KEY_ID + "=?",
+                new String[]{String.valueOf(playlistId)});
+    }
+
     /**
      * Called when a database corruption happens.
      */
@@ -1568,6 +1794,10 @@ public class PodDBAdapter {
             db.execSQL(CREATE_TABLE_QUEUE);
             db.execSQL(CREATE_TABLE_SIMPLECHAPTERS);
             db.execSQL(CREATE_TABLE_FAVORITES);
+            // FORK: Smart Playlist tables
+            db.execSQL(CREATE_TABLE_SMART_PLAYLISTS);
+            db.execSQL(CREATE_TABLE_SMART_PLAYLIST_RULES);
+            db.execSQL(CREATE_TABLE_SMART_PLAYLIST_EPISODES);
 
             db.execSQL(CREATE_INDEX_FEEDITEMS_FEED);
             db.execSQL(CREATE_INDEX_FEEDITEMS_PUBDATE);
@@ -1575,6 +1805,8 @@ public class PodDBAdapter {
             db.execSQL(CREATE_INDEX_FEEDMEDIA_FEEDITEM);
             db.execSQL(CREATE_INDEX_QUEUE_FEEDITEM);
             db.execSQL(CREATE_INDEX_SIMPLECHAPTERS_FEEDITEM);
+            // FORK: Smart Playlist index
+            db.execSQL(CREATE_INDEX_SMART_PLAYLIST_EPISODES_PLAYLIST);
         }
 
         @Override

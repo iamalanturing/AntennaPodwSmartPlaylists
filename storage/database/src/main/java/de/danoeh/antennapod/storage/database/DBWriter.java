@@ -13,6 +13,8 @@ import androidx.documentfile.provider.DocumentFile;
 
 import com.google.common.util.concurrent.Futures;
 import de.danoeh.antennapod.event.DownloadLogEvent;
+import de.danoeh.antennapod.model.feed.SmartPlaylist;
+import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.net.download.serviceinterface.AutoDownloadManager;
@@ -985,6 +987,101 @@ public class DBWriter {
             }
         } else {
             Log.w(TAG, "removeFeedWithDownloadUrl: Could not find feed with url: " + downloadUrl);
+        }
+    }
+
+    // FORK: Smart Playlist write methods
+
+    public static Future<?> createSmartPlaylist(SmartPlaylist playlist, Context context) {
+        return runOnDbThread(() -> {
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            try {
+                long playlistId = adapter.setSmartPlaylist(playlist);
+                playlist.setId(playlistId);
+                for (int i = 0; i < playlist.getRules().size(); i++) {
+                    SmartPlaylistRule rule = playlist.getRules().get(i);
+                    rule.setPlaylistId(playlistId);
+                    rule.setPosition(i);
+                    adapter.setSmartPlaylistRule(rule);
+                }
+            } finally {
+                adapter.close();
+            }
+        });
+    }
+
+    public static Future<?> updateSmartPlaylist(SmartPlaylist playlist, Context context) {
+        return runOnDbThread(() -> {
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            try {
+                adapter.setSmartPlaylist(playlist);
+                adapter.deleteSmartPlaylistRulesForPlaylist(playlist.getId());
+                for (int i = 0; i < playlist.getRules().size(); i++) {
+                    SmartPlaylistRule rule = playlist.getRules().get(i);
+                    rule.setPlaylistId(playlist.getId());
+                    rule.setPosition(i);
+                    rule.setId(0); // force insert
+                    adapter.setSmartPlaylistRule(rule);
+                }
+            } finally {
+                adapter.close();
+            }
+        });
+    }
+
+    public static Future<?> deleteSmartPlaylist(long playlistId) {
+        return runOnDbThread(() -> {
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            try {
+                adapter.deleteSmartPlaylist(playlistId);
+            } finally {
+                adapter.close();
+            }
+        });
+    }
+
+    public static Future<?> generateSmartPlaylist(SmartPlaylist playlist) {
+        return runOnDbThread(() -> generateSmartPlaylistInternal(playlist));
+    }
+
+    // Synchronous variant — used when auto-regeneration fires during playback on the DB thread
+    public static void generateSmartPlaylistSync(SmartPlaylist playlist) {
+        generateSmartPlaylistInternal(playlist);
+    }
+
+    private static void generateSmartPlaylistInternal(SmartPlaylist playlist) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try {
+            adapter.deleteSmartPlaylistEpisodes(playlist.getId());
+
+            // Collect episodes from each rule and merge by position
+            List<Long> episodeIds = new ArrayList<>();
+            for (SmartPlaylistRule rule : playlist.getRules()) {
+                rule.setPlaylistId(playlist.getId());
+                try (android.database.Cursor cursor = adapter.getSmartPlaylistRuleMatchesCursor(rule)) {
+                    while (cursor.moveToNext()) {
+                        long itemId = cursor.getLong(
+                                cursor.getColumnIndexOrThrow(PodDBAdapter.SELECT_KEY_ITEM_ID));
+                        if (!episodeIds.contains(itemId)) {
+                            episodeIds.add(itemId);
+                        }
+                    }
+                }
+            }
+
+            for (int i = 0; i < episodeIds.size(); i++) {
+                adapter.insertSmartPlaylistEpisode(playlist.getId(), episodeIds.get(i), i);
+            }
+
+            // Update generatedAt timestamp
+            playlist.setGeneratedAt(System.currentTimeMillis());
+            adapter.setSmartPlaylist(playlist);
+        } finally {
+            adapter.close();
         }
     }
 
