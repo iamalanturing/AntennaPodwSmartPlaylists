@@ -1747,7 +1747,10 @@ public class PodDBAdapter {
     }
 
     public void deleteSmartPlaylist(long playlistId) {
-        // Cascading deletes remove rules and episodes automatically
+        // SQLite does not honor ON DELETE CASCADE unless PRAGMA foreign_keys is enabled, which
+        // AntennaPod does not set, so remove the child rows explicitly to avoid orphaned data.
+        deleteSmartPlaylistRulesForPlaylist(playlistId);
+        deleteSmartPlaylistEpisodes(playlistId);
         db.delete(TABLE_NAME_SMART_PLAYLISTS, KEY_ID + "=?",
                 new String[]{String.valueOf(playlistId)});
     }
