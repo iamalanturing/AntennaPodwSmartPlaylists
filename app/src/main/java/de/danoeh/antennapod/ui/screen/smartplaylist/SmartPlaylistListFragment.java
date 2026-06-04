@@ -65,6 +65,16 @@ public class SmartPlaylistListFragment extends Fragment {
     }
 
     @Override
+    public void onHiddenChanged(boolean hidden) {
+        super.onHiddenChanged(hidden);
+        // loadChildFragment hides (does not destroy) this fragment, so onCreateView does not re-run
+        // when returning from create/edit/detail. Reload here so new or deleted playlists are reflected.
+        if (!hidden) {
+            loadPlaylists();
+        }
+    }
+
+    @Override
     public void onDestroyView() {
         super.onDestroyView();
         if (disposable != null) {

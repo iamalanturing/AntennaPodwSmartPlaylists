@@ -10,6 +10,7 @@ import android.widget.EditText;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.SwitchCompat;
 import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -37,6 +38,7 @@ public class SmartPlaylistEditFragment extends Fragment {
     private SmartPlaylistRuleAdapter ruleAdapter;
     private Disposable disposable;
     private EditText nameEdit;
+    private SwitchCompat autoRebuildSwitch;
 
     public static SmartPlaylistEditFragment newInstance(long playlistId) {
         SmartPlaylistEditFragment fragment = new SmartPlaylistEditFragment();
@@ -70,6 +72,8 @@ public class SmartPlaylistEditFragment extends Fragment {
             }
             return false;
         });
+
+        autoRebuildSwitch = view.findViewById(R.id.auto_rebuild_switch);
 
         nameEdit = view.findViewById(R.id.smart_playlist_name_edit);
         nameEdit.addTextChangedListener(new TextWatcher() {
@@ -111,6 +115,7 @@ public class SmartPlaylistEditFragment extends Fragment {
                     if (result != null) {
                         playlist = result;
                         nameEdit.setText(playlist.getName());
+                        autoRebuildSwitch.setChecked(playlist.isAutoRegenerate());
                         if (ruleAdapter != null) {
                             ruleAdapter.setRules(playlist.getRules());
                         }
@@ -125,6 +130,7 @@ public class SmartPlaylistEditFragment extends Fragment {
             return;
         }
         playlist.setName(name);
+        playlist.setAutoRegenerate(autoRebuildSwitch.isChecked());
 
         if (playlistId == 0) {
             DBWriter.createSmartPlaylist(playlist, requireContext());

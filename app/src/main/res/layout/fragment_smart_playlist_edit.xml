@@ -35,10 +35,18 @@
 
             </com.google.android.material.textfield.TextInputLayout>
 
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/auto_rebuild_switch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:checked="true"
+                android:text="@string/smart_queue_auto_rebuild" />
+
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Rules"
+                android:text="@string/smart_queue_rules"
                 android:textAppearance="?attr/textAppearanceTitleMedium"
                 android:paddingTop="16dp"
                 android:paddingBottom="8dp" />

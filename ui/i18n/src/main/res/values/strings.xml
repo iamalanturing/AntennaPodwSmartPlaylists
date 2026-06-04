@@ -1089,6 +1089,7 @@
     <string name="smart_queue_media_type_any">Any</string>
     <string name="smart_queue_media_type_audio">Audio only</string>
     <string name="smart_queue_media_type_video">Video only</string>
+    <string name="smart_queue_rules">Rules</string>
     <string name="save_label">Save</string>
 </resources>
 
