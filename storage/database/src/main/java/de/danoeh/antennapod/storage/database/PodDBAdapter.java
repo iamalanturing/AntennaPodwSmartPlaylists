@@ -1568,21 +1568,21 @@ public class PodDBAdapter {
 
     public Cursor getSmartPlaylistCursor(long playlistId) {
         final String query = "SELECT * FROM " + TABLE_NAME_SMART_PLAYLISTS
-                + " WHERE " + KEY_ID + " = " + playlistId;
-        return db.rawQuery(query, null);
+                + " WHERE " + KEY_ID + " = ?";
+        return db.rawQuery(query, new String[]{String.valueOf(playlistId)});
     }
 
     public Cursor getSmartPlaylistRulesCursor(long playlistId) {
         final String query = "SELECT * FROM " + TABLE_NAME_SMART_PLAYLIST_RULES
-                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = " + playlistId
+                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = ?"
                 + " ORDER BY " + KEY_SMART_PLAYLIST_POSITION + " ASC";
-        return db.rawQuery(query, null);
+        return db.rawQuery(query, new String[]{String.valueOf(playlistId)});
     }
 
     public int getSmartPlaylistEpisodeCount(long playlistId) {
         final String query = "SELECT COUNT(*) FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
-                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = " + playlistId;
-        try (Cursor cursor = db.rawQuery(query, null)) {
+                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = ?";
+        try (Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(playlistId)})) {
             if (cursor.moveToFirst()) {
                 return cursor.getInt(0);
             }
@@ -1592,9 +1592,9 @@ public class PodDBAdapter {
 
     public boolean isItemInSmartQueue(long queueId, long itemId) {
         final String query = "SELECT COUNT(*) FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
-                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = " + queueId
-                + " AND " + KEY_SMART_PLAYLIST_EPISODE_ID + " = " + itemId;
-        try (Cursor cursor = db.rawQuery(query, null)) {
+                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = ?"
+                + " AND " + KEY_SMART_PLAYLIST_EPISODE_ID + " = ?";
+        try (Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(queueId), String.valueOf(itemId)})) {
             if (cursor.moveToFirst()) {
                 return cursor.getInt(0) > 0;
             }
@@ -1603,7 +1603,6 @@ public class PodDBAdapter {
     }
 
     public Cursor getNextInSmartQueueCursor(long queueId, long currentItemId) {
-        // Find the position of the current item, then return the episode at position + 1
         final String query = "SELECT " + KEYS_FEED_ITEM_WITHOUT_DESCRIPTION + ", " + KEYS_FEED_MEDIA
                 + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
                 + " INNER JOIN " + TABLE_NAME_FEED_ITEMS
@@ -1611,14 +1610,15 @@ public class PodDBAdapter {
                 + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_EPISODE_ID
                 + JOIN_FEED_ITEM_AND_MEDIA
                 + " WHERE " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_ID
-                + " = " + queueId
+                + " = ?"
                 + " AND " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_POSITION
                 + " > (SELECT " + KEY_SMART_PLAYLIST_POSITION + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
-                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = " + queueId
-                + " AND " + KEY_SMART_PLAYLIST_EPISODE_ID + " = " + currentItemId + ")"
+                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = ?"
+                + " AND " + KEY_SMART_PLAYLIST_EPISODE_ID + " = ?)"
                 + " ORDER BY " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_POSITION + " ASC"
                 + " LIMIT 1";
-        return db.rawQuery(query, null);
+        String queueIdStr = String.valueOf(queueId);
+        return db.rawQuery(query, new String[]{queueIdStr, queueIdStr, String.valueOf(currentItemId)});
     }
 
     public Cursor getSmartPlaylistEpisodesCursor(long playlistId) {
@@ -1629,9 +1629,9 @@ public class PodDBAdapter {
                 + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_EPISODE_ID
                 + JOIN_FEED_ITEM_AND_MEDIA
                 + " WHERE " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_ID
-                + " = " + playlistId
+                + " = ?"
                 + " ORDER BY " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_POSITION + " ASC";
-        return db.rawQuery(query, null);
+        return db.rawQuery(query, new String[]{String.valueOf(playlistId)});
     }
 
     /**
