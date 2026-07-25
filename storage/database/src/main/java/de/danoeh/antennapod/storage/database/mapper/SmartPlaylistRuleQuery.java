@@ -2,6 +2,7 @@ package de.danoeh.antennapod.storage.database.mapper;
 
 import android.text.TextUtils;
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
+import de.danoeh.antennapod.model.feed.FeedPreferences;
 import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 import de.danoeh.antennapod.storage.database.PodDBAdapter;
 
@@ -9,6 +10,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class SmartPlaylistRuleQuery {
+    /** Always-false condition, used to fail closed when a restriction resolves to no values. */
+    private static final String MATCH_NOTHING = "1=0";
+
     private SmartPlaylistRuleQuery() {
         // Must not be instantiated
     }
@@ -42,29 +46,44 @@ public class SmartPlaylistRuleQuery {
             if (!validatedIds.isEmpty()) {
                 conditions.add(PodDBAdapter.TABLE_NAME_FEED_ITEMS + "." + PodDBAdapter.KEY_FEED
                         + " IN (" + TextUtils.join(",", validatedIds) + ")");
+            } else {
+                // The user asked to restrict to specific feeds but not one id survived
+                // validation. Dropping the condition would widen the rule from "these podcasts"
+                // to "every podcast", so fail closed instead.
+                conditions.add(MATCH_NOTHING);
             }
         }
 
-        // Feed tags — LIKE search on the Feeds.tags column (comma-separated tag string).
-        // Escape LIKE wildcards (%, _) and backslash so user-supplied tags are treated literally.
+        // Feed tags — LIKE search on the Feeds.tags column, which stores tags joined by
+        // FeedPreferences.TAG_SEPARATOR. Both the column and the pattern are wrapped in that
+        // separator so a tag only matches a whole entry: a bare '%News%' would also match a
+        // feed tagged "NewsRoom". Escape LIKE wildcards (%, _) and backslash first so
+        // user-supplied tags are still treated literally.
         String feedTags = rule.getFeedTags();
         if (!TextUtils.isEmpty(feedTags)) {
             String[] tags = feedTags.split(",");
             List<String> tagConditions = new ArrayList<>();
+            String separator = android.database.DatabaseUtils.sqlEscapeString(
+                    FeedPreferences.TAG_SEPARATOR);
             for (String tag : tags) {
                 String trimmed = tag.trim();
                 if (!trimmed.isEmpty()) {
                     String escaped = trimmed.replace("\\", "\\\\")
                             .replace("%", "\\%").replace("_", "\\_");
                     String sanitized = android.database.DatabaseUtils.sqlEscapeString(
-                            "%" + escaped + "%");
-                    tagConditions.add(PodDBAdapter.TABLE_NAME_FEEDS + "."
-                            + PodDBAdapter.KEY_FEED_TAGS + " LIKE " + sanitized
-                            + " ESCAPE '\\'");
+                            "%" + FeedPreferences.TAG_SEPARATOR + escaped
+                                    + FeedPreferences.TAG_SEPARATOR + "%");
+                    tagConditions.add("(" + separator + " || " + PodDBAdapter.TABLE_NAME_FEEDS
+                            + "." + PodDBAdapter.KEY_FEED_TAGS + " || " + separator + ") LIKE "
+                            + sanitized + " ESCAPE '\\'");
                 }
             }
             if (!tagConditions.isEmpty()) {
                 conditions.add("(" + TextUtils.join(" OR ", tagConditions) + ")");
+            } else {
+                // Same reasoning as the feed id branch: a tag restriction that resolves to
+                // nothing must not silently become "match every feed".
+                conditions.add(MATCH_NOTHING);
             }
         }
 
