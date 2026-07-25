@@ -1041,6 +1041,12 @@ public class DBWriter {
             } finally {
                 adapter.close();
             }
+            // Drop the playback-side pointer too. The service recovers on its own once the
+            // membership rows are gone, but only at the next track transition; clearing it here
+            // means the deleted playlist stops being the active queue immediately.
+            if (PlaybackPreferences.getActiveSmartQueueId() == playlistId) {
+                PlaybackPreferences.clearActiveSmartQueueId();
+            }
         });
     }
 
@@ -1057,10 +1063,10 @@ public class DBWriter {
         PodDBAdapter adapter = PodDBAdapter.getInstance();
         adapter.open();
         try {
-            adapter.deleteSmartPlaylistEpisodes(playlist.getId());
-
             // Collect episodes from each rule and merge by position. LinkedHashSet preserves the
             // first-matched order while deduplicating in O(1) per item across large playlists.
+            // The existing list is left in place until the new one is ready, so the playlist is
+            // never empty for readers while the rule queries run.
             LinkedHashSet<Long> episodeIds = new LinkedHashSet<>();
             for (SmartPlaylistRule rule : playlist.getRules()) {
                 rule.setPlaylistId(playlist.getId());
@@ -1073,10 +1079,7 @@ public class DBWriter {
                 }
             }
 
-            int position = 0;
-            for (Long itemId : episodeIds) {
-                adapter.insertSmartPlaylistEpisode(playlist.getId(), itemId, position++);
-            }
+            adapter.replaceSmartPlaylistEpisodes(playlist.getId(), episodeIds);
 
             // Update generatedAt timestamp
             playlist.setGeneratedAt(System.currentTimeMillis());

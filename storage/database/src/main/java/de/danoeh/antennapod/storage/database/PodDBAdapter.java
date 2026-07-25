@@ -1006,6 +1006,12 @@ public class PodDBAdapter {
             db.delete(TABLE_NAME_FEED_MEDIA, KEY_ID + " IN (" + mediaIds + ")", null);
             db.delete(TABLE_NAME_FEED_ITEMS, KEY_ID + " IN (" + itemIds + ")", null);
             db.delete(TABLE_NAME_FAVORITES, KEY_FEEDITEM + " IN (" + itemIds + ")", null);
+            // Smart playlist membership is not covered by a foreign key, and SQLite does not
+            // enforce ON DELETE CASCADE unless PRAGMA foreign_keys is enabled, which AntennaPod
+            // does not set. Without this the rows outlive their episodes and inflate the counts
+            // reported by getSmartPlaylistEpisodeCount.
+            db.delete(TABLE_NAME_SMART_PLAYLIST_EPISODES,
+                    KEY_SMART_PLAYLIST_EPISODE_ID + " IN (" + itemIds + ")", null);
             db.setTransactionSuccessful();
         } catch (SQLException e) {
             Log.e(TAG, Log.getStackTraceString(e));
@@ -1744,6 +1750,29 @@ public class PodDBAdapter {
         values.put(KEY_SMART_PLAYLIST_EPISODE_ID, episodeId);
         values.put(KEY_SMART_PLAYLIST_POSITION, position);
         db.insert(TABLE_NAME_SMART_PLAYLIST_EPISODES, null, values);
+    }
+
+    /**
+     * Replaces the cached episode list of a smart playlist atomically. Regeneration runs on the
+     * playback thread while the UI reads the same rows, so doing the delete and the inserts in
+     * one transaction keeps readers from observing an empty or half-rebuilt playlist, and stops
+     * a crash mid-rebuild from leaving a truncated one behind. It also collapses what used to be
+     * one round trip per episode into a single commit.
+     */
+    public void replaceSmartPlaylistEpisodes(long playlistId, Iterable<Long> episodeIds) {
+        try {
+            db.beginTransactionNonExclusive();
+            deleteSmartPlaylistEpisodes(playlistId);
+            int position = 0;
+            for (Long episodeId : episodeIds) {
+                insertSmartPlaylistEpisode(playlistId, episodeId, position++);
+            }
+            db.setTransactionSuccessful();
+        } catch (SQLException e) {
+            Log.e(TAG, Log.getStackTraceString(e));
+        } finally {
+            db.endTransaction();
+        }
     }
 
     public void deleteSmartPlaylist(long playlistId) {
