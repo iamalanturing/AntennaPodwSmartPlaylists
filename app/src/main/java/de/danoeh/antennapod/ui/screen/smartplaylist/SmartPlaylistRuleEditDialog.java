@@ -89,10 +89,10 @@ public class SmartPlaylistRuleEditDialog {
                     rule.setMaxAgeDays(maxAgeStr.isEmpty() ? 0 : parseInt(maxAgeStr));
 
                     String minDurStr = minDurEdit.getText().toString().trim();
-                    rule.setMinDurationMs(minDurStr.isEmpty() ? 0 : parseInt(minDurStr) * 60000);
+                    rule.setMinDurationMs(minutesToMillis(minDurStr));
 
                     String maxDurStr = maxDurEdit.getText().toString().trim();
-                    rule.setMaxDurationMs(maxDurStr.isEmpty() ? 0 : parseInt(maxDurStr) * 60000);
+                    rule.setMaxDurationMs(minutesToMillis(maxDurStr));
 
                     rule.setSortOrder(sortValues[sortSpinner.getSelectedItemPosition()]);
 
@@ -141,5 +141,20 @@ public class SmartPlaylistRuleEditDialog {
         } catch (NumberFormatException e) {
             return 0;
         }
+    }
+
+    /**
+     * Converts a minutes field to milliseconds. Multiplying in {@code int} overflowed for
+     * anything from about 35 792 minutes upwards, wrapping negative; the rule compiler only
+     * emits a duration condition when the value is positive, so the filter silently vanished
+     * instead of being applied. Widen to {@code long} and saturate at {@link Integer#MAX_VALUE},
+     * which is the largest value the rule model can hold (~24 days) and far beyond any episode.
+     */
+    private static int minutesToMillis(String s) {
+        if (s.isEmpty()) {
+            return 0;
+        }
+        long millis = (long) parseInt(s) * 60000L;
+        return (int) Math.max(0, Math.min(millis, Integer.MAX_VALUE));
     }
 }
