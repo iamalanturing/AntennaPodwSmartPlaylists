@@ -21,29 +21,67 @@ public class SmartPlaylist implements Serializable {
         this.updatedAt = this.createdAt;
     }
 
-    public long getId() { return id; }
-    public void setId(long id) { this.id = id; }
+    public long getId() {
+        return id;
+    }
 
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
+    public void setId(long id) {
+        this.id = id;
+    }
 
-    public boolean isAutoRegenerate() { return autoRegenerate; }
-    public void setAutoRegenerate(boolean autoRegenerate) { this.autoRegenerate = autoRegenerate; }
+    public String getName() {
+        return name;
+    }
 
-    public long getGeneratedAt() { return generatedAt; }
-    public void setGeneratedAt(long generatedAt) { this.generatedAt = generatedAt; }
+    public void setName(String name) {
+        this.name = name;
+    }
 
-    public long getCreatedAt() { return createdAt; }
-    public void setCreatedAt(long createdAt) { this.createdAt = createdAt; }
+    public boolean isAutoRegenerate() {
+        return autoRegenerate;
+    }
 
-    public long getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(long updatedAt) { this.updatedAt = updatedAt; }
+    public void setAutoRegenerate(boolean autoRegenerate) {
+        this.autoRegenerate = autoRegenerate;
+    }
 
-    public List<SmartPlaylistRule> getRules() { return rules; }
+    public long getGeneratedAt() {
+        return generatedAt;
+    }
+
+    public void setGeneratedAt(long generatedAt) {
+        this.generatedAt = generatedAt;
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public long getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(long updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public List<SmartPlaylistRule> getRules() {
+        return rules;
+    }
+
     public void setRules(List<SmartPlaylistRule> rules) {
         this.rules = rules != null ? rules : new ArrayList<>();
     }
 
-    public int getEpisodeCount() { return episodeCount; }
-    public void setEpisodeCount(int episodeCount) { this.episodeCount = episodeCount; }
+    public int getEpisodeCount() {
+        return episodeCount;
+    }
+
+    public void setEpisodeCount(int episodeCount) {
+        this.episodeCount = episodeCount;
+    }
 }

@@ -21,8 +21,6 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -59,7 +57,7 @@ public class SmartPlaylistsSection extends HomeSection {
                     playlists.clear();
                     playlists.addAll(result);
                     cardAdapter.notifyDataSetChanged();
-                }, error -> {});
+                }, error -> { });
     }
 
     @Override

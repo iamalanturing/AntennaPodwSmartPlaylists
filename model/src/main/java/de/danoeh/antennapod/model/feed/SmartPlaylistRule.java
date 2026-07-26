@@ -28,42 +28,98 @@ public class SmartPlaylistRule implements Serializable {
         this.sortOrder = "NEWEST";
     }
 
-    public long getId() { return id; }
-    public void setId(long id) { this.id = id; }
+    public long getId() {
+        return id;
+    }
 
-    public long getPlaylistId() { return playlistId; }
-    public void setPlaylistId(long playlistId) { this.playlistId = playlistId; }
+    public void setId(long id) {
+        this.id = id;
+    }
 
-    public int getPosition() { return position; }
-    public void setPosition(int position) { this.position = position; }
+    public long getPlaylistId() {
+        return playlistId;
+    }
 
-    public String getFilterProperties() { return filterProperties; }
+    public void setPlaylistId(long playlistId) {
+        this.playlistId = playlistId;
+    }
+
+    public int getPosition() {
+        return position;
+    }
+
+    public void setPosition(int position) {
+        this.position = position;
+    }
+
+    public String getFilterProperties() {
+        return filterProperties;
+    }
+
     public void setFilterProperties(String filterProperties) {
         this.filterProperties = filterProperties != null ? filterProperties : "";
     }
 
-    public String getFeedIds() { return feedIds; }
-    public void setFeedIds(String feedIds) { this.feedIds = feedIds != null ? feedIds : ""; }
+    public String getFeedIds() {
+        return feedIds;
+    }
 
-    public String getFeedTags() { return feedTags; }
-    public void setFeedTags(String feedTags) { this.feedTags = feedTags != null ? feedTags : ""; }
+    public void setFeedIds(String feedIds) {
+        this.feedIds = feedIds != null ? feedIds : "";
+    }
 
-    public int getMaxAgeDays() { return maxAgeDays; }
-    public void setMaxAgeDays(int maxAgeDays) { this.maxAgeDays = maxAgeDays; }
+    public String getFeedTags() {
+        return feedTags;
+    }
 
-    public int getMinDurationMs() { return minDurationMs; }
-    public void setMinDurationMs(int minDurationMs) { this.minDurationMs = minDurationMs; }
+    public void setFeedTags(String feedTags) {
+        this.feedTags = feedTags != null ? feedTags : "";
+    }
 
-    public int getMaxDurationMs() { return maxDurationMs; }
-    public void setMaxDurationMs(int maxDurationMs) { this.maxDurationMs = maxDurationMs; }
+    public int getMaxAgeDays() {
+        return maxAgeDays;
+    }
 
-    public String getMediaType() { return mediaType; }
-    public void setMediaType(String mediaType) { this.mediaType = mediaType != null ? mediaType : ""; }
+    public void setMaxAgeDays(int maxAgeDays) {
+        this.maxAgeDays = maxAgeDays;
+    }
 
-    public int getEpisodeLimit() { return episodeLimit; }
-    public void setEpisodeLimit(int episodeLimit) { this.episodeLimit = episodeLimit; }
+    public int getMinDurationMs() {
+        return minDurationMs;
+    }
 
-    public String getSortOrder() { return sortOrder; }
+    public void setMinDurationMs(int minDurationMs) {
+        this.minDurationMs = minDurationMs;
+    }
+
+    public int getMaxDurationMs() {
+        return maxDurationMs;
+    }
+
+    public void setMaxDurationMs(int maxDurationMs) {
+        this.maxDurationMs = maxDurationMs;
+    }
+
+    public String getMediaType() {
+        return mediaType;
+    }
+
+    public void setMediaType(String mediaType) {
+        this.mediaType = mediaType != null ? mediaType : "";
+    }
+
+    public int getEpisodeLimit() {
+        return episodeLimit;
+    }
+
+    public void setEpisodeLimit(int episodeLimit) {
+        this.episodeLimit = episodeLimit;
+    }
+
+    public String getSortOrder() {
+        return sortOrder;
+    }
+
     public void setSortOrder(String sortOrder) {
         this.sortOrder = sortOrder != null ? sortOrder : "NEWEST";
     }

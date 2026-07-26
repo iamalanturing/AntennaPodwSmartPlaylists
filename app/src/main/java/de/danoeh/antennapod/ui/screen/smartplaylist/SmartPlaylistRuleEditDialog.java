@@ -80,7 +80,9 @@ public class SmartPlaylistRuleEditDialog {
                     // Collect filter chips
                     List<String> props = new ArrayList<>();
                     for (String p : activeFilters) {
-                        if (!p.isEmpty()) props.add(p);
+                        if (!p.isEmpty()) {
+                            props.add(p);
+                        }
                     }
                     rule.setFilterProperties(String.join(",", props));
                     rule.setFeedTags(tagsEdit.getText().toString().trim());
@@ -123,10 +125,18 @@ public class SmartPlaylistRuleEditDialog {
                 if (checked) {
                     activeFilters.add(option[0]);
                     // Remove conflicting state
-                    if (option[0].equals(FeedItemFilter.UNPLAYED)) activeFilters.remove(FeedItemFilter.PLAYED);
-                    if (option[0].equals(FeedItemFilter.PLAYED)) activeFilters.remove(FeedItemFilter.UNPLAYED);
-                    if (option[0].equals(FeedItemFilter.DOWNLOADED)) activeFilters.remove(FeedItemFilter.NOT_DOWNLOADED);
-                    if (option[0].equals(FeedItemFilter.NOT_DOWNLOADED)) activeFilters.remove(FeedItemFilter.DOWNLOADED);
+                    if (option[0].equals(FeedItemFilter.UNPLAYED)) {
+                        activeFilters.remove(FeedItemFilter.PLAYED);
+                    }
+                    if (option[0].equals(FeedItemFilter.PLAYED)) {
+                        activeFilters.remove(FeedItemFilter.UNPLAYED);
+                    }
+                    if (option[0].equals(FeedItemFilter.DOWNLOADED)) {
+                        activeFilters.remove(FeedItemFilter.NOT_DOWNLOADED);
+                    }
+                    if (option[0].equals(FeedItemFilter.NOT_DOWNLOADED)) {
+                        activeFilters.remove(FeedItemFilter.DOWNLOADED);
+                    }
                 } else {
                     activeFilters.remove(option[0]);
                 }

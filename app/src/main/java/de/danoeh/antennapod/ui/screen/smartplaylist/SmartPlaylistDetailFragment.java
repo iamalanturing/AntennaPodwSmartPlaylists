@@ -2,7 +2,6 @@ package de.danoeh.antennapod.ui.screen.smartplaylist;
 
 import android.os.Bundle;
 import android.view.LayoutInflater;
-import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
@@ -122,7 +121,7 @@ public class SmartPlaylistDetailFragment extends Fragment {
                     episodeAdapter.setDummyViews(0);
                     episodeAdapter.updateItems(episodes);
                     emptyView.setVisibility(episodes.isEmpty() ? View.VISIBLE : View.GONE);
-                }, error -> {});
+                }, error -> { });
     }
 
     private boolean onMenuItemClick(MenuItem item) {
@@ -162,7 +161,7 @@ public class SmartPlaylistDetailFragment extends Fragment {
                     episodes.addAll(result);
                     episodeAdapter.updateItems(episodes);
                     emptyView.setVisibility(episodes.isEmpty() ? View.VISIBLE : View.GONE);
-                }, error -> {});
+                }, error -> { });
     }
 
     private void startPlayback() {

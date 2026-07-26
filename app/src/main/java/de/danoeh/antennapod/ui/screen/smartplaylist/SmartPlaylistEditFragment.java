@@ -16,7 +16,6 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import de.danoeh.antennapod.R;
-import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.ui.common.ThemeUtils;
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
@@ -27,7 +26,6 @@ import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
-import java.util.ArrayList;
 
 public class SmartPlaylistEditFragment extends Fragment {
     public static final String TAG = "SmartPlaylistEditFrag";
@@ -77,8 +75,12 @@ public class SmartPlaylistEditFragment extends Fragment {
 
         nameEdit = view.findViewById(R.id.smart_playlist_name_edit);
         nameEdit.addTextChangedListener(new TextWatcher() {
-            public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
-            public void onTextChanged(CharSequence s, int st, int b, int c) {}
+            public void beforeTextChanged(CharSequence s, int st, int c, int a) {
+            }
+
+            public void onTextChanged(CharSequence s, int st, int b, int c) {
+            }
+
             public void afterTextChanged(Editable s) {
                 if (playlist != null) {
                     playlist.setName(s.toString().trim());
@@ -120,7 +122,7 @@ public class SmartPlaylistEditFragment extends Fragment {
                             ruleAdapter.setRules(playlist.getRules());
                         }
                     }
-                }, error -> {});
+                }, error -> { });
     }
 
     private void savePlaylist() {

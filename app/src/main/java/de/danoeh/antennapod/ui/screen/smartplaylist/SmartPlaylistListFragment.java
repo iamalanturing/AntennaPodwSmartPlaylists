@@ -61,7 +61,7 @@ public class SmartPlaylistListFragment extends Fragment {
                     playlists.clear();
                     playlists.addAll(result);
                     adapter.notifyDataSetChanged();
-                }, error -> {});
+                }, error -> { });
     }
 
     @Override
