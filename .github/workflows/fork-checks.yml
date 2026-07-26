@@ -1,0 +1,83 @@
+# Fork-only CI.
+#
+# Upstream's .github/workflows/checks.yml is the source of truth for how this project is built,
+# but it only triggers on master/develop and on pull requests, so fork feature branches never run
+# it. This file exists so they do. It is deliberately a lean subset -- compile, unit tests, static
+# analysis -- and skips the emulator tests and the three-variant matrix, because the point is to
+# catch "does it build and do the tests pass" on every push.
+#
+# Keeping it separate rather than editing checks.yml means it never conflicts when merging
+# upstream. The trade-off is drift: re-check this against upstream's checks.yml during each
+# upstream sync and adopt anything that matters (see FORK.md).
+name: Fork Checks
+
+on:
+  push:
+    branches: [ 'claude/**' ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: "Build and Unit Test"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Cache Gradle
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle*') }}-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Configure parallel build
+        run: echo "org.gradle.parallel=true" >> local.properties
+      - name: Create temporary release keystore
+        # app/build.gradle resolves signingConfigs at configuration time, so this has to exist
+        # even for a debug assemble.
+        run: |
+          keytool -noprompt -genkey -v -keystore "app/keystore" -alias alias -storepass password -keypass password -keyalg RSA -validity 10 -dname "CN=antennapod.org, OU=dummy, O=dummy, L=dummy, S=dummy, C=US"
+          cp app/keystore app-wearos/keystore
+      - name: Build
+        run: ./gradlew assemblePlayDebug
+      - name: Test
+        # testDebugUnitTest is the one that covers the library modules, which is where the
+        # Smart Queue tests live (storage/database/src/test).
+        run: ./gradlew testPlayDebugUnitTest testDebugUnitTest
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: '**/build/reports/tests/'
+
+  static-analysis:
+    name: "Static Code Analysis"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Cache Gradle
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle*') }}-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Configure parallel build
+        run: echo "org.gradle.parallel=true" >> local.properties
+      - name: Checkstyle, Lint
+        run: ./gradlew checkstyle lint
+      - name: Generate readable error messages for GitHub
+        if: failure()
+        run: python .github/workflows/errorPrinter.py
