@@ -25,12 +25,30 @@ android {
             keyAlias project.getProperties().getOrDefault("releaseKeyAlias", "alias")
             keyPassword project.getProperties().getOrDefault("releaseKeyPassword", "password")
         }
+        // FORK: a stable debug key, supplied out of band via local.properties (CI decodes it
+        // from a secret). Debug builds are otherwise signed with a keystore each machine
+        // generates for itself, so two builds of this fork could not update one another --
+        // Android refuses to install across signatures. Absent the properties this block is
+        // not registered at all and the normal per-machine debug key is used.
+        if (project.hasProperty("forkDebugStoreFile")) {
+            forkDebugConfig {
+                enableV1Signing true
+                enableV2Signing true
+                storeFile file(project.property("forkDebugStoreFile"))
+                storePassword project.property("forkDebugStorePassword")
+                keyAlias project.property("forkDebugKeyAlias")
+                keyPassword project.property("forkDebugKeyPassword")
+            }
+        }
     }
 
     buildTypes {
         debug {
             applicationIdSuffix ".debug"
             resValue "string", "provider_authority", "de.danoeh.antennapod.debug.provider"
+            if (project.hasProperty("forkDebugStoreFile")) {
+                signingConfig signingConfigs.forkDebugConfig
+            }
         }
         release {
             resValue "string", "provider_authority", "de.danoeh.antennapod.provider"

@@ -43,6 +43,29 @@ jobs:
         run: |
           keytool -noprompt -genkey -v -keystore "app/keystore" -alias alias -storepass password -keypass password -keyalg RSA -validity 10 -dname "CN=antennapod.org, OU=dummy, O=dummy, L=dummy, S=dummy, C=US"
           cp app/keystore app-wearos/keystore
+      - name: Install fork debug signing key
+        # Without this, every runner invents its own debug keystore and the resulting APKs
+        # cannot update one another -- Android refuses to install across signatures. Decoding a
+        # stable key from a secret means each CI build installs over the previous one.
+        # Optional: if the secret is absent (a fork of this fork, say) the build still works,
+        # it just falls back to the throwaway per-runner debug key.
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+          DEBUG_KEYSTORE_PASSWORD: ${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$DEBUG_KEYSTORE_BASE64" ]; then
+            echo "DEBUG_KEYSTORE_BASE64 not set - falling back to the per-runner debug key."
+            echo "APKs from this run will NOT install over one signed with the fork key."
+            exit 0
+          fi
+          echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > app/fork-debug.keystore
+          {
+            echo "forkDebugStoreFile=fork-debug.keystore"
+            echo "forkDebugStorePassword=$DEBUG_KEYSTORE_PASSWORD"
+            echo "forkDebugKeyAlias=forkdebug"
+            echo "forkDebugKeyPassword=$DEBUG_KEYSTORE_PASSWORD"
+          } >> local.properties
+          echo "Fork debug signing key installed."
       - name: Build
         run: ./gradlew assemblePlayDebug
       - name: Test
@@ -50,8 +73,6 @@ jobs:
         # Smart Queue tests live (storage/database/src/test).
         run: ./gradlew testPlayDebugUnitTest testDebugUnitTest
       - name: Upload APK
-        # Signed with whatever debug keystore the runner generates, which differs from any
-        # locally built APK. It will not install over an existing install -- see FORK.md.
         uses: actions/upload-artifact@v4
         with:
           name: app-play-debug
