@@ -37,7 +37,7 @@
                 android:id="@+id/rule_tags_edit"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="e.g. tech, science" />
+                android:hint="@string/smart_queue_rule_tags_hint" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <TextView
@@ -55,7 +55,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="number"
-                android:hint="0 = no limit" />
+                android:hint="@string/smart_queue_no_limit" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <LinearLayout
@@ -118,7 +118,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="number"
-                android:hint="0 = no limit" />
+                android:hint="@string/smart_queue_no_limit" />
         </com.google.android.material.textfield.TextInputLayout>
 
     </LinearLayout>
