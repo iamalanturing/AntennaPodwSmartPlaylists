@@ -16,7 +16,16 @@ class DBUpgrader {
     /**
      * Upgrades the given database to a new schema version
      */
-    static void upgrade(final SQLiteDatabase db, final int oldVersion, final int newVersion) {
+    static void upgrade(final SQLiteDatabase db, final int stampedVersion, final int newVersion) {
+        // FORK: the version stamp is not a reliable statement about the upstream schema. This
+        // fork set VERSION to 3120000 before upstream got there, so a fork-stamped database
+        // claims an upstream level it does not have. Feeding that stamp straight into the chain
+        // below would mean an upstream migration numbered at or below 3120000 never runs, and
+        // the failure would be silent — the new columns would simply be missing. Drive the chain
+        // off the separately recorded level instead. Creating the fork schema first is what
+        // makes that record readable; it is idempotent.
+        PodDBAdapter.createForkSchema(db);
+        final int oldVersion = PodDBAdapter.readUpstreamSchemaLevel(db, stampedVersion);
         if (oldVersion <= 1) {
             db.execSQL("ALTER TABLE " + PodDBAdapter.TABLE_NAME_FEEDS + " ADD COLUMN "
                     + PodDBAdapter.KEY_TYPE + " TEXT");
@@ -355,14 +364,10 @@ class DBUpgrader {
             db.execSQL("DELETE FROM " + PodDBAdapter.TABLE_NAME_FAVORITES + " WHERE " + PodDBAdapter.KEY_FEEDITEM
                     + " NOT IN (SELECT " + PodDBAdapter.KEY_ID + " FROM " + PodDBAdapter.TABLE_NAME_FEED_ITEMS + ")");
         }
-        // FORK: Smart Playlist tables
-        if (oldVersion < 3120000) {
-            db.execSQL(PodDBAdapter.CREATE_TABLE_SMART_PLAYLISTS);
-            db.execSQL(PodDBAdapter.CREATE_TABLE_SMART_PLAYLIST_RULES);
-            db.execSQL(PodDBAdapter.CREATE_TABLE_SMART_PLAYLIST_EPISODES);
-            db.execSQL(PodDBAdapter.CREATE_INDEX_SMART_PLAYLIST_EPISODES_PLAYLIST);
-            db.execSQL(PodDBAdapter.CREATE_INDEX_SMART_PLAYLIST_RULES_PLAYLIST);
-        }
+        // FORK: the upstream chain above has now been applied up to the level this fork ships.
+        // Record it so the next upgrade starts from here instead of replaying those migrations —
+        // replaying an ALTER TABLE ADD COLUMN would fail and leave the app unable to open.
+        PodDBAdapter.writeUpstreamSchemaLevel(db, PodDBAdapter.UPSTREAM_SCHEMA_LEVEL);
     }
 
 }

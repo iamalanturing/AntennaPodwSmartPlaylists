@@ -61,6 +61,51 @@ public class PodDBAdapter {
     public static final int VERSION = 3120000; // FORK: bumped for SmartPlaylist tables
 
     /**
+     * FORK: how far through upstream's migration chain the code in this fork actually goes.
+     *
+     * <p>{@link #VERSION} was bumped to 3120000 to carry the Smart Queue tables, but upstream had
+     * not reached that number — its own VERSION is still 3110000. The stamp therefore claims an
+     * upstream schema level the database does not have, and once upstream ships a migration of
+     * its own numbered at or below 3120000, every already-stamped device would skip it: the
+     * chain in {@link DBUpgrader} is written as {@code if (oldVersion < N)}, and the stamp is
+     * already >= N. Nothing would fail loudly — upstream's new columns would simply be absent.
+     *
+     * <p>So the upstream chain is driven by a separately recorded level (see
+     * {@link #readUpstreamSchemaLevel}) rather than by the stamp. Note the level has to be
+     * persisted rather than derived: deriving it would make the chain re-run on every subsequent
+     * upgrade, and re-running an {@code ALTER TABLE ADD COLUMN} fails outright.
+     *
+     * <p><b>Raise this to upstream's VERSION whenever upstream is merged in</b>, in the same
+     * commit as the merge. That is what makes the newly merged migrations run once, and only
+     * once, on existing installs.
+     */
+    static final int UPSTREAM_SCHEMA_LEVEL = 3110000;
+
+    /**
+     * FORK: the stamp the fork's original migration wrote, and the upstream level a database
+     * carrying it actually has.
+     *
+     * <p>These are historical facts and must never be edited — unlike {@link
+     * #UPSTREAM_SCHEMA_LEVEL}, which moves with each upstream merge. They are what lets a device
+     * that predates the {@link #TABLE_NAME_FORK_SCHEMA} bookkeeping be placed correctly on the
+     * upstream chain. Deriving the fallback from the moving constant instead would defeat the
+     * whole mechanism: the moment {@code VERSION} is bumped during a merge, those devices would
+     * be mistaken for genuine upstream installs and would skip the very migration being added.
+     */
+    private static final int LEGACY_FORK_STAMP = 3120000;
+    private static final int LEGACY_FORK_UPSTREAM_LEVEL = 3110000;
+
+    /** FORK: fork-owned bookkeeping that must not collide with any upstream table name. */
+    static final String TABLE_NAME_FORK_SCHEMA = "ForkSchema";
+    private static final String KEY_FORK_SCHEMA_NAME = "name";
+    private static final String KEY_FORK_SCHEMA_VALUE = "value";
+    private static final String FORK_SCHEMA_UPSTREAM_LEVEL = "upstream_level";
+
+    private static final String CREATE_TABLE_FORK_SCHEMA = "CREATE TABLE IF NOT EXISTS "
+            + TABLE_NAME_FORK_SCHEMA + " (" + KEY_FORK_SCHEMA_NAME + " TEXT PRIMARY KEY,"
+            + KEY_FORK_SCHEMA_VALUE + " INTEGER NOT NULL)";
+
+    /**
      * Maximum number of arguments for IN-operator.
      */
     private static final int IN_OPERATOR_MAXIMUM = 800;
@@ -278,7 +323,7 @@ public class PodDBAdapter {
             + KEY_FEEDITEM + " INTEGER," + KEY_FEED + " INTEGER)";
 
     // FORK: Smart Playlist CREATE TABLE statements
-    static final String CREATE_TABLE_SMART_PLAYLISTS = "CREATE TABLE "
+    static final String CREATE_TABLE_SMART_PLAYLISTS = "CREATE TABLE IF NOT EXISTS "
             + TABLE_NAME_SMART_PLAYLISTS + " (" + KEY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
             + KEY_SMART_PLAYLIST_NAME + " TEXT NOT NULL,"
             + KEY_SMART_PLAYLIST_AUTO_REGENERATE + " INTEGER DEFAULT 1,"
@@ -286,7 +331,7 @@ public class PodDBAdapter {
             + KEY_SMART_PLAYLIST_CREATED_AT + " INTEGER NOT NULL,"
             + KEY_SMART_PLAYLIST_UPDATED_AT + " INTEGER NOT NULL)";
 
-    static final String CREATE_TABLE_SMART_PLAYLIST_RULES = "CREATE TABLE "
+    static final String CREATE_TABLE_SMART_PLAYLIST_RULES = "CREATE TABLE IF NOT EXISTS "
             + TABLE_NAME_SMART_PLAYLIST_RULES + " (" + KEY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
             + KEY_SMART_PLAYLIST_ID + " INTEGER REFERENCES " + TABLE_NAME_SMART_PLAYLISTS + "(" + KEY_ID + ") ON DELETE CASCADE,"
             + KEY_SMART_PLAYLIST_POSITION + " INTEGER DEFAULT 0,"
@@ -300,22 +345,27 @@ public class PodDBAdapter {
             + KEY_SMART_PLAYLIST_EPISODE_LIMIT + " INTEGER DEFAULT 0,"
             + KEY_SMART_PLAYLIST_SORT_ORDER + " TEXT DEFAULT 'NEWEST')";
 
-    static final String CREATE_TABLE_SMART_PLAYLIST_EPISODES = "CREATE TABLE "
+    static final String CREATE_TABLE_SMART_PLAYLIST_EPISODES = "CREATE TABLE IF NOT EXISTS "
             + TABLE_NAME_SMART_PLAYLIST_EPISODES + " (" + KEY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
             + KEY_SMART_PLAYLIST_ID + " INTEGER REFERENCES " + TABLE_NAME_SMART_PLAYLISTS + "(" + KEY_ID + ") ON DELETE CASCADE,"
             + KEY_SMART_PLAYLIST_EPISODE_ID + " INTEGER REFERENCES " + TABLE_NAME_FEED_ITEMS + "(" + KEY_ID + "),"
             + KEY_SMART_PLAYLIST_POSITION + " INTEGER DEFAULT 0)";
 
     static final String CREATE_INDEX_SMART_PLAYLIST_EPISODES_PLAYLIST =
-            "CREATE INDEX " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "_playlist ON "
+            "CREATE INDEX IF NOT EXISTS " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "_playlist ON "
             + TABLE_NAME_SMART_PLAYLIST_EPISODES + " (" + KEY_SMART_PLAYLIST_ID + ")";
 
     static final String CREATE_INDEX_SMART_PLAYLIST_RULES_PLAYLIST =
-            "CREATE INDEX " + TABLE_NAME_SMART_PLAYLIST_RULES + "_playlist ON "
+            "CREATE INDEX IF NOT EXISTS " + TABLE_NAME_SMART_PLAYLIST_RULES + "_playlist ON "
             + TABLE_NAME_SMART_PLAYLIST_RULES + " (" + KEY_SMART_PLAYLIST_ID + ")";
 
     /**
-     * All the tables in the database
+     * All the tables in the database.
+     *
+     * <p>Drives {@link #deleteDatabase()}, which clears user content. FORK: TABLE_NAME_FORK_SCHEMA
+     * is deliberately absent — it records how far the upstream migration chain has been applied,
+     * which is a property of the schema rather than of the user's data, and wiping content must
+     * not make the next upgrade replay migrations that have already run.
      */
     private static final String[] ALL_TABLES = {
             TABLE_NAME_FEEDS,
@@ -1809,6 +1859,54 @@ public class PodDBAdapter {
     /**
      * Helper class for opening the Antennapod database.
      */
+    /**
+     * FORK: creates everything this fork adds — its bookkeeping table plus the Smart Queue
+     * tables and indexes — if they are not already present.
+     *
+     * <p>Every statement is {@code IF NOT EXISTS}, so this is safe on a fresh database and on
+     * one that already has them. Applying the fork's schema this way, rather than gating it
+     * behind {@code if (oldVersion < 3120000)}, means it cannot be missed because of whatever
+     * version stamp the database happens to carry — which matters precisely because upstream
+     * will eventually move its own numbering through the range this fork already claimed.
+     */
+    static void createForkSchema(final SQLiteDatabase db) {
+        db.execSQL(CREATE_TABLE_FORK_SCHEMA);
+        db.execSQL(CREATE_TABLE_SMART_PLAYLISTS);
+        db.execSQL(CREATE_TABLE_SMART_PLAYLIST_RULES);
+        db.execSQL(CREATE_TABLE_SMART_PLAYLIST_EPISODES);
+        db.execSQL(CREATE_INDEX_SMART_PLAYLIST_EPISODES_PLAYLIST);
+        db.execSQL(CREATE_INDEX_SMART_PLAYLIST_RULES_PLAYLIST);
+    }
+
+    /**
+     * FORK: how far through upstream's migration chain this database has actually been taken.
+     *
+     * <p>Falls back to reading it off the version stamp the first time, for databases written
+     * before this bookkeeping existed. A stamp at or above {@link #LEGACY_FORK_STAMP} can only
+     * have been produced by the fork's original migration, which applied upstream's
+     * {@link #LEGACY_FORK_UPSTREAM_LEVEL} schema and nothing beyond it. Any lower stamp is a
+     * genuine upstream version and is trusted as-is.
+     */
+    static int readUpstreamSchemaLevel(final SQLiteDatabase db, final int stampedVersion) {
+        try (Cursor cursor = db.rawQuery("SELECT " + KEY_FORK_SCHEMA_VALUE + " FROM "
+                        + TABLE_NAME_FORK_SCHEMA + " WHERE " + KEY_FORK_SCHEMA_NAME + "=?",
+                new String[]{FORK_SCHEMA_UPSTREAM_LEVEL})) {
+            if (cursor.moveToFirst()) {
+                return cursor.getInt(0);
+            }
+        }
+        return stampedVersion >= LEGACY_FORK_STAMP ? LEGACY_FORK_UPSTREAM_LEVEL : stampedVersion;
+    }
+
+    /** FORK: records the upstream chain position so it is not replayed on the next upgrade. */
+    static void writeUpstreamSchemaLevel(final SQLiteDatabase db, final int level) {
+        ContentValues values = new ContentValues();
+        values.put(KEY_FORK_SCHEMA_NAME, FORK_SCHEMA_UPSTREAM_LEVEL);
+        values.put(KEY_FORK_SCHEMA_VALUE, level);
+        db.insertWithOnConflict(TABLE_NAME_FORK_SCHEMA, null, values,
+                SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
     private static class PodDBHelper extends SQLiteOpenHelper {
         /**
          * Constructor.
@@ -1830,10 +1928,6 @@ public class PodDBAdapter {
             db.execSQL(CREATE_TABLE_QUEUE);
             db.execSQL(CREATE_TABLE_SIMPLECHAPTERS);
             db.execSQL(CREATE_TABLE_FAVORITES);
-            // FORK: Smart Playlist tables
-            db.execSQL(CREATE_TABLE_SMART_PLAYLISTS);
-            db.execSQL(CREATE_TABLE_SMART_PLAYLIST_RULES);
-            db.execSQL(CREATE_TABLE_SMART_PLAYLIST_EPISODES);
 
             db.execSQL(CREATE_INDEX_FEEDITEMS_FEED);
             db.execSQL(CREATE_INDEX_FEEDITEMS_PUBDATE);
@@ -1841,9 +1935,11 @@ public class PodDBAdapter {
             db.execSQL(CREATE_INDEX_FEEDMEDIA_FEEDITEM);
             db.execSQL(CREATE_INDEX_QUEUE_FEEDITEM);
             db.execSQL(CREATE_INDEX_SIMPLECHAPTERS_FEEDITEM);
-            // FORK: Smart Playlist index
-            db.execSQL(CREATE_INDEX_SMART_PLAYLIST_EPISODES_PLAYLIST);
-            db.execSQL(CREATE_INDEX_SMART_PLAYLIST_RULES_PLAYLIST);
+            // FORK: Smart Queue tables plus fork bookkeeping. A database created here already
+            // has upstream's current schema, so record that level rather than leaving it to be
+            // inferred later.
+            createForkSchema(db);
+            writeUpstreamSchemaLevel(db, UPSTREAM_SCHEMA_LEVEL);
         }
 
         @Override
