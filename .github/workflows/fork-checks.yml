@@ -72,6 +72,19 @@ jobs:
         # testDebugUnitTest is the one that covers the library modules, which is where the
         # Smart Queue tests live (storage/database/src/test).
         run: ./gradlew testPlayDebugUnitTest testDebugUnitTest
+      - name: Report APK signer
+        # Which key signed this APK decides whether it can update an existing install.
+        # Printing the fingerprint means a mismatch is obvious here rather than at install
+        # time. Expected SHA-256 for the fork debug key:
+        #   D4:F2:EA:A3:5A:36:1A:9F:9D:26:B4:26:99:2F:30:7E:5F:3B:A9:75:E3:6C:E7:68:20:1B:10:B7:04:F5:EC:C8
+        run: |
+          APK=app/build/outputs/apk/play/debug/app-play-debug.apk
+          SIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)
+          if [ -n "$SIGNER" ]; then
+            "$SIGNER" verify --print-certs "$APK" | grep -iE "SHA-256 digest|SHA-256" || true
+          else
+            unzip -p "$APK" META-INF/*.RSA | keytool -printcert | grep -E "SHA256:" || true
+          fi
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
