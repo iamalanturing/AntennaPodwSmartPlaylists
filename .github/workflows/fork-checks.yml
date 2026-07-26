@@ -78,6 +78,16 @@ jobs:
         run: echo "org.gradle.parallel=true" >> local.properties
       - name: Checkstyle, Lint
         run: ./gradlew checkstyle lint
+      - name: Print full lint report
+        # Lint prints only the first failure to the console ("Lint found N errors. First
+        # failure:"), which turns fixing a batch into one CI round trip per error. Dump the
+        # full text report instead.
+        if: failure()
+        run: |
+          find . -name 'lint-results-*.txt' -not -path '*/node_modules/*' | while read -r f; do
+            echo "===== $f ====="
+            cat "$f"
+          done
       - name: Generate readable error messages for GitHub
         if: failure()
         run: python .github/workflows/errorPrinter.py
