@@ -4,8 +4,8 @@ This fork of AntennaPod adds **Smart Queues** — rule-based playlists that popu
 from filters (feeds, tags, age, duration, media type) instead of being filled by hand.
 
 - **Branch:** `claude/add-smart-playlists-v2`
-- **Upstream base:** `95f94ca` (2026-05-31, during the 3.12.0 beta cycle)
-- **Size:** 38 files, +2915 / −7 — 27 new files and 11 modified upstream files
+- **Upstream base:** `b7ee12c` (2026-07-21), merged in from `upstream/develop`
+- **Modified upstream files:** 11 — the rest of the fork is new files
 
 An earlier attempt lives on `claude/add-smart-playlists-fqUHX`. It touched 137 files and
 modified 40+ upstream ones, including breaking API changes. This branch is a cleaner
@@ -52,18 +52,52 @@ Two related constraints worth knowing before touching `VERSION`:
 - `ForkSchema` is intentionally **not** in `ALL_TABLES`, so clearing user content via
   `deleteDatabase()` does not discard the migration record.
 
-### Known collision
+### The home section is the part that breaks
 
-Upstream #8611 "Use fixed IDs for home sections" versus this fork prepending
-`SmartPlaylistsSection` to the **order-sensitive parallel arrays** `home_section_tags` /
-`home_section_titles` in `ui/preferences/src/main/res/values/arrays.xml`. Misalignment there
-**fails silently rather than at compile time** — check the home screen visually after merging.
+The fork registers `SmartPlaylistsSection` in the parallel arrays `home_section_tags` /
+`home_section_titles` (`ui/preferences/src/main/res/values/arrays.xml`) and adds a case to
+`HomeFragment.getSection`. Upstream #8611 then added a second lookup,
+`HomeFragment.getSectionContainerId`, mapping each tag to a fixed view id — **and its default
+branch throws `IllegalArgumentException`**.
+
+Any tag present in the arrays but missing from *either* switch now crashes the home screen the
+moment it opens. So a section needs three things kept in step, and the compiler checks none of
+them:
+
+1. an entry in `home_section_tags` / `home_section_titles` (order-sensitive, same index)
+2. a case in `HomeFragment.getSection`
+3. a case in `HomeFragment.getSectionContainerId` **and** a matching
+   `home_section_*` id in `app/src/main/res/values/ids.xml`
+
+After merging anything that touches home sections, open the home screen and confirm the Smart
+Queue card is there.
 
 ### Also re-check
 
 `.github/workflows/fork-checks.yml` is fork-owned and deliberately separate from upstream's
 `checks.yml` so it never conflicts. The cost is drift: compare the two during each sync and
 adopt anything worth having.
+
+### Dependencies: track upstream, do not get ahead of it
+
+Every third-party version comes from upstream's `gradle/libs.versions.toml`, and several are
+old — jsoup 1.15.1, okhttp 4.12.0, guava 31.0.1, rxjava 3.1.5, commons-io 2.5, media3 1.9.0.
+Leave them alone.
+
+They were audited and **no CVE is currently reachable from this codebase**: Guava's
+CVE-2023-2976 needs `FileBackedOutputStream` and jsoup's CVE-2022-36033 needs the
+`SafeList`/`Cleaner` API, neither of which AntennaPod uses — it only calls `Jsoup.parse`, and
+the resulting HTML goes to a WebView with JavaScript disabled and no JS bridge. commons-io is
+pinned deliberately: newer versions break Android 6, and `minSdk` is 23.
+
+Bumping any of them would put the fork ahead of upstream in a file upstream edits regularly,
+buying a merge conflict for no reachable benefit. Same reasoning for the dependency lint checks
+disabled at `common.gradle:58` (`GradleDependency`, `OutdatedLibrary`,
+`AndroidGradlePluginVersion`) — re-enabling them would fail CI on upstream's own choices, which
+is noise rather than signal for a fork.
+
+Revisit only if upstream bumps them, or if a CVE becomes reachable because this fork starts
+using one of the affected APIs.
 
 ---
 
