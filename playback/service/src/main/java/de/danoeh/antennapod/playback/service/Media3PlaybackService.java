@@ -57,6 +57,7 @@ import de.danoeh.antennapod.storage.preferences.SleepTimerPreferences;
 import de.danoeh.antennapod.storage.preferences.SleepTimerType;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import de.danoeh.antennapod.ui.appstartintent.MainActivityStarter;
+import de.danoeh.antennapod.ui.chapters.ChapterUtils;
 import de.danoeh.antennapod.ui.episodes.PlaybackSpeedUtils;
 import de.danoeh.antennapod.ui.notifications.NotificationUtils;
 import de.danoeh.antennapod.ui.widget.WidgetUpdater;
@@ -165,6 +166,20 @@ public class Media3PlaybackService extends MediaLibraryService {
             public void seekForward() {
                 seekTo(Math.min(getDuration(), getCurrentPosition() + UserPreferences.getFastForwardSecs() * 1000L));
             }
+
+            @Override
+            public void seekToNextMediaItem() {
+                if (currentPlayable != null) {
+                    startNextInQueue(currentPlayable.getItem());
+                }
+            }
+
+            @Override
+            public void seekTo(long positionMs) {
+                super.seekTo(positionMs);
+                EventBus.getDefault().post(
+                        new PlaybackPositionEvent((int) player.getCurrentPosition(), (int) player.getDuration()));
+            }
         };
         player.addListener(playerListener);
         mediaSession = new MediaLibraryService.MediaLibrarySession.Builder(this, player, sessionCallback)
@@ -184,9 +199,7 @@ public class Media3PlaybackService extends MediaLibraryService {
                 setNextPlaybackSpeed();
                 return Futures.immediateFuture(new SessionResult(SessionResult.RESULT_SUCCESS));
             } else if (customCommand.customAction.equals(SESSION_COMMAND_SKIP_TO_NEXT.customAction)) {
-                if (currentPlayable != null) {
-                    startNextInQueue(currentPlayable.getItem());
-                }
+                session.getPlayer().seekToNextMediaItem();
                 return Futures.immediateFuture(new SessionResult(SessionResult.RESULT_SUCCESS));
             } else if (customCommand.customAction.equals(SESSION_COMMAND_NEXT_CHAPTER.customAction)) {
                 seekToNextChapter();
@@ -197,7 +210,7 @@ public class Media3PlaybackService extends MediaLibraryService {
                 exoPlayer.setSkipSilenceEnabled(enabled);
                 return Futures.immediateFuture(new SessionResult(SessionResult.RESULT_SUCCESS));
             } else if (customCommand.customAction.equals(SESSION_COMMAND_SET_SLEEP_TIMER.customAction)) {
-                startSleepTimer(MediaLibrarySessionCallback.getLong(args, 0));
+                startSleepTimer(SleepTimerPreferences.timerMillisOrEpisodes());
                 return Futures.immediateFuture(new SessionResult(SessionResult.RESULT_SUCCESS));
             } else if (customCommand.customAction.equals(SESSION_COMMAND_DISABLE_SLEEP_TIMER.customAction)) {
                 disableSleepTimer();
@@ -237,12 +250,13 @@ public class Media3PlaybackService extends MediaLibraryService {
         public void onPlaybackStateChanged(int playbackState) {
             if (playbackState == Player.STATE_BUFFERING) {
                 EventBus.getDefault().post(BufferUpdateEvent.started());
-                PlaybackService.isRunning = true; // Immediately show as playing
+                PlaybackService.isRunning = player.getPlayWhenReady(); // Immediately show as playing
                 updatePlaybackPreferences();
             } else {
                 EventBus.getDefault().post(BufferUpdateEvent.ended());
             }
-            if (playbackState == Player.STATE_READY || playbackState == Player.STATE_ENDED) {
+            if ((playbackState == Player.STATE_READY && player.getPlayWhenReady())
+                    || playbackState == Player.STATE_ENDED) {
                 saveCurrentPosition();
             }
             if (playbackState == Player.STATE_ENDED && currentPlayable != null) {
@@ -263,7 +277,6 @@ public class Media3PlaybackService extends MediaLibraryService {
                 }
                 startNextInQueue(media.getItem());
             }
-            EventBus.getDefault().post(new PlayerStatusEvent());
         }
 
         @Override
@@ -283,9 +296,9 @@ public class Media3PlaybackService extends MediaLibraryService {
                     PlaybackService.isRunning ? PlayerStatus.PLAYING : PlayerStatus.PAUSED,
                     (int) player.getContentPosition(), (int) player.getDuration(),
                     player.getPlaybackParameters().speed);
-            WidgetUpdater.updateWidget(Media3PlaybackService.this, widgetState);
+            Schedulers.io().scheduleDirect(() ->
+                    WidgetUpdater.updateWidget(Media3PlaybackService.this, widgetState));
             updatePlaybackPreferences();
-            EventBus.getDefault().post(new PlayerStatusEvent());
 
             // Auto-enable sleep timer when playback starts
             if (PlaybackService.isRunning && sleepTimer == null && SleepTimerPreferences.autoEnable()) {
@@ -301,8 +314,13 @@ public class Media3PlaybackService extends MediaLibraryService {
 
         @Override
         public void onMediaItemTransition(@Nullable MediaItem mediaItem, int reason) {
-            ensureCurrentMediaLoaded();
-            EventBus.getDefault().post(new PlayerStatusEvent());
+            if (mediaItem == null) {
+                currentPlayable = null;
+                PlaybackPreferences.writeNoMediaPlaying();
+                EventBus.getDefault().post(new PlayerStatusEvent());
+            } else {
+                ensureCurrentMediaLoaded();
+            }
         }
 
         @Override
@@ -310,6 +328,7 @@ public class Media3PlaybackService extends MediaLibraryService {
             PlaybackService.isRunning = false;
             EventBus.getDefault().post(new PlayerErrorEvent(
                     ExoPlayerUtils.translateErrorReason(error, Media3PlaybackService.this)));
+            EventBus.getDefault().post(new PlayerStatusEvent());
         }
     };
 
@@ -346,6 +365,7 @@ public class Media3PlaybackService extends MediaLibraryService {
             player.removeListener(playerListener);
             player.release();
         }
+        ExoPlayerUtils.releaseCache();
         if (mediaSession != null) {
             mediaSession.release();
         }
@@ -373,7 +393,8 @@ public class Media3PlaybackService extends MediaLibraryService {
                                 WidgetUpdater.WidgetState widgetState = new WidgetUpdater.WidgetState(currentPlayable,
                                         Util.shouldShowPlayButton(player) ? PlayerStatus.PAUSED : PlayerStatus.PLAYING,
                                         (int) position, (int) duration, speed);
-                                WidgetUpdater.updateWidget(this, widgetState);
+                                Schedulers.io().scheduleDirect(() ->
+                                        WidgetUpdater.updateWidget(this, widgetState));
                                 long currentTime = System.currentTimeMillis();
                                 if (currentTime - lastPositionSaveTime >= POSITION_SAVE_INTERVAL_MS) {
                                     saveCurrentPosition();
@@ -408,7 +429,11 @@ public class Media3PlaybackService extends MediaLibraryService {
                 if (mediaLoaderDisposable != null) {
                     mediaLoaderDisposable.dispose();
                 }
-                mediaLoaderDisposable = Single.fromCallable(() -> DBReader.getFeedMedia(mediaId))
+                mediaLoaderDisposable = Single.fromCallable(() -> {
+                    FeedMedia media = DBReader.getFeedMedia(mediaId);
+                    ChapterUtils.loadChapters(media, this, false);
+                    return media;
+                })
                         .subscribeOn(Schedulers.io())
                         .observeOn(AndroidSchedulers.mainThread())
                         .subscribe(media -> {
@@ -441,7 +466,6 @@ public class Media3PlaybackService extends MediaLibraryService {
                                 applyVolumeAdaption(1.0f);
                             }
                             updatePlaybackPreferences();
-                            EventBus.getDefault().post(new PlayerStatusEvent());
                         },
                                 error -> Log.e(TAG, "Failed to load current media", error));
 
@@ -454,13 +478,17 @@ public class Media3PlaybackService extends MediaLibraryService {
     }
 
     private void updatePlaybackPreferences() {
-        if (currentPlayable == null || player == null) {
-            return;
+        int statusBefore = PlaybackPreferences.getCurrentPlayerStatus();
+        long mediaBefore = PlaybackPreferences.getCurrentlyPlayingFeedMediaId();
+        if (currentPlayable != null) {
+            PlaybackPreferences.writeMediaPlaying(currentPlayable);
         }
-        PlaybackPreferences.writeMediaPlaying(currentPlayable);
-        int status = Util.shouldShowPlayButton(player) ? PlaybackPreferences.PLAYER_STATUS_PAUSED
-                : PlaybackPreferences.PLAYER_STATUS_PLAYING;
+        int status = PlaybackService.isRunning ? PlaybackPreferences.PLAYER_STATUS_PLAYING
+                : PlaybackPreferences.PLAYER_STATUS_PAUSED;
         PlaybackPreferences.setCurrentPlayerStatus(status);
+        if (status != statusBefore || (currentPlayable != null && currentPlayable.getId() != mediaBefore)) {
+            EventBus.getDefault().post(new PlayerStatusEvent());
+        }
     }
 
     private void saveCurrentPosition() {
@@ -660,7 +688,7 @@ public class Media3PlaybackService extends MediaLibraryService {
             // FORK end
 
             if (nextItem != null && nextItem.getMedia() != null) {
-                return new Pair<>(nextItem.getMedia(), MediaItemAdapter.fromPlayable(Media3PlaybackService.this, nextItem.getMedia()));
+                return new Pair<>(nextItem.getMedia(), MediaItemAdapter.fromPlayable(Media3PlaybackService.this, nextItem.getMedia(), false));
             }
             return null;
         })
@@ -698,11 +726,13 @@ public class Media3PlaybackService extends MediaLibraryService {
                             player.stop();
                             player.clearMediaItems();
                             PlaybackPreferences.writeNoMediaPlaying();
+                            EventBus.getDefault().post(new PlayerStatusEvent());
                             EventBus.getDefault().post(
                                     new PlaybackServiceEvent(PlaybackServiceEvent.Action.SERVICE_SHUT_DOWN));
                         });
     }
 
+    @UnstableApi
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onSleepTimerUpdated(SleepTimerUpdatedEvent event) {
         if (event.isOver()) {
@@ -712,8 +742,10 @@ public class Media3PlaybackService extends MediaLibraryService {
                 player.pause();
             }
             sleepTimer = null;
+            sessionCallback.refreshNotification(mediaSession);
         } else if (event.isCancelled()) {
             applyVolumeAdaption(1.0f);
+            sessionCallback.refreshNotification(mediaSession);
         } else if (!event.wasJustEnabled()) {
             long millisLeft = event.getMillisTimeLeft();
             if (millisLeft < SleepTimer.NOTIFICATION_THRESHOLD && millisLeft > 0) {
@@ -725,6 +757,7 @@ public class Media3PlaybackService extends MediaLibraryService {
         }
     }
 
+    @UnstableApi
     private void startSleepTimer(long timeOrEpisodes) {
         if (sleepTimer != null) {
             sleepTimer.stop();
@@ -735,6 +768,7 @@ public class Media3PlaybackService extends MediaLibraryService {
             sleepTimer = new ClockSleepTimer(this);
         }
         sleepTimer.start(timeOrEpisodes);
+        sessionCallback.refreshNotification(mediaSession);
     }
 
     private void disableSleepTimer() {
