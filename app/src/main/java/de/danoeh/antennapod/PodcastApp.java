@@ -4,6 +4,7 @@ import android.app.Application;
 import android.content.ComponentName;
 import android.util.Log;
 
+import androidx.core.content.ContextCompat;
 import androidx.media3.session.MediaController;
 import androidx.media3.session.SessionToken;
 
@@ -54,7 +55,7 @@ public class PodcastApp extends Application {
                 } catch (Exception e) {
                     Log.d(TAG, "Media service registration: " + e.getMessage());
                 }
-            }, getMainExecutor());
+            }, ContextCompat.getMainExecutor(this));
         } catch (Exception e) {
             Log.d(TAG, "Could not register media browser service: " + e.getMessage());
         }
