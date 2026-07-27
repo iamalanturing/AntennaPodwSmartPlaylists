@@ -168,19 +168,26 @@ public class SmartPlaylistDetailFragment extends Fragment {
         if (episodes.isEmpty()) {
             return;
         }
-        // Find first in-progress episode, otherwise use first
+        // Find first in-progress episode, otherwise the first one that has not been played yet
         FeedItem startItem = null;
         for (FeedItem ep : episodes) {
-            if (ep.getMedia() != null && ep.getMedia().getPosition() > 0) {
+            if (ep.getMedia() == null || ep.isPlayed()) {
+                continue;
+            }
+            if (ep.getMedia().getPosition() > 0) {
                 startItem = ep;
                 break;
             }
+            if (startItem == null) {
+                startItem = ep;
+            }
         }
         if (startItem == null) {
+            // Everything has been played already: start over at the top of the queue
             startItem = episodes.get(0);
-        }
-        if (startItem.getMedia() == null) {
-            return;
+            if (startItem.getMedia() == null) {
+                return;
+            }
         }
         // FORK: Set active smart queue so playback service knows to advance within this queue
         PlaybackPreferences.writeActiveSmartQueueId(playlistId);
