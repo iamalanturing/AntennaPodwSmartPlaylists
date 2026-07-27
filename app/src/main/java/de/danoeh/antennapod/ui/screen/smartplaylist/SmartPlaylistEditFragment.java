@@ -7,6 +7,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.ScrollView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -126,9 +127,16 @@ public class SmartPlaylistEditFragment extends Fragment {
 
         loadFeeds();
 
+        ScrollView scrollView = view.findViewById(R.id.smart_playlist_edit_scroll);
         view.findViewById(R.id.add_rule_button).setOnClickListener(v -> {
-            playlist.getRules().add(newRule());
-            ruleAdapter.notifyItemInserted(playlist.getRules().size() - 1);
+            // Configure the rule first: appending it silently puts it below the fold on a queue
+            // with enough rules to fill the screen, so the button looks like it did nothing
+            SmartPlaylistRule rule = newRule();
+            SmartPlaylistRuleEditDialog.show(requireContext(), rule, feeds, () -> {
+                playlist.getRules().add(rule);
+                ruleAdapter.notifyItemInserted(playlist.getRules().size() - 1);
+                scrollView.post(() -> scrollView.fullScroll(View.FOCUS_DOWN));
+            });
         });
 
         if (playlistId != 0) {
