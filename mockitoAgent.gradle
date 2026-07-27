@@ -3,7 +3,8 @@ configurations {
 }
 
 dependencies {
-    mockitoAgent("org.mockito:mockito-core:$mockitoVersion") {
+    def mockitoCore = libs.mockito.core.get()
+    mockitoAgent("${mockitoCore.module}:${mockitoCore.versionConstraint}") {
         transitive = false
     }
 }

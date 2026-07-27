@@ -4,7 +4,8 @@ This fork of AntennaPod adds **Smart Queues** — rule-based playlists that popu
 from filters (feeds, tags, age, duration, media type) instead of being filled by hand.
 
 - **Branch:** `claude/add-smart-playlists-v2`
-- **Upstream base:** `b7ee12c` (2026-07-21), merged in from `upstream/develop`
+- **Upstream base:** `b7ee12c` (2026-07-21) from `upstream/develop`, plus `b25adc2` from
+  `upstream/master` (the 3.12.0-beta line, 20 commits)
 - **Modified upstream files:** 11 — the rest of the fork is new files
 
 An earlier attempt lives on `claude/add-smart-playlists-fqUHX`. It touched 137 files and
@@ -88,6 +89,18 @@ them:
 
 After merging anything that touches home sections, open the home screen and confirm the Smart
 Queue card is there.
+
+### `master` and `develop` are not interchangeable bases
+
+The fork sits on `develop`. Files arriving from `master` can be written against the older
+conventions that line still uses, and nothing about the merge flags it — Gradle only fails at
+configuration time, and only when that script is applied.
+
+The 3.12.0-beta merge brought in `mockitoAgent.gradle` referencing `$mockitoVersion`, an ext
+property `develop` had already replaced with the version catalog. Same for the test dependencies
+in `playback/service/build.gradle`, which arrived as `"junit:junit:$junitVersion"` strings. Both
+were converted to `libs.` accessors. After merging `master`, grep the tree for `$…Version` in
+`*.gradle` — the catalog is the only supported form on this branch.
 
 ### Also re-check
 

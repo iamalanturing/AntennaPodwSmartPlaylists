@@ -102,12 +102,14 @@ unlimited, or well above the backlog.
 1. **Remove the diagnostic crash reporter.** `CrashReportExceptionHandler` currently also writes
    stack traces to Downloads via MediaStore. Added because Android 11+ hides the app's own
    directory and the app was crashing on launch with no readable trace. No longer needed.
-2. **Merge `upstream/master`.** Approved, not started. It is the 3.12.0 stabilisation line and
-   carries ~20 commits `develop` lacks, mostly playback-service fixes that land where Smart Queue
-   hooks in: playback position reset on continuous playback, "Restore Media3 Next behavior",
-   playback speed when playing next from queue, buffering over mobile data without confirmation,
-   memory leaks and Play Store crashes. Expect conflicts in `Media3PlaybackService`; afterwards
-   re-verify the fork invariants listed in `FORK.md`.
+2. **Verify the `upstream/master` merge on a device.** Merged on
+   `claude/merge-upstream-master`: 20 commits, three conflicts (`Media3PlaybackService`,
+   `HomeFragment`, `playback/service/build.gradle`). `UPSTREAM_SCHEMA_LEVEL` needed no bump —
+   master's `VERSION` is still 3110000, the level the fork already records. Upstream refactored
+   `startNextInQueue` into `updateDatabaseAfterPlayback` / `confirmStreamingIfNeeded` /
+   `switchToPlayable`; the Smart Queue lookup and the follow-queue override were reapplied on top.
+   Nothing here has run on a device yet: check that a smart queue still advances to its next
+   episode, that it does so with follow-queue off, and that the home screen renders.
 3. **Auto-download does not know about Smart Queues.** It selects from episodes marked NEW plus
    the regular queue, so a queue filtered on `downloaded` only fills as new episodes arrive and
    get downloaded. Making smart-queue membership a download candidate source would be a natural
