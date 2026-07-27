@@ -3,12 +3,15 @@ package de.danoeh.antennapod.storage.database;
 import android.content.Context;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedItem;
+import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
+import de.danoeh.antennapod.model.feed.SortOrder;
 import de.danoeh.antennapod.net.sync.serviceinterface.SynchronizationQueue;
 import de.danoeh.antennapod.net.sync.serviceinterface.SynchronizationQueueStub;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -16,6 +19,7 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 
 import java.util.ArrayList;
+import java.util.Date;
 
 import static org.junit.Assert.assertEquals;
 
@@ -41,8 +45,15 @@ public class SmartPlaylistRuleMatchCountTest {
         SynchronizationQueue.setInstance(new SynchronizationQueueStub());
     }
 
+    @After
+    public void tearDown() {
+        // Feeds left behind here are read by other tests in this module through the shared adapter
+        PodDBAdapter.deleteDatabase();
+        PodDBAdapter.tearDownTests();
+    }
+
     @Test
-    public void countsEpisodesMatchingTheRule() {
+    public void countsEpisodesMatchingTheRule() throws Exception {
         Feed feed = storeFeed("feed-a", 3);
         SmartPlaylistRule rule = new SmartPlaylistRule();
         rule.setFeedIds(String.valueOf(feed.getId()));
@@ -51,7 +62,7 @@ public class SmartPlaylistRuleMatchCountTest {
     }
 
     @Test
-    public void countsNothingWhenTheRuleMatchesNoFeed() {
+    public void countsNothingWhenTheRuleMatchesNoFeed() throws Exception {
         storeFeed("feed-a", 3);
         SmartPlaylistRule rule = new SmartPlaylistRule();
         rule.setFeedIds("123456");
@@ -60,7 +71,7 @@ public class SmartPlaylistRuleMatchCountTest {
     }
 
     @Test
-    public void countRespectsTheEpisodeLimit() {
+    public void countRespectsTheEpisodeLimit() throws Exception {
         Feed feed = storeFeed("feed-a", 5);
         SmartPlaylistRule rule = new SmartPlaylistRule();
         rule.setFeedIds(String.valueOf(feed.getId()));
@@ -70,7 +81,7 @@ public class SmartPlaylistRuleMatchCountTest {
     }
 
     @Test
-    public void countCoversEveryFeedTheRuleSelects() {
+    public void countCoversEveryFeedTheRuleSelects() throws Exception {
         Feed first = storeFeed("feed-a", 2);
         Feed second = storeFeed("feed-b", 3);
         SmartPlaylistRule rule = new SmartPlaylistRule();
@@ -113,18 +124,22 @@ public class SmartPlaylistRuleMatchCountTest {
         return rule;
     }
 
-    private Feed storeFeed(String identifier, int itemCount) {
-        Feed feed = new Feed("url-" + identifier, null, "Feed " + identifier);
+    private Feed storeFeed(String identifier, int itemCount) throws Exception {
+        Feed feed = new Feed(0, null, "Feed " + identifier, "http://example.com/" + identifier,
+                "description", null, "author", "en", null, "http://example.com/" + identifier,
+                null, null, "http://example.com/" + identifier, System.currentTimeMillis());
         feed.setItems(new ArrayList<>());
         for (int i = 0; i < itemCount; i++) {
-            FeedItem item = new FeedItem();
-            item.setItemIdentifier(identifier + "-item-" + i);
-            item.setTitle("Item " + i);
-            item.setMedia(new FeedMedia(item, "url-" + identifier + "-" + i, 2, "mime"));
-            item.setFeed(feed);
+            FeedItem item = new FeedItem(0, "Item " + i, identifier + "-item-" + i,
+                    "http://example.com/" + identifier + "/" + i, new Date(), FeedItem.UNPLAYED, feed);
+            item.setMedia(new FeedMedia(item, "http://example.com/" + identifier + "/" + i + ".mp3",
+                    1234, "audio/mpeg"));
             feed.getItems().add(item);
         }
-        return FeedDatabaseWriter.updateFeed(context, feed, false);
+        DBWriter.setCompleteFeed(feed).get();
+        assertEquals(itemCount, DBReader.getFeedItemList(feed, FeedItemFilter.unfiltered(),
+                SortOrder.DATE_NEW_OLD, 0, Integer.MAX_VALUE).size());
+        return feed;
     }
 
 }
