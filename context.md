@@ -109,18 +109,15 @@ unlimited, or well above the backlog.
 
 ## Outstanding
 
-1. **Remove the diagnostic crash reporter.** `CrashReportExceptionHandler` currently also writes
-   stack traces to Downloads via MediaStore. Added because Android 11+ hides the app's own
-   directory and the app was crashing on launch with no readable trace. No longer needed.
-2. **Still unverified on a device**, after a round that verified most of the rest: playback speed
+1. **Still unverified on a device**, after a round that verified most of the rest: playback speed
    carrying to the next episode, and streaming confirmation over mobile data. Both come from
    `upstream/master` and land in the same code path the Smart Queue hooks into.
-3. **Auto-download does not know about Smart Queues.** It selects from episodes marked NEW plus
+2. **Auto-download does not know about Smart Queues.** It selects from episodes marked NEW plus
    the regular queue, so a queue filtered on `downloaded` only fills as new episodes arrive and
    get downloaded. Making smart-queue membership a download candidate source would be a natural
    feature addition. Deferred: new episodes do arrive on their own, and a backlog can be
    downloaded by hand once. Watch the episode cache instead — see below.
-4. **One UX gap** left from removing dead strings: there is no media-type control in the rule
+3. **One UX gap** left from removing dead strings: there is no media-type control in the rule
    editor (the model supports `mediaType`, nothing exposes it). The smart queue list screen still
    has no empty state, but it now has an app bar to hang one on. The podcast picker that was
    missing from the rule editor is done — rules restored from the older branch had feed ids the v2
