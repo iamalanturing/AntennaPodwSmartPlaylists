@@ -59,12 +59,16 @@ jobs:
             exit 0
           fi
           echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > app/fork-debug.keystore
+          # gradle.properties, not local.properties: Gradle exposes the former as project
+          # properties, while nothing in this build reads the latter. Writing these to
+          # local.properties leaves project.hasProperty() false and the signing config
+          # silently unregistered, which is not visible until the APK fails to install.
           {
             echo "forkDebugStoreFile=fork-debug.keystore"
             echo "forkDebugStorePassword=$DEBUG_KEYSTORE_PASSWORD"
             echo "forkDebugKeyAlias=forkdebug"
             echo "forkDebugKeyPassword=$DEBUG_KEYSTORE_PASSWORD"
-          } >> local.properties
+          } >> gradle.properties
           echo "Fork debug signing key installed."
       - name: Build
         run: ./gradlew assemblePlayDebug
@@ -72,19 +76,31 @@ jobs:
         # testDebugUnitTest is the one that covers the library modules, which is where the
         # Smart Queue tests live (storage/database/src/test).
         run: ./gradlew testPlayDebugUnitTest testDebugUnitTest
-      - name: Report APK signer
-        # Which key signed this APK decides whether it can update an existing install.
-        # Printing the fingerprint means a mismatch is obvious here rather than at install
-        # time. Expected SHA-256 for the fork debug key:
-        #   D4:F2:EA:A3:5A:36:1A:9F:9D:26:B4:26:99:2F:30:7E:5F:3B:A9:75:E3:6C:E7:68:20:1B:10:B7:04:F5:EC:C8
+      - name: Verify APK signer
+        # Which key signed this APK decides whether it can update an existing install, and a
+        # wrong key is only discovered after an uninstall has already destroyed the database
+        # and downloads. Assert it here instead. The fingerprint is a public certificate
+        # digest, not a secret.
+        env:
+          EXPECTED: d4f2eaa35a361a9f9d26b426992f307e5f3ba975e36ce768201b10b704f5ecc8
         run: |
           APK=app/build/outputs/apk/play/debug/app-play-debug.apk
           SIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)
-          if [ -n "$SIGNER" ]; then
-            "$SIGNER" verify --print-certs "$APK" | grep -iE "SHA-256 digest|SHA-256" || true
-          else
-            unzip -p "$APK" META-INF/*.RSA | keytool -printcert | grep -E "SHA256:" || true
+          ACTUAL=$("$SIGNER" verify --print-certs "$APK" \
+            | grep -ioE "SHA-256 digest: [0-9a-f]+" | head -1 | awk '{print $NF}')
+          echo "APK signer SHA-256: ${ACTUAL:-<none found>}"
+          if [ ! -f app/fork-debug.keystore ]; then
+            echo "No fork key was installed; this APK is signed with the throwaway per-runner"
+            echo "debug key and will NOT update an existing install."
+            exit 0
           fi
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::APK is not signed with the fork debug key."
+            echo "  expected $EXPECTED"
+            echo "  actual   ${ACTUAL:-<none found>}"
+            exit 1
+          fi
+          echo "Signed with the fork debug key - installs over a previous fork-signed build."
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
