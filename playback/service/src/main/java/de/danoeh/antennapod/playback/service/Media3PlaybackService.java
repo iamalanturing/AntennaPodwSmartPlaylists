@@ -465,6 +465,16 @@ public class Media3PlaybackService extends MediaLibraryService {
         pendingStreamMediaId = null;
         try {
             long mediaId = Long.parseLong(player.getCurrentMediaItem().mediaId);
+            // FORK: Smart Queue — an episode the active queue does not own means the user started
+            // playback elsewhere, so the queue stops driving
+            if (PlaybackPreferences.getActiveSmartQueueId() != 0
+                    && PlaybackPreferences.getActiveSmartQueueMediaId() != mediaId) {
+                if (DEBUG_SMART_QUEUE) {
+                    Log.d(TAG, "Playing an episode the active smart queue does not own, "
+                            + "clearing smart queue mode");
+                }
+                PlaybackPreferences.clearActiveSmartQueueId();
+            }
             if (currentPlayable == null || currentPlayable.getId() != mediaId) {
                 if (mediaLoaderDisposable != null) {
                     mediaLoaderDisposable.dispose();
@@ -731,8 +741,7 @@ public class Media3PlaybackService extends MediaLibraryService {
             nextItemFromSmartQueue = false;
             long activeSmartQueueId = PlaybackPreferences.getActiveSmartQueueId();
             if (activeSmartQueueId != 0) {
-                if (item.getMedia() != null
-                        && DBReader.isItemInSmartQueue(activeSmartQueueId, item.getId())) {
+                if (media.getId() == PlaybackPreferences.getActiveSmartQueueMediaId()) {
                     nextItem = DBReader.getNextInSmartQueue(activeSmartQueueId, item.getId());
                     if (nextItem == null) {
                         // End of smart queue — auto-regenerate or stop smart queue mode
@@ -756,12 +765,10 @@ public class Media3PlaybackService extends MediaLibraryService {
                         }
                     }
                     nextItemFromSmartQueue = nextItem != null;
-                } else {
-                    // Current item not in smart queue — user switched away; exit smart queue mode
-                    if (DEBUG_SMART_QUEUE) {
-                        Log.d(TAG, "Current item not in active smart queue, clearing smart queue mode");
+                    if (nextItemFromSmartQueue && nextItem.getMedia() != null) {
+                        PlaybackPreferences.writeActiveSmartQueue(
+                                activeSmartQueueId, nextItem.getMedia().getId());
                     }
-                    PlaybackPreferences.clearActiveSmartQueueId();
                 }
             }
 

@@ -172,19 +172,36 @@ public abstract class PlaybackPreferences {
         editor.apply();
     }
 
-    // FORK: Smart Queue — tracks which smart queue is currently driving playback
+    /**
+     * FORK: Smart Queue — tracks which smart queue is currently driving playback, together with the
+     * one episode it owns. The queue stays active only for as long as that episode is the one
+     * playing: the service hands ownership on when it advances within the queue, and anything else
+     * reaching the player means the user started playback elsewhere.
+     */
     private static final String PREF_ACTIVE_SMART_QUEUE_ID =
             "de.danoeh.antennapod.preferences.currently_active_smart_queue_id";
+    private static final String PREF_ACTIVE_SMART_QUEUE_MEDIA_ID =
+            "de.danoeh.antennapod.preferences.currently_active_smart_queue_media_id";
 
-    public static void writeActiveSmartQueueId(long id) {
-        prefs.edit().putLong(PREF_ACTIVE_SMART_QUEUE_ID, id).apply();
+    public static void writeActiveSmartQueue(long queueId, long mediaId) {
+        prefs.edit()
+                .putLong(PREF_ACTIVE_SMART_QUEUE_ID, queueId)
+                .putLong(PREF_ACTIVE_SMART_QUEUE_MEDIA_ID, mediaId)
+                .apply();
     }
 
     public static long getActiveSmartQueueId() {
         return prefs.getLong(PREF_ACTIVE_SMART_QUEUE_ID, 0);
     }
 
+    public static long getActiveSmartQueueMediaId() {
+        return prefs.getLong(PREF_ACTIVE_SMART_QUEUE_MEDIA_ID, 0);
+    }
+
     public static void clearActiveSmartQueueId() {
-        prefs.edit().remove(PREF_ACTIVE_SMART_QUEUE_ID).apply();
+        prefs.edit()
+                .remove(PREF_ACTIVE_SMART_QUEUE_ID)
+                .remove(PREF_ACTIVE_SMART_QUEUE_MEDIA_ID)
+                .apply();
     }
 }

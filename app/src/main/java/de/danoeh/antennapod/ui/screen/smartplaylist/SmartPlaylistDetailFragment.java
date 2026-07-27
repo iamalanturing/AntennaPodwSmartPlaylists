@@ -1,10 +1,12 @@
 package de.danoeh.antennapod.ui.screen.smartplaylist;
 
 import android.os.Bundle;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
@@ -20,10 +22,15 @@ import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.ui.common.ThemeUtils;
 import de.danoeh.antennapod.event.FeedItemEvent;
 import de.danoeh.antennapod.event.MessageEvent;
+import de.danoeh.antennapod.event.PlayerStatusEvent;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
+import de.danoeh.antennapod.playback.base.BuildConfig;
+import de.danoeh.antennapod.playback.service.PlaybackController;
 import de.danoeh.antennapod.playback.service.PlaybackServiceStarter;
+import de.danoeh.antennapod.playback.service.PlaybackStatus;
+import de.danoeh.antennapod.ui.appstartintent.MediaButtonStarter;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
@@ -33,6 +40,8 @@ import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -48,6 +57,7 @@ public class SmartPlaylistDetailFragment extends Fragment {
     private EpisodeItemListAdapter episodeAdapter;
     private Disposable disposable;
     private TextView emptyView;
+    private Button playButton;
 
     public static SmartPlaylistDetailFragment newInstance(long playlistId) {
         SmartPlaylistDetailFragment fragment = new SmartPlaylistDetailFragment();
@@ -96,10 +106,60 @@ public class SmartPlaylistDetailFragment extends Fragment {
 
         emptyView = view.findViewById(R.id.empty_view);
 
-        view.findViewById(R.id.play_button).setOnClickListener(v -> startPlayback());
+        playButton = view.findViewById(R.id.play_button);
+        playButton.setOnClickListener(v -> {
+            if (playingEpisode() != null) {
+                pausePlayback();
+            } else {
+                startPlayback();
+            }
+        });
+        updatePlayButton();
 
         loadData(view);
         return view;
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        EventBus.getDefault().register(this);
+        updatePlayButton();
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        EventBus.getDefault().unregister(this);
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onPlayerStatusChanged(PlayerStatusEvent event) {
+        updatePlayButton();
+    }
+
+    private FeedItem playingEpisode() {
+        for (FeedItem ep : episodes) {
+            if (ep.getMedia() != null && PlaybackStatus.isCurrentlyPlaying(ep.getMedia())) {
+                return ep;
+            }
+        }
+        return null;
+    }
+
+    private void updatePlayButton() {
+        if (playButton != null) {
+            playButton.setText(playingEpisode() != null ? R.string.pause_label : R.string.play_label);
+        }
+    }
+
+    private void pausePlayback() {
+        if (BuildConfig.USE_MEDIA3_PLAYBACK_SERVICE) {
+            PlaybackController.bindToMedia3Service(requireContext(), controller -> controller.pause());
+            return;
+        }
+        requireContext().sendBroadcast(
+                MediaButtonStarter.createIntent(requireContext(), KeyEvent.KEYCODE_MEDIA_PAUSE));
     }
 
     private void loadData(View view) {
@@ -126,6 +186,7 @@ public class SmartPlaylistDetailFragment extends Fragment {
                     episodeAdapter.setDummyViews(0);
                     episodeAdapter.updateItems(episodes);
                     emptyView.setVisibility(episodes.isEmpty() ? View.VISIBLE : View.GONE);
+                    updatePlayButton();
                 }, error -> { });
     }
 
@@ -203,8 +264,9 @@ public class SmartPlaylistDetailFragment extends Fragment {
             EventBus.getDefault().post(new MessageEvent(getString(R.string.error_file_not_found)));
             return;
         }
-        // FORK: Set active smart queue so playback service knows to advance within this queue
-        PlaybackPreferences.writeActiveSmartQueueId(playlistId);
+        // FORK: Hand the queue ownership of this episode so the playback service keeps advancing
+        // within it for as long as it is the one playing
+        PlaybackPreferences.writeActiveSmartQueue(playlistId, media.getId());
         new PlaybackServiceStarter(requireContext(), media)
                 .callEvenIfRunning(true)
                 .start();

@@ -70,6 +70,19 @@ current databases and safe on every upgrade.
 3120000, and without a higher version no upgrade fires and the conversion never happens.
 `LegacySmartQueueMigrationTest` covers it, using DDL copied verbatim from the older branch.
 
+### A smart queue drives playback by ownership, not by membership
+
+`PlaybackPreferences` stores the active queue id together with the id of the one episode that queue
+owns. The queue keeps overriding continuous playback only while that episode is the one playing:
+the service hands ownership to the next episode as it advances, and
+`Media3PlaybackService.ensureCurrentMediaLoaded` releases the queue as soon as an episode it does
+not own reaches the player.
+
+Do not go back to asking whether the finished episode is *in* the queue. Membership is not
+exclusive — an episode can sit in the regular queue and match a smart queue's rules at the same
+time — so that test silently kept smart queue mode alive and overrode the user's continuous
+playback setting during ordinary queue playback.
+
 ### The home section is the part that breaks
 
 The fork registers `SmartPlaylistsSection` in the parallel arrays `home_section_tags` /
@@ -156,8 +169,8 @@ Layouts and menus under `app/src/main/res/`.
 | `storage/database/.../DBUpgrader.java` | Drives the upstream chain off the recorded level; applies fork DDL unconditionally |
 | `storage/database/.../DBReader.java` | Smart Queue read methods |
 | `storage/database/.../DBWriter.java` | Smart Queue CRUD, transactional regeneration, clears the active queue id on delete |
-| `storage/preferences/.../PlaybackPreferences.java` | Active smart queue id |
-| `playback/service/.../Media3PlaybackService.java` | Advances within a smart queue; auto-regenerates at end of queue |
+| `storage/preferences/.../PlaybackPreferences.java` | Active smart queue id, and the episode that queue owns |
+| `playback/service/.../Media3PlaybackService.java` | Advances within a smart queue; auto-regenerates at end of queue; releases the queue when an episode it does not own starts |
 | `app/.../PodcastApp.java` | Registers the media browser service at startup for Bluetooth/AVRCP |
 | `app/.../MainActivity.java`, `.../home/HomeFragment.java` | Fragment and home-section wiring |
 | `ui/i18n/.../values/strings.xml`, `ui/preferences/.../values/arrays.xml` | Strings and home-section registration |

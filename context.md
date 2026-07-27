@@ -108,14 +108,22 @@ unlimited, or well above the backlog.
    master's `VERSION` is still 3110000, the level the fork already records. Upstream refactored
    `startNextInQueue` into `updateDatabaseAfterPlayback` / `confirmStreamingIfNeeded` /
    `switchToPlayable`; the Smart Queue lookup and the follow-queue override were reapplied on top.
-   Nothing here has run on a device yet: check that a smart queue still advances to its next
-   episode, that it does so with follow-queue off, and that the home screen renders.
-3. **Auto-download does not know about Smart Queues.** It selects from episodes marked NEW plus
+   Device testing confirmed the queue advances, that it advances with continuous playback off, and
+   that the home screen renders. Not yet re-tested after the ownership change described below;
+   playback speed carrying to the next episode and streaming confirmation over mobile data are
+   still unchecked.
+3. **Re-test the smart queue ownership change.** Device testing found that with continuous playback
+   off, an ordinary queue episode also auto-advanced. Cause was not the merge: smart queue mode was
+   still active from an earlier smart queue play, because the old check asked whether the finished
+   episode was *in* the active queue, and that episode was in both. The queue now owns exactly one
+   episode at a time (see `FORK.md`). Worth confirming: a normal queue with continuous playback off
+   stops after each episode, and a smart queue still plays through.
+4. **Auto-download does not know about Smart Queues.** It selects from episodes marked NEW plus
    the regular queue, so a queue filtered on `downloaded` only fills as new episodes arrive and
    get downloaded. Making smart-queue membership a download candidate source would be a natural
    feature addition. Deferred: new episodes do arrive on their own, and a backlog can be
    downloaded by hand once. Watch the episode cache instead — see below.
-4. **One UX gap** left from removing dead strings: there is no media-type control in the rule
+5. **One UX gap** left from removing dead strings: there is no media-type control in the rule
    editor (the model supports `mediaType`, nothing exposes it). The smart queue list screen still
    has no empty state, but it now has an app bar to hang one on.
 
