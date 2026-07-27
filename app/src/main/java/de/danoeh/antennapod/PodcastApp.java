@@ -22,7 +22,7 @@ public class PodcastApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        Thread.setDefaultUncaughtExceptionHandler(new CrashReportExceptionHandler());
+        Thread.setDefaultUncaughtExceptionHandler(new CrashReportExceptionHandler(this));
         RxJavaErrorHandlerSetup.setupRxJavaErrorHandler();
 
         try {
