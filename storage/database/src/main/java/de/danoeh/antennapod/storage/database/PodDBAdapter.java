@@ -58,7 +58,11 @@ public class PodDBAdapter {
 
     private static final String TAG = "PodDBAdapter";
     public static final String DATABASE_NAME = "Antennapod.db";
-    public static final int VERSION = 3120000; // FORK: bumped for SmartPlaylist tables
+    // FORK: 3120001 converts Smart Queue tables written by the earlier fork, which named their
+    // columns without the sp_ prefix. The bump is what makes the conversion run: a database
+    // restored from one of those backups is stamped 3120000, so without a higher VERSION no
+    // upgrade fires and the rename never happens.
+    public static final int VERSION = 3120001;
 
     /**
      * FORK: how far through upstream's migration chain the code in this fork actually goes.
@@ -1885,6 +1889,81 @@ public class PodDBAdapter {
         db.execSQL(CREATE_TABLE_SMART_PLAYLIST_EPISODES);
         db.execSQL(CREATE_INDEX_SMART_PLAYLIST_EPISODES_PLAYLIST);
         db.execSQL(CREATE_INDEX_SMART_PLAYLIST_RULES_PLAYLIST);
+    }
+
+    /**
+     * FORK: converts Smart Queue tables written by the earlier fork branch.
+     *
+     * <p>That branch named these columns without the {@code sp_} prefix this one uses, so its
+     * databases — including any backup restored from one — carry {@code name}, {@code
+     * playlist_id} and so on. Every query here asks for the prefixed names, so the playlists
+     * would be unreadable and the feature silently empty.
+     *
+     * <p>Recreate-and-copy rather than {@code ALTER TABLE ... RENAME COLUMN}, which needs
+     * SQLite 3.25 and {@code minSdk} is 23. Dropping the renamed original also frees its index
+     * names, so {@link #createForkSchema} can recreate them afterwards.
+     *
+     * <p>Detected per table by looking for a legacy column, so this is a no-op on databases
+     * already using the current names and safe to run on every upgrade.
+     */
+    static void migrateLegacySmartQueueSchema(final SQLiteDatabase db) {
+        convertLegacyTable(db, TABLE_NAME_SMART_PLAYLISTS, "name", CREATE_TABLE_SMART_PLAYLISTS,
+                new String[]{KEY_ID, "name", "auto_regenerate", "generated_at",
+                        "created_at", "updated_at"},
+                new String[]{KEY_ID, KEY_SMART_PLAYLIST_NAME, KEY_SMART_PLAYLIST_AUTO_REGENERATE,
+                        KEY_SMART_PLAYLIST_GENERATED_AT, KEY_SMART_PLAYLIST_CREATED_AT,
+                        KEY_SMART_PLAYLIST_UPDATED_AT});
+
+        convertLegacyTable(db, TABLE_NAME_SMART_PLAYLIST_RULES, "playlist_id",
+                CREATE_TABLE_SMART_PLAYLIST_RULES,
+                new String[]{KEY_ID, "playlist_id", "position", "filter_properties", "feed_ids",
+                        "feed_tags", "max_age_days", "min_duration_ms", "max_duration_ms",
+                        "media_type", "episode_limit", "sort_order"},
+                new String[]{KEY_ID, KEY_SMART_PLAYLIST_ID, KEY_SMART_PLAYLIST_POSITION,
+                        KEY_SMART_PLAYLIST_FILTER_PROPERTIES, KEY_SMART_PLAYLIST_FEED_IDS,
+                        KEY_SMART_PLAYLIST_FEED_TAGS, KEY_SMART_PLAYLIST_MAX_AGE_DAYS,
+                        KEY_SMART_PLAYLIST_MIN_DURATION_MS, KEY_SMART_PLAYLIST_MAX_DURATION_MS,
+                        KEY_SMART_PLAYLIST_MEDIA_TYPE, KEY_SMART_PLAYLIST_EPISODE_LIMIT,
+                        KEY_SMART_PLAYLIST_SORT_ORDER});
+
+        convertLegacyTable(db, TABLE_NAME_SMART_PLAYLIST_EPISODES, "playlist_id",
+                CREATE_TABLE_SMART_PLAYLIST_EPISODES,
+                new String[]{KEY_ID, "playlist_id", "episode_id", "position"},
+                new String[]{KEY_ID, KEY_SMART_PLAYLIST_ID, KEY_SMART_PLAYLIST_EPISODE_ID,
+                        KEY_SMART_PLAYLIST_POSITION});
+    }
+
+    private static void convertLegacyTable(final SQLiteDatabase db, final String table,
+                                           final String legacyMarkerColumn, final String createSql,
+                                           final String[] legacyColumns,
+                                           final String[] currentColumns) {
+        if (!hasColumn(db, table, legacyMarkerColumn)) {
+            return;
+        }
+        String legacyTable = table + "_legacy";
+        db.execSQL("DROP TABLE IF EXISTS " + legacyTable);
+        db.execSQL("ALTER TABLE " + table + " RENAME TO " + legacyTable);
+        db.execSQL(createSql);
+        db.execSQL("INSERT INTO " + table + " (" + TextUtils.join(",", currentColumns) + ") SELECT "
+                + TextUtils.join(",", legacyColumns) + " FROM " + legacyTable);
+        db.execSQL("DROP TABLE " + legacyTable);
+        Log.i(TAG, "Converted legacy Smart Queue table " + table);
+    }
+
+    private static boolean hasColumn(final SQLiteDatabase db, final String table,
+                                     final String column) {
+        try (Cursor cursor = db.rawQuery("PRAGMA table_info(" + table + ")", null)) {
+            int nameColumn = cursor.getColumnIndex("name");
+            if (nameColumn < 0) {
+                return false;
+            }
+            while (cursor.moveToNext()) {
+                if (column.equals(cursor.getString(nameColumn))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

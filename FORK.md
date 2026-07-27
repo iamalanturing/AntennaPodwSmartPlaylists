@@ -52,6 +52,23 @@ Two related constraints worth knowing before touching `VERSION`:
 - `ForkSchema` is intentionally **not** in `ALL_TABLES`, so clearing user content via
   `deleteDatabase()` does not discard the migration record.
 
+### Column names differ from the older branch
+
+This branch prefixes every Smart Queue column with `sp_` — `sp_name`, `sp_playlist_id` and so
+on. The older `fqUHX` branch did not. A database written by that branch, including any backup
+restored from one, therefore carries the unprefixed names, and every query here would miss:
+the feature comes up empty rather than failing loudly.
+
+`PodDBAdapter.migrateLegacySmartQueueSchema` converts them, recreate-and-copy rather than
+`ALTER TABLE ... RENAME COLUMN` because that needs SQLite 3.25 and `minSdk` is 23. It runs
+before `createForkSchema`, since those statements are `IF NOT EXISTS` and would otherwise leave
+a legacy table untouched. Detection keys off a legacy column being present, so it is a no-op on
+current databases and safe on every upgrade.
+
+`VERSION` is 3120001 specifically to make this reachable: a restored legacy backup is stamped
+3120000, and without a higher version no upgrade fires and the conversion never happens.
+`LegacySmartQueueMigrationTest` covers it, using DDL copied verbatim from the older branch.
+
 ### The home section is the part that breaks
 
 The fork registers `SmartPlaylistsSection` in the parallel arrays `home_section_tags` /

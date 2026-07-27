@@ -24,6 +24,9 @@ class DBUpgrader {
         // the failure would be silent — the new columns would simply be missing. Drive the chain
         // off the separately recorded level instead. Creating the fork schema first is what
         // makes that record readable; it is idempotent.
+        // Convert before createForkSchema: the create statements are IF NOT EXISTS, so a legacy
+        // table would survive them untouched and keep its old column names.
+        PodDBAdapter.migrateLegacySmartQueueSchema(db);
         PodDBAdapter.createForkSchema(db);
         final int oldVersion = PodDBAdapter.readUpstreamSchemaLevel(db, stampedVersion);
         if (oldVersion <= 1) {
