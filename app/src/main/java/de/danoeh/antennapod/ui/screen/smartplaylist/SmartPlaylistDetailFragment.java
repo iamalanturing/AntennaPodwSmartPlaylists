@@ -18,7 +18,10 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.ui.common.ThemeUtils;
+import de.danoeh.antennapod.event.FeedItemEvent;
+import de.danoeh.antennapod.event.MessageEvent;
 import de.danoeh.antennapod.model.feed.FeedItem;
+import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.playback.service.PlaybackServiceStarter;
 import de.danoeh.antennapod.storage.database.DBReader;
@@ -29,8 +32,10 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
+import org.greenrobot.eventbus.EventBus;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class SmartPlaylistDetailFragment extends Fragment {
@@ -189,9 +194,18 @@ public class SmartPlaylistDetailFragment extends Fragment {
                 return;
             }
         }
+        FeedMedia media = startItem.getMedia();
+        if (media.localFileAvailable() && !media.fileExists()) {
+            media.setDownloaded(false, 0);
+            media.setLocalFileUrl(null);
+            DBWriter.setMediaDownloadInformation(media);
+            EventBus.getDefault().post(new FeedItemEvent(Collections.singletonList(startItem), false));
+            EventBus.getDefault().post(new MessageEvent(getString(R.string.error_file_not_found)));
+            return;
+        }
         // FORK: Set active smart queue so playback service knows to advance within this queue
         PlaybackPreferences.writeActiveSmartQueueId(playlistId);
-        new PlaybackServiceStarter(requireContext(), startItem.getMedia())
+        new PlaybackServiceStarter(requireContext(), media)
                 .callEvenIfRunning(true)
                 .start();
     }
