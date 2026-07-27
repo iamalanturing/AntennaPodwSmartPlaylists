@@ -8,6 +8,7 @@ import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 import de.danoeh.antennapod.model.feed.SortOrder;
+import de.danoeh.antennapod.storage.database.mapper.SmartPlaylistRuleQuery;
 import de.danoeh.antennapod.net.sync.serviceinterface.SynchronizationQueue;
 import de.danoeh.antennapod.net.sync.serviceinterface.SynchronizationQueueStub;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
@@ -58,7 +59,9 @@ public class SmartPlaylistRuleMatchCountTest {
         SmartPlaylistRule rule = new SmartPlaylistRule();
         rule.setFeedIds(String.valueOf(feed.getId()));
 
-        assertEquals(3, DBReader.getSmartPlaylistRuleMatchCount(rule));
+        assertEquals("feedId=" + feed.getId() + " feedIds=" + rule.getFeedIds()
+                + " where=" + SmartPlaylistRuleQuery.generateWhereClause(rule),
+                3, DBReader.getSmartPlaylistRuleMatchCount(rule));
     }
 
     @Test

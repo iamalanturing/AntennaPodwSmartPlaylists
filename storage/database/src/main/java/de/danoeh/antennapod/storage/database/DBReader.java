@@ -899,8 +899,6 @@ public final class DBReader {
         adapter.open();
         try (Cursor cursor = adapter.getSmartPlaylistRuleMatchesCursor(rule)) {
             return cursor.getCount();
-        } catch (Exception e) {
-            return 0;
         } finally {
             adapter.close();
         }
