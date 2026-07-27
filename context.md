@@ -76,6 +76,8 @@ build reads the latter, and writing there leaves the config silently unregistere
 
 - `LegacySmartQueueMigrationTest` — legacy conversion, using DDL copied verbatim from fqUHX
 - `SmartQueueSchemaMigrationTest` — schema bootstrap, idempotency, upstream-level bookkeeping
+- `SmartPlaylistRuleMatchCountTest` — what a single rule matches, and rule order surviving a save
+  and reload, which is what the drag handle in the editor depends on
 - `SmartPlaylistRuleQueryTest` — pins the SQL-injection defences (allowlisted ORDER BY, escaping,
   numeric validation). Injection is currently closed; these stop a refactor reopening it
 - `HomeSectionSubscriberTest` — every `HomeSection` subclass must declare `@Subscribe`

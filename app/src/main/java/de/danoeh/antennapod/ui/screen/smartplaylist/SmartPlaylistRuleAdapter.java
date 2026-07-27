@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
+import de.danoeh.antennapod.ui.common.ThemeUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -90,6 +91,9 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
             holder.countView.setVisibility(View.VISIBLE);
             holder.countView.setText(holder.itemView.getContext().getResources()
                     .getQuantityString(R.plurals.smart_queue_n_episodes_plural, count, count));
+            // A rule matching nothing contributes nothing, which is worth spotting at a glance
+            holder.countView.setTextColor(ThemeUtils.getColorFromAttr(holder.itemView.getContext(),
+                    count == 0 ? R.attr.colorError : android.R.attr.textColorSecondary));
         } else {
             holder.countView.setVisibility(View.GONE);
         }

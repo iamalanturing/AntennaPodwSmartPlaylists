@@ -115,6 +115,28 @@ in `playback/service/build.gradle`, which arrived as `"junit:junit:$junitVersion
 were converted to `libs.` accessors. After merging `master`, grep the tree for `$…Version` in
 `*.gradle` — the catalog is the only supported form on this branch.
 
+### The screens are where this fork keeps losing things
+
+Every defect found by using the app has been in the fork's own UI, and none of it was caught by
+CI — each one compiled, passed lint and passed the unit tests. Assume the same of the next
+rewrite, and check these on a device before believing a smart queue screen works:
+
+- **Never nest the rules list, or any RecyclerView, in a ScrollView.** A `wrap_content`
+  RecyclerView inside a scrolling parent measures to the space available, not to its content: the
+  rule editor showed seven of fourteen rules, refused to scroll past them, and dragging a row
+  shuffled unreachable rules into view. Rules the user could not see were still generating the
+  queue. Give the list the scrolling region and fix the header and footer around it.
+- **Claim the status bar inset.** See the `:app` README; a bare `Toolbar` at the top of a layout
+  draws under the clock.
+- **Exercise a screen with a lot of data.** Both of the above only appear once the content is
+  taller than the display. A queue with two rules looks perfect either way.
+
+Features that existed on `fqUHX`, were dropped when v2 was written from scratch, and had to be
+rebuilt later: drag-to-reorder rules, the podcast picker, the tag picker, window insets. Still
+missing: a media type control, and an empty state on the queue list screen. Before rewriting a
+screen, diff it against `fqUHX` and decide deliberately about anything that is not carried over —
+the fork's rule model has always held more than its editor exposed.
+
 ### Also re-check
 
 `.github/workflows/fork-checks.yml` is fork-owned and deliberately separate from upstream's
@@ -155,8 +177,8 @@ queue must subscribe to it: the queue changes from outside the UI, so a one-shot
 
 **Storage** (`storage/database/.../`) — `mapper/SmartPlaylistCursor`,
 `mapper/SmartPlaylistRuleCursor`, `mapper/SmartPlaylistRuleQuery` (compiles a rule into a SQL
-WHERE/ORDER BY clause), plus tests `SmartQueueSchemaMigrationTest` and
-`mapper/SmartPlaylistRuleQueryTest`.
+WHERE/ORDER BY clause), plus tests `SmartQueueSchemaMigrationTest`,
+`SmartPlaylistRuleMatchCountTest` and `mapper/SmartPlaylistRuleQueryTest`.
 
 **UI** (`app/.../ui/screen/smartplaylist/`) — list, detail and edit fragments, three adapters,
 the rule edit dialog, and `ui/screen/home/sections/SmartPlaylistsSection` for the home card.
