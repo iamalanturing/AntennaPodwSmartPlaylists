@@ -6,6 +6,7 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.EditText;
 import android.widget.ScrollView;
 import android.widget.Toast;
@@ -135,7 +136,7 @@ public class SmartPlaylistEditFragment extends Fragment {
             SmartPlaylistRuleEditDialog.show(requireContext(), rule, feeds, () -> {
                 playlist.getRules().add(rule);
                 ruleAdapter.notifyItemInserted(playlist.getRules().size() - 1);
-                scrollView.post(() -> scrollView.fullScroll(View.FOCUS_DOWN));
+                scrollToNewRule(scrollView);
             });
         });
 
@@ -143,6 +144,22 @@ public class SmartPlaylistEditFragment extends Fragment {
             loadExistingPlaylist();
         }
         return view;
+    }
+
+    /**
+     * The rules list is a wrap_content RecyclerView inside the ScrollView, so it only reaches its
+     * new height once the inserted row has been laid out. Scrolling before that lands short of the
+     * bottom and the new rule stays out of sight, which is what made the button look inert.
+     */
+    private void scrollToNewRule(ScrollView scrollView) {
+        scrollView.getViewTreeObserver().addOnGlobalLayoutListener(
+                new ViewTreeObserver.OnGlobalLayoutListener() {
+                    @Override
+                    public void onGlobalLayout() {
+                        scrollView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                        scrollView.fullScroll(View.FOCUS_DOWN);
+                    }
+                });
     }
 
     /**

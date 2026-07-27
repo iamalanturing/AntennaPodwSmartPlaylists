@@ -5,9 +5,9 @@ import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.Spinner;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -73,18 +73,15 @@ public class SmartPlaylistRuleEditDialog {
             maxDurEdit.setText(String.valueOf(rule.getMaxDurationMs() / 60000));
         }
 
-        // Sort order spinner
-        Spinner sortSpinner = dialogView.findViewById(R.id.rule_sort_spinner);
+        // Sort order
+        AutoCompleteTextView sortInput = dialogView.findViewById(R.id.rule_sort_spinner);
         String[] sortValues = {"NEWEST", "OLDEST", "SHORTEST", "LONGEST", "RANDOM"};
         String[] sortLabels = context.getResources().getStringArray(R.array.smart_queue_sort_order_entries);
-        ArrayAdapter<String> sortAdapter = new ArrayAdapter<>(context,
-                android.R.layout.simple_spinner_item, sortLabels);
-        sortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        sortSpinner.setAdapter(sortAdapter);
-        int sortIdx = Arrays.asList(sortValues).indexOf(rule.getSortOrder());
-        if (sortIdx >= 0) {
-            sortSpinner.setSelection(sortIdx);
-        }
+        sortInput.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_list_item_1, sortLabels));
+        int storedSortIdx = Arrays.asList(sortValues).indexOf(rule.getSortOrder());
+        final int[] sortIdx = {storedSortIdx >= 0 ? storedSortIdx : 0};
+        sortInput.setText(sortLabels[sortIdx[0]], false);
+        sortInput.setOnItemClickListener((parent, v, position, id) -> sortIdx[0] = position);
 
         // Episode limit
         EditText limitEdit = dialogView.findViewById(R.id.rule_episode_limit_edit);
@@ -116,7 +113,7 @@ public class SmartPlaylistRuleEditDialog {
                     String maxDurStr = maxDurEdit.getText().toString().trim();
                     rule.setMaxDurationMs(minutesToMillis(maxDurStr));
 
-                    rule.setSortOrder(sortValues[sortSpinner.getSelectedItemPosition()]);
+                    rule.setSortOrder(sortValues[sortIdx[0]]);
 
                     String limitStr = limitEdit.getText().toString().trim();
                     rule.setEpisodeLimit(limitStr.isEmpty() ? 0 : parseInt(limitStr));
