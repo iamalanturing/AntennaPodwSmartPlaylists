@@ -1690,18 +1690,6 @@ public class PodDBAdapter {
         return 0;
     }
 
-    public boolean isItemInSmartQueue(long queueId, long itemId) {
-        final String query = "SELECT COUNT(*) FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
-                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = ?"
-                + " AND " + KEY_SMART_PLAYLIST_EPISODE_ID + " = ?";
-        try (Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(queueId), String.valueOf(itemId)})) {
-            if (cursor.moveToFirst()) {
-                return cursor.getInt(0) > 0;
-            }
-        }
-        return false;
-    }
-
     public Cursor getNextInSmartQueueCursor(long queueId, long currentItemId) {
         final String query = "SELECT " + KEYS_FEED_ITEM_WITHOUT_DESCRIPTION + ", " + KEYS_FEED_MEDIA
                 + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES

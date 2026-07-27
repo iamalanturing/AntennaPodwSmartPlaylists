@@ -18,6 +18,10 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import de.danoeh.antennapod.R;
+import de.danoeh.antennapod.actionbutton.ItemActionButton;
+import de.danoeh.antennapod.actionbutton.PlayActionButton;
+import de.danoeh.antennapod.actionbutton.PlayLocalActionButton;
+import de.danoeh.antennapod.actionbutton.StreamActionButton;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.ui.common.ThemeUtils;
 import de.danoeh.antennapod.event.FeedItemEvent;
@@ -35,6 +39,7 @@ import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.ui.episodeslist.EpisodeItemListAdapter;
+import de.danoeh.antennapod.ui.episodeslist.EpisodeItemViewHolder;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
@@ -99,6 +104,26 @@ public class SmartPlaylistDetailFragment extends Fragment {
             @Override
             public boolean onContextItemSelected(@NonNull MenuItem item) {
                 return super.onContextItemSelected(item);
+            }
+
+            @Override
+            protected void afterBindViewHolder(EpisodeItemViewHolder holder, int pos) {
+                super.afterBindViewHolder(holder, pos);
+                if (inActionMode() || pos >= episodes.size()) {
+                    return;
+                }
+                FeedItem episode = episodes.get(pos);
+                if (episode.getMedia() == null) {
+                    return;
+                }
+                ItemActionButton action = ItemActionButton.forItem(episode);
+                if (action instanceof PlayActionButton || action instanceof PlayLocalActionButton
+                        || action instanceof StreamActionButton) {
+                    holder.secondaryActionButton.setOnClickListener(v -> {
+                        PlaybackPreferences.writeActiveSmartQueue(playlistId, episode.getMedia().getId());
+                        action.onClick(requireContext());
+                    });
+                }
             }
         };
         episodeAdapter.setDummyViews(3);

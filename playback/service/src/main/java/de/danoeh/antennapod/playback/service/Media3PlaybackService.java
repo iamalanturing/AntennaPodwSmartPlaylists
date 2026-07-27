@@ -751,12 +751,15 @@ public class Media3PlaybackService extends MediaLibraryService {
                                 Log.d(TAG, "Auto-regenerating smart queue " + activeSmartQueueId);
                             }
                             DBWriter.generateSmartPlaylistSync(queue);
-                            java.util.List<FeedItem> newEpisodes =
-                                    DBReader.getSmartPlaylistEpisodes(activeSmartQueueId);
-                            if (!newEpisodes.isEmpty()) {
-                                nextItem = newEpisodes.get(0);
+                            for (FeedItem candidate : DBReader.getSmartPlaylistEpisodes(activeSmartQueueId)) {
+                                if (candidate.getId() != item.getId() && !candidate.isPlayed()
+                                        && candidate.getMedia() != null) {
+                                    nextItem = candidate;
+                                    break;
+                                }
                             }
-                        } else {
+                        }
+                        if (nextItem == null) {
                             if (DEBUG_SMART_QUEUE) {
                                 Log.d(TAG, "Reached end of smart queue " + activeSmartQueueId
                                         + ", clearing smart queue mode");

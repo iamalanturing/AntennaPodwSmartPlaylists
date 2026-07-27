@@ -909,13 +909,4 @@ public final class DBReader {
         }
     }
 
-    public static synchronized boolean isItemInSmartQueue(long queueId, long itemId) {
-        PodDBAdapter adapter = PodDBAdapter.getInstance();
-        adapter.open();
-        try {
-            return adapter.isItemInSmartQueue(queueId, itemId);
-        } finally {
-            adapter.close();
-        }
-    }
 }
