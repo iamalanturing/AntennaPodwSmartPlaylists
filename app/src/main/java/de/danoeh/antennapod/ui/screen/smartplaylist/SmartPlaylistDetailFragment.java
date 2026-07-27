@@ -27,6 +27,7 @@ import de.danoeh.antennapod.ui.common.ThemeUtils;
 import de.danoeh.antennapod.event.FeedItemEvent;
 import de.danoeh.antennapod.event.MessageEvent;
 import de.danoeh.antennapod.event.PlayerStatusEvent;
+import de.danoeh.antennapod.event.SmartPlaylistEvent;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
@@ -163,6 +164,18 @@ public class SmartPlaylistDetailFragment extends Fragment {
         updatePlayButton();
     }
 
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onSmartPlaylistChanged(SmartPlaylistEvent event) {
+        if (event.affects(playlistId)) {
+            loadData();
+        }
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onFeedItemsChanged(FeedItemEvent event) {
+        loadData();
+    }
+
     private FeedItem playingEpisode() {
         for (FeedItem ep : episodes) {
             if (ep.getMedia() != null && PlaybackStatus.isCurrentlyPlaying(ep.getMedia())) {
@@ -187,7 +200,17 @@ public class SmartPlaylistDetailFragment extends Fragment {
                 MediaButtonStarter.createIntent(requireContext(), KeyEvent.KEYCODE_MEDIA_PAUSE));
     }
 
+    private void loadData() {
+        View view = getView();
+        if (view != null) {
+            loadData(view);
+        }
+    }
+
     private void loadData(View view) {
+        if (disposable != null) {
+            disposable.dispose();
+        }
         disposable = Observable.fromCallable(() -> {
             SmartPlaylist pl = DBReader.getSmartPlaylist(playlistId);
             List<FeedItem> eps = DBReader.getSmartPlaylistEpisodes(playlistId);
@@ -241,18 +264,8 @@ public class SmartPlaylistDetailFragment extends Fragment {
         if (playlist == null) {
             return;
         }
-        disposable = Observable.fromCallable(() -> {
-            DBWriter.generateSmartPlaylistSync(playlist);
-            return DBReader.getSmartPlaylistEpisodes(playlistId);
-        })
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(result -> {
-                    episodes.clear();
-                    episodes.addAll(result);
-                    episodeAdapter.updateItems(episodes);
-                    emptyView.setVisibility(episodes.isEmpty() ? View.VISIBLE : View.GONE);
-                }, error -> { });
+        // Reloading is driven by the SmartPlaylistEvent this posts once the rebuild finishes
+        DBWriter.generateSmartPlaylist(playlist);
     }
 
     private void startPlayback() {

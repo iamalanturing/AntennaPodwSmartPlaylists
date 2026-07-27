@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.event.FeedListUpdateEvent;
+import de.danoeh.antennapod.event.SmartPlaylistEvent;
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.ui.screen.home.HomeSection;
@@ -73,6 +74,11 @@ public class SmartPlaylistsSection extends HomeSection {
      */
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onFeedListChanged(FeedListUpdateEvent event) {
+        loadData();
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onSmartPlaylistChanged(SmartPlaylistEvent event) {
         loadData();
     }
 

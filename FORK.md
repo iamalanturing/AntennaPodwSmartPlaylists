@@ -148,6 +148,11 @@ using one of the affected APIs.
 
 **Model** — `SmartPlaylist`, `SmartPlaylistRule` (`model/.../feed/`).
 
+**Event** — `SmartPlaylistEvent` (`event/.../event/`), posted by every `DBWriter` smart queue write
+including the regeneration the playback service runs when a queue is exhausted. A screen showing a
+queue must subscribe to it: the queue changes from outside the UI, so a one-shot load in
+`onCreateView` goes stale without anything on screen indicating it.
+
 **Storage** (`storage/database/.../`) — `mapper/SmartPlaylistCursor`,
 `mapper/SmartPlaylistRuleCursor`, `mapper/SmartPlaylistRuleQuery` (compiles a rule into a SQL
 WHERE/ORDER BY clause), plus tests `SmartQueueSchemaMigrationTest` and

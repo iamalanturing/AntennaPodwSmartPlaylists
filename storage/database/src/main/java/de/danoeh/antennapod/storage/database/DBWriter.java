@@ -42,6 +42,7 @@ import de.danoeh.antennapod.event.FeedItemEvent;
 import de.danoeh.antennapod.event.FeedListUpdateEvent;
 import de.danoeh.antennapod.event.playback.PlaybackHistoryEvent;
 import de.danoeh.antennapod.event.QueueEvent;
+import de.danoeh.antennapod.event.SmartPlaylistEvent;
 import de.danoeh.antennapod.event.FeedEvent;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
@@ -1009,6 +1010,7 @@ public class DBWriter {
             } finally {
                 adapter.close();
             }
+            EventBus.getDefault().post(new SmartPlaylistEvent(playlist.getId()));
         });
     }
 
@@ -1029,6 +1031,7 @@ public class DBWriter {
             } finally {
                 adapter.close();
             }
+            EventBus.getDefault().post(new SmartPlaylistEvent(playlist.getId()));
         });
     }
 
@@ -1047,6 +1050,7 @@ public class DBWriter {
             if (PlaybackPreferences.getActiveSmartQueueId() == playlistId) {
                 PlaybackPreferences.clearActiveSmartQueueId();
             }
+            EventBus.getDefault().post(new SmartPlaylistEvent(playlistId));
         });
     }
 
@@ -1087,6 +1091,7 @@ public class DBWriter {
         } finally {
             adapter.close();
         }
+        EventBus.getDefault().post(new SmartPlaylistEvent(playlist.getId()));
     }
 
     /**
