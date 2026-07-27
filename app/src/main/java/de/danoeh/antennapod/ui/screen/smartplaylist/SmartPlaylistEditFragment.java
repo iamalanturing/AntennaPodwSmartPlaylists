@@ -6,9 +6,7 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewTreeObserver;
 import android.widget.EditText;
-import android.widget.ScrollView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -45,6 +43,7 @@ public class SmartPlaylistEditFragment extends Fragment {
     private final List<Feed> feeds = new ArrayList<>();
     private Disposable disposable;
     private Disposable feedsDisposable;
+    private Disposable countsDisposable;
     private EditText nameEdit;
     private SwitchCompat autoRebuildSwitch;
 
@@ -104,8 +103,11 @@ public class SmartPlaylistEditFragment extends Fragment {
         playlist = new SmartPlaylist();
         playlist.getRules().add(newRule());
         ruleAdapter = new SmartPlaylistRuleAdapter(playlist.getRules(), rule ->
-                SmartPlaylistRuleEditDialog.show(requireContext(), rule, feeds, () ->
-                        ruleAdapter.notifyDataSetChanged()));
+                SmartPlaylistRuleEditDialog.show(requireContext(), rule, feeds, () -> {
+                    ruleAdapter.notifyDataSetChanged();
+                    loadRuleCounts();
+                }));
+        ruleAdapter.setOnRulesChangedListener(this::loadRuleCounts);
         rulesRecycler.setAdapter(ruleAdapter);
 
         ItemTouchHelper touchHelper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(
@@ -116,6 +118,7 @@ public class SmartPlaylistEditFragment extends Fragment {
                                   @NonNull RecyclerView.ViewHolder target) {
                 ruleAdapter.moveRule(viewHolder.getBindingAdapterPosition(),
                         target.getBindingAdapterPosition());
+                loadRuleCounts();
                 return true;
             }
 
@@ -127,16 +130,17 @@ public class SmartPlaylistEditFragment extends Fragment {
         ruleAdapter.setOnStartDragListener(touchHelper::startDrag);
 
         loadFeeds();
+        loadRuleCounts();
 
-        ScrollView scrollView = view.findViewById(R.id.smart_playlist_edit_scroll);
         view.findViewById(R.id.add_rule_button).setOnClickListener(v -> {
-            // Configure the rule first: appending it silently puts it below the fold on a queue
-            // with enough rules to fill the screen, so the button looks like it did nothing
+            // Configure the rule first, so the button does something visible even when the list
+            // is long enough that the new row lands off screen
             SmartPlaylistRule rule = newRule();
             SmartPlaylistRuleEditDialog.show(requireContext(), rule, feeds, () -> {
                 playlist.getRules().add(rule);
                 ruleAdapter.notifyItemInserted(playlist.getRules().size() - 1);
-                scrollToNewRule(scrollView);
+                rulesRecycler.smoothScrollToPosition(playlist.getRules().size() - 1);
+                loadRuleCounts();
             });
         });
 
@@ -147,22 +151,6 @@ public class SmartPlaylistEditFragment extends Fragment {
     }
 
     /**
-     * The rules list is a wrap_content RecyclerView inside the ScrollView, so it only reaches its
-     * new height once the inserted row has been laid out. Scrolling before that lands short of the
-     * bottom and the new rule stays out of sight, which is what made the button look inert.
-     */
-    private void scrollToNewRule(ScrollView scrollView) {
-        scrollView.getViewTreeObserver().addOnGlobalLayoutListener(
-                new ViewTreeObserver.OnGlobalLayoutListener() {
-                    @Override
-                    public void onGlobalLayout() {
-                        scrollView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                        scrollView.fullScroll(View.FOCUS_DOWN);
-                    }
-                });
-    }
-
-    /**
      * A fresh rule takes one episode. Stored rules keep whatever they hold, including the 0 that
      * still means no limit, so an existing queue is never silently narrowed.
      */
@@ -170,6 +158,31 @@ public class SmartPlaylistEditFragment extends Fragment {
         SmartPlaylistRule rule = new SmartPlaylistRule();
         rule.setEpisodeLimit(1);
         return rule;
+    }
+
+    /**
+     * Counts what each rule matches on its own, so a rule that quietly matches nothing is visible
+     * without generating the playlist and counting by hand.
+     */
+    private void loadRuleCounts() {
+        if (countsDisposable != null) {
+            countsDisposable.dispose();
+        }
+        List<SmartPlaylistRule> snapshot = new ArrayList<>(playlist.getRules());
+        countsDisposable = Observable.fromCallable(() -> {
+            List<Integer> counts = new ArrayList<>();
+            for (SmartPlaylistRule rule : snapshot) {
+                counts.add(DBReader.getSmartPlaylistRuleMatchCount(rule));
+            }
+            return counts;
+        })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(counts -> {
+                    if (ruleAdapter != null && counts.size() == playlist.getRules().size()) {
+                        ruleAdapter.setMatchCounts(counts);
+                    }
+                }, error -> { });
     }
 
     private void loadFeeds() {
@@ -205,6 +218,7 @@ public class SmartPlaylistEditFragment extends Fragment {
                         if (ruleAdapter != null) {
                             ruleAdapter.setRules(playlist.getRules());
                         }
+                        loadRuleCounts();
                     }
                 }, error -> { });
     }
@@ -236,6 +250,9 @@ public class SmartPlaylistEditFragment extends Fragment {
         }
         if (feedsDisposable != null) {
             feedsDisposable.dispose();
+        }
+        if (countsDisposable != null) {
+            countsDisposable.dispose();
         }
     }
 }

@@ -890,6 +890,22 @@ public final class DBReader {
         }
     }
 
+    /**
+     * How many episodes a single rule currently matches, so the rule editor can show what each
+     * rule contributes before the playlist is generated.
+     */
+    public static synchronized int getSmartPlaylistRuleMatchCount(SmartPlaylistRule rule) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (Cursor cursor = adapter.getSmartPlaylistRuleMatchesCursor(rule)) {
+            return cursor.getCount();
+        } catch (Exception e) {
+            return 0;
+        } finally {
+            adapter.close();
+        }
+    }
+
     @Nullable
     public static synchronized FeedItem getNextInSmartQueue(long queueId, long currentItemId) {
         PodDBAdapter adapter = PodDBAdapter.getInstance();

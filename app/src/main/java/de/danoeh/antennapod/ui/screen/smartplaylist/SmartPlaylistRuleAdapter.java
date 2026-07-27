@@ -20,8 +20,10 @@ import java.util.List;
 public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylistRuleAdapter.ViewHolder> {
     private List<SmartPlaylistRule> rules;
     private List<Feed> feeds = new ArrayList<>();
+    private List<Integer> matchCounts = new ArrayList<>();
     private final OnRuleClickListener listener;
     private OnStartDragListener dragListener;
+    private Runnable onRulesChanged;
 
     public interface OnRuleClickListener {
         void onRuleClicked(SmartPlaylistRule rule);
@@ -46,8 +48,17 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
         notifyDataSetChanged();
     }
 
+    public void setMatchCounts(List<Integer> matchCounts) {
+        this.matchCounts = matchCounts;
+        notifyDataSetChanged();
+    }
+
     public void setOnStartDragListener(OnStartDragListener dragListener) {
         this.dragListener = dragListener;
+    }
+
+    public void setOnRulesChangedListener(Runnable onRulesChanged) {
+        this.onRulesChanged = onRulesChanged;
     }
 
     /**
@@ -74,6 +85,14 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         SmartPlaylistRule rule = rules.get(position);
         holder.summaryView.setText(buildSummary(rule, holder));
+        if (position < matchCounts.size()) {
+            int count = matchCounts.get(position);
+            holder.countView.setVisibility(View.VISIBLE);
+            holder.countView.setText(holder.itemView.getContext().getResources()
+                    .getQuantityString(R.plurals.smart_queue_n_episodes_plural, count, count));
+        } else {
+            holder.countView.setVisibility(View.GONE);
+        }
         holder.itemView.setOnClickListener(v -> listener.onRuleClicked(rule));
         holder.dragHandle.setOnTouchListener((v, event) -> {
             if (dragListener != null && event.getActionMasked() == MotionEvent.ACTION_DOWN) {
@@ -82,10 +101,13 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
             return false;
         });
         holder.deleteButton.setOnClickListener(v -> {
-            int pos = holder.getAdapterPosition();
+            int pos = holder.getBindingAdapterPosition();
             if (pos >= 0 && pos < rules.size()) {
                 rules.remove(pos);
                 notifyItemRemoved(pos);
+                if (onRulesChanged != null) {
+                    onRulesChanged.run();
+                }
             }
         });
     }
@@ -121,12 +143,14 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
 
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView summaryView;
+        TextView countView;
         ImageButton deleteButton;
         ImageView dragHandle;
 
         ViewHolder(@NonNull View itemView) {
             super(itemView);
             summaryView = itemView.findViewById(R.id.rule_summary);
+            countView = itemView.findViewById(R.id.rule_episode_count);
             deleteButton = itemView.findViewById(R.id.rule_delete_button);
             dragHandle = itemView.findViewById(R.id.rule_drag_handle);
         }
