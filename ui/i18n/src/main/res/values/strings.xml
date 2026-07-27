@@ -1074,12 +1074,14 @@
     <string name="smart_queue_rule_filter">Filter</string>
     <string name="smart_queue_rule_feeds">Podcasts</string>
     <string name="smart_queue_rule_feeds_all">All podcasts</string>
+    <string name="smart_queue_rule_reorder">Drag to reorder rule</string>
+    <string name="smart_queue_rule_episode_limit_hint">1 episode, 0 = no limit</string>
+    <string name="smart_queue_rule_tags_all">Any tag</string>
     <plurals name="smart_queue_rule_feeds_count">
         <item quantity="one">%d podcast</item>
         <item quantity="other">%d podcasts</item>
     </plurals>
     <string name="smart_queue_rule_tags">Tags</string>
-    <string name="smart_queue_rule_tags_hint">e.g. tech, science</string>
     <string name="smart_queue_rule_max_age">Max age (days)</string>
     <string name="smart_queue_rule_min_duration">Min duration (min)</string>
     <string name="smart_queue_rule_max_duration">Max duration (min)</string>

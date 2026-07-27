@@ -13,6 +13,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import de.danoeh.antennapod.R;
@@ -99,15 +100,34 @@ public class SmartPlaylistEditFragment extends Fragment {
         rulesRecycler.setLayoutManager(new LinearLayoutManager(getContext()));
 
         playlist = new SmartPlaylist();
-        playlist.getRules().add(new SmartPlaylistRule());
+        playlist.getRules().add(newRule());
         ruleAdapter = new SmartPlaylistRuleAdapter(playlist.getRules(), rule ->
                 SmartPlaylistRuleEditDialog.show(requireContext(), rule, feeds, () ->
                         ruleAdapter.notifyDataSetChanged()));
         rulesRecycler.setAdapter(ruleAdapter);
+
+        ItemTouchHelper touchHelper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(
+                ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView,
+                                  @NonNull RecyclerView.ViewHolder viewHolder,
+                                  @NonNull RecyclerView.ViewHolder target) {
+                ruleAdapter.moveRule(viewHolder.getBindingAdapterPosition(),
+                        target.getBindingAdapterPosition());
+                return true;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+            }
+        });
+        touchHelper.attachToRecyclerView(rulesRecycler);
+        ruleAdapter.setOnStartDragListener(touchHelper::startDrag);
+
         loadFeeds();
 
         view.findViewById(R.id.add_rule_button).setOnClickListener(v -> {
-            playlist.getRules().add(new SmartPlaylistRule());
+            playlist.getRules().add(newRule());
             ruleAdapter.notifyItemInserted(playlist.getRules().size() - 1);
         });
 
@@ -115,6 +135,16 @@ public class SmartPlaylistEditFragment extends Fragment {
             loadExistingPlaylist();
         }
         return view;
+    }
+
+    /**
+     * A fresh rule takes one episode. Stored rules keep whatever they hold, including the 0 that
+     * still means no limit, so an existing queue is never silently narrowed.
+     */
+    private SmartPlaylistRule newRule() {
+        SmartPlaylistRule rule = new SmartPlaylistRule();
+        rule.setEpisodeLimit(1);
+        return rule;
     }
 
     private void loadFeeds() {

@@ -1,6 +1,7 @@
 package de.danoeh.antennapod.ui.screen.smartplaylist;
 
 import android.content.Context;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -13,12 +14,15 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
+import de.danoeh.antennapod.model.feed.FeedPreferences;
 import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 
 public class SmartPlaylistRuleEditDialog {
 
@@ -45,9 +49,13 @@ public class SmartPlaylistRuleEditDialog {
                 Arrays.asList(rule.getFilterProperties().split(",")));
         setupFilterChips(filterChips, activeFilters, rule);
 
-        // Tags field
-        EditText tagsEdit = dialogView.findViewById(R.id.rule_tags_edit);
-        tagsEdit.setText(rule.getFeedTags());
+        // Tag selection, offering only tags that are actually in use
+        List<String> allTags = collectTags(feeds);
+        Set<String> selectedTags = splitTags(rule.getFeedTags());
+        Button tagsButton = dialogView.findViewById(R.id.rule_tags_button);
+        tagsButton.setText(describeTags(context, selectedTags));
+        tagsButton.setOnClickListener(v -> showTagPicker(context, allTags, selectedTags,
+                () -> tagsButton.setText(describeTags(context, selectedTags))));
 
         // Max age
         EditText maxAgeEdit = dialogView.findViewById(R.id.rule_max_age_edit);
@@ -97,7 +105,7 @@ public class SmartPlaylistRuleEditDialog {
                     }
                     rule.setFilterProperties(String.join(",", props));
                     rule.setFeedIds(SmartPlaylistFeedNames.joinFeedIds(selectedFeedIds));
-                    rule.setFeedTags(tagsEdit.getText().toString().trim());
+                    rule.setFeedTags(TextUtils.join(",", selectedTags));
 
                     String maxAgeStr = maxAgeEdit.getText().toString().trim();
                     rule.setMaxAgeDays(maxAgeStr.isEmpty() ? 0 : parseInt(maxAgeStr));
@@ -148,6 +156,67 @@ public class SmartPlaylistRuleEditDialog {
                 .show();
     }
 
+    private static List<String> collectTags(List<Feed> feeds) {
+        Set<String> tags = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        for (Feed feed : feeds) {
+            if (feed.getPreferences() != null && feed.getPreferences().getTags() != null) {
+                for (String tag : feed.getPreferences().getTags()) {
+                    if (!TextUtils.isEmpty(tag) && !FeedPreferences.TAG_ROOT.equals(tag)) {
+                        tags.add(tag);
+                    }
+                }
+            }
+        }
+        return new ArrayList<>(tags);
+    }
+
+    private static Set<String> splitTags(String feedTags) {
+        Set<String> tags = new LinkedHashSet<>();
+        if (TextUtils.isEmpty(feedTags)) {
+            return tags;
+        }
+        for (String tag : feedTags.split(",")) {
+            if (!tag.trim().isEmpty()) {
+                tags.add(tag.trim());
+            }
+        }
+        return tags;
+    }
+
+    private static String describeTags(Context context, Set<String> selectedTags) {
+        if (selectedTags.isEmpty()) {
+            return context.getString(R.string.smart_queue_rule_tags_all);
+        }
+        return TextUtils.join(", ", selectedTags);
+    }
+
+    private static void showTagPicker(Context context, List<String> allTags,
+                                      Set<String> selectedTags, Runnable onPicked) {
+        String[] titles = allTags.toArray(new String[0]);
+        boolean[] checked = new boolean[allTags.size()];
+        for (int i = 0; i < allTags.size(); i++) {
+            checked[i] = selectedTags.contains(allTags.get(i));
+        }
+        new MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.smart_queue_rule_tags)
+                .setMultiChoiceItems(titles, checked, (d, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton(android.R.string.ok, (d, w) -> {
+                    selectedTags.clear();
+                    for (int i = 0; i < allTags.size(); i++) {
+                        if (checked[i]) {
+                            selectedTags.add(allTags.get(i));
+                        }
+                    }
+                    onPicked.run();
+                })
+                .setNegativeButton(R.string.cancel_label, null)
+                .setNeutralButton(R.string.smart_queue_rule_tags_all, (d, w) -> {
+                    selectedTags.clear();
+                    onPicked.run();
+                })
+                .show();
+    }
+
     private static void setupFilterChips(ChipGroup group, Set<String> activeFilters,
                                          SmartPlaylistRule rule) {
         String[][] filterOptions = {
@@ -158,9 +227,9 @@ public class SmartPlaylistRuleEditDialog {
                 {FeedItemFilter.IS_FAVORITE, "Favorite"},
         };
         for (String[] option : filterOptions) {
-            Chip chip = new Chip(group.getContext());
+            Chip chip = (Chip) LayoutInflater.from(group.getContext()).inflate(
+                    R.layout.item_smart_playlist_filter_chip, group, false);
             chip.setText(option[1]);
-            chip.setCheckable(true);
             chip.setChecked(activeFilters.contains(option[0]));
             chip.setOnCheckedChangeListener((btn, checked) -> {
                 if (checked) {

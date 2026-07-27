@@ -1,9 +1,11 @@
 package de.danoeh.antennapod.ui.screen.smartplaylist;
 
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -12,15 +14,21 @@ import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylistRuleAdapter.ViewHolder> {
     private List<SmartPlaylistRule> rules;
     private List<Feed> feeds = new ArrayList<>();
     private final OnRuleClickListener listener;
+    private OnStartDragListener dragListener;
 
     public interface OnRuleClickListener {
         void onRuleClicked(SmartPlaylistRule rule);
+    }
+
+    public interface OnStartDragListener {
+        void onStartDrag(RecyclerView.ViewHolder holder);
     }
 
     public SmartPlaylistRuleAdapter(List<SmartPlaylistRule> rules, OnRuleClickListener listener) {
@@ -38,6 +46,22 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
         notifyDataSetChanged();
     }
 
+    public void setOnStartDragListener(OnStartDragListener dragListener) {
+        this.dragListener = dragListener;
+    }
+
+    /**
+     * Rules are applied in list order and the earlier one wins an episode's place in the queue,
+     * so the order is part of what the user is editing.
+     */
+    public void moveRule(int from, int to) {
+        if (from < 0 || to < 0 || from >= rules.size() || to >= rules.size()) {
+            return;
+        }
+        Collections.swap(rules, from, to);
+        notifyItemMoved(from, to);
+    }
+
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -51,6 +75,12 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
         SmartPlaylistRule rule = rules.get(position);
         holder.summaryView.setText(buildSummary(rule, holder));
         holder.itemView.setOnClickListener(v -> listener.onRuleClicked(rule));
+        holder.dragHandle.setOnTouchListener((v, event) -> {
+            if (dragListener != null && event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                dragListener.onStartDrag(holder);
+            }
+            return false;
+        });
         holder.deleteButton.setOnClickListener(v -> {
             int pos = holder.getAdapterPosition();
             if (pos >= 0 && pos < rules.size()) {
@@ -92,11 +122,13 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView summaryView;
         ImageButton deleteButton;
+        ImageView dragHandle;
 
         ViewHolder(@NonNull View itemView) {
             super(itemView);
             summaryView = itemView.findViewById(R.id.rule_summary);
             deleteButton = itemView.findViewById(R.id.rule_delete_button);
+            dragHandle = itemView.findViewById(R.id.rule_drag_handle);
         }
     }
 }
