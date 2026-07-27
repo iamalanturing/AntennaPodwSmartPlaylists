@@ -8,7 +8,8 @@ is an earlier attempt kept only for reference; do not build from it. It is still
 v2 screen looks wrong: v2's UI was written fresh rather than ported, so details fqUHX got right
 (window insets, for one) were silently dropped.
 
-**Upstream base:** `b7ee12c` (2026-07-21), merged from `upstream/develop`. 34 commits on top.
+**Upstream base:** `b7ee12c` (2026-07-21) from `upstream/develop`, plus `b25adc2` from
+`upstream/master` (3.12.0-beta, 20 commits). 45 commits on top.
 
 ---
 
@@ -26,6 +27,13 @@ working on a Pixel 10 (API 36), not merely green in CI:
   was never involved — an early theory of mine that turned out to be wrong.
 - Smart queue screens sit below the status bar, and the queue's Play button starts at the first
   unplayed episode
+- A queue advances to its next episode, including with continuous playback off, while a normal
+  queue still stops; Play/Pause toggles; playing an episode from inside a queue continues from
+  there; an exhausted queue rebuilds and plays something new
+- The detail screen refreshes when a queue is rebuilt, an episode finishes, rules change or a
+  queue is deleted
+- The rule editor: podcast picker, tag picker, drag to reorder, and a rule list that scrolls to
+  every rule (a queue here has fourteen)
 
 Not yet verified: deleting a queue mid-playback falling back to the normal queue.
 
@@ -104,28 +112,15 @@ unlimited, or well above the backlog.
 1. **Remove the diagnostic crash reporter.** `CrashReportExceptionHandler` currently also writes
    stack traces to Downloads via MediaStore. Added because Android 11+ hides the app's own
    directory and the app was crashing on launch with no readable trace. No longer needed.
-2. **Verify the `upstream/master` merge on a device.** Merged on
-   `claude/merge-upstream-master`: 20 commits, three conflicts (`Media3PlaybackService`,
-   `HomeFragment`, `playback/service/build.gradle`). `UPSTREAM_SCHEMA_LEVEL` needed no bump —
-   master's `VERSION` is still 3110000, the level the fork already records. Upstream refactored
-   `startNextInQueue` into `updateDatabaseAfterPlayback` / `confirmStreamingIfNeeded` /
-   `switchToPlayable`; the Smart Queue lookup and the follow-queue override were reapplied on top.
-   Device testing confirmed the queue advances, that it advances with continuous playback off, and
-   that the home screen renders. Not yet re-tested after the ownership change described below;
-   playback speed carrying to the next episode and streaming confirmation over mobile data are
-   still unchecked.
-3. **Re-test the smart queue ownership change.** Device testing found that with continuous playback
-   off, an ordinary queue episode also auto-advanced. Cause was not the merge: smart queue mode was
-   still active from an earlier smart queue play, because the old check asked whether the finished
-   episode was *in* the active queue, and that episode was in both. The queue now owns exactly one
-   episode at a time (see `FORK.md`). Worth confirming: a normal queue with continuous playback off
-   stops after each episode, and a smart queue still plays through.
-4. **Auto-download does not know about Smart Queues.** It selects from episodes marked NEW plus
+2. **Still unverified on a device**, after a round that verified most of the rest: playback speed
+   carrying to the next episode, and streaming confirmation over mobile data. Both come from
+   `upstream/master` and land in the same code path the Smart Queue hooks into.
+3. **Auto-download does not know about Smart Queues.** It selects from episodes marked NEW plus
    the regular queue, so a queue filtered on `downloaded` only fills as new episodes arrive and
    get downloaded. Making smart-queue membership a download candidate source would be a natural
    feature addition. Deferred: new episodes do arrive on their own, and a backlog can be
    downloaded by hand once. Watch the episode cache instead — see below.
-5. **One UX gap** left from removing dead strings: there is no media-type control in the rule
+4. **One UX gap** left from removing dead strings: there is no media-type control in the rule
    editor (the model supports `mediaType`, nothing exposes it). The smart queue list screen still
    has no empty state, but it now has an app bar to hang one on. The podcast picker that was
    missing from the rule editor is done — rules restored from the older branch had feed ids the v2
