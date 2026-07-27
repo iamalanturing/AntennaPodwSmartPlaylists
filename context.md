@@ -4,9 +4,11 @@ Where this fork stands and what to pick up next. `FORK.md` covers how the fork i
 what must not be broken when merging upstream; this file is the current state.
 
 **Branch:** `claude/add-smart-playlists-v2` — the canonical one. `claude/add-smart-playlists-fqUHX`
-is an earlier attempt kept only for reference; do not build from it.
+is an earlier attempt kept only for reference; do not build from it. It is still worth reading when a
+v2 screen looks wrong: v2's UI was written fresh rather than ported, so details fqUHX got right
+(window insets, for one) were silently dropped.
 
-**Upstream base:** `b7ee12c` (2026-07-21), merged from `upstream/develop`. 31 commits on top.
+**Upstream base:** `b7ee12c` (2026-07-21), merged from `upstream/develop`. 34 commits on top.
 
 ---
 
@@ -22,6 +24,8 @@ working on a Pixel 10 (API 36), not merely green in CI:
   installed from Play unless *Developer settings → Unknown sources* is enabled. Enabling it
   fixed both the missing app entry and the steering-wheel behaviour. BeyondPod being installed
   was never involved — an early theory of mine that turned out to be wrong.
+- Smart queue screens sit below the status bar, and the queue's Play button starts at the first
+  unplayed episode
 
 Not yet verified: deleting a queue mid-playback falling back to the normal queue.
 
@@ -79,6 +83,20 @@ build reads the latter, and writing there leaves the config silently unregistere
 Robolectric runs real SQLite, so the migration tests genuinely exercise the upgrade path rather
 than mocking it.
 
+## The episode cache gates auto-download
+
+`AutomaticDownloadAlgorithm` computes `episodeSpaceLeft = cacheSize - (downloaded - deleted)` and
+downloads that many candidates. The episode cache defaults to 20 and episode cleanup defaults to
+`EPISODE_CLEANUP_NULL`, which deletes nothing — so once the number of downloaded episodes reaches
+the cache size, auto-download quietly stops. Past it, `episodeSpaceLeft` goes negative and the
+`candidates.subList(0, episodeSpaceLeft)` call throws inside the executor's Runnable, killing the
+run with nothing user-visible.
+
+This is upstream behaviour, not fork-specific, but it matters more here: a Smart Queue filtered on
+`downloaded` depends entirely on auto-download to keep filling. Hand-downloading a backlog inflates
+the downloaded count and can park the app on the wrong side of that limit. Set the episode cache to
+unlimited, or well above the backlog.
+
 ## Outstanding
 
 1. **Remove the diagnostic crash reporter.** `CrashReportExceptionHandler` currently also writes
@@ -93,10 +111,11 @@ than mocking it.
 3. **Auto-download does not know about Smart Queues.** It selects from episodes marked NEW plus
    the regular queue, so a queue filtered on `downloaded` only fills as new episodes arrive and
    get downloaded. Making smart-queue membership a download candidate source would be a natural
-   feature addition.
-4. **Two UX gaps** found while removing dead strings: there is no media-type control in the rule
-   editor (the model supports `mediaType`, nothing exposes it), and no empty state on the smart
-   playlist list screen.
+   feature addition. Deferred: new episodes do arrive on their own, and a backlog can be
+   downloaded by hand once. Watch the episode cache instead — see below.
+4. **One UX gap** left from removing dead strings: there is no media-type control in the rule
+   editor (the model supports `mediaType`, nothing exposes it). The smart queue list screen still
+   has no empty state, but it now has an app bar to hang one on.
 
 ## Decisions worth not relitigating
 
