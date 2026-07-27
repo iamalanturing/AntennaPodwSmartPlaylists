@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
+import de.danoeh.antennapod.event.FeedListUpdateEvent;
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.ui.screen.home.HomeSection;
@@ -21,6 +22,8 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,6 +61,19 @@ public class SmartPlaylistsSection extends HomeSection {
                     playlists.addAll(result);
                     cardAdapter.notifyDataSetChanged();
                 }, error -> { });
+    }
+
+    /**
+     * Refreshes the cards when the library changes, since a smart queue's contents and episode
+     * count are derived from the feeds and episodes present.
+     *
+     * <p>This also has to exist for the section to work at all: {@link HomeSection#onStart}
+     * registers every section with EventBus, and EventBus throws when a subscriber declares no
+     * {@code @Subscribe} method. Without one, opening the home screen crashes the app.
+     */
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onFeedListChanged(FeedListUpdateEvent event) {
+        loadData();
     }
 
     @Override
