@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.ui.common.ThemeUtils;
+import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 import de.danoeh.antennapod.storage.database.DBReader;
@@ -26,6 +27,10 @@ import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 
 public class SmartPlaylistEditFragment extends Fragment {
     public static final String TAG = "SmartPlaylistEditFrag";
@@ -34,7 +39,9 @@ public class SmartPlaylistEditFragment extends Fragment {
     private long playlistId;
     private SmartPlaylist playlist;
     private SmartPlaylistRuleAdapter ruleAdapter;
+    private final List<Feed> feeds = new ArrayList<>();
     private Disposable disposable;
+    private Disposable feedsDisposable;
     private EditText nameEdit;
     private SwitchCompat autoRebuildSwitch;
 
@@ -94,9 +101,10 @@ public class SmartPlaylistEditFragment extends Fragment {
         playlist = new SmartPlaylist();
         playlist.getRules().add(new SmartPlaylistRule());
         ruleAdapter = new SmartPlaylistRuleAdapter(playlist.getRules(), rule ->
-                SmartPlaylistRuleEditDialog.show(requireContext(), rule, () ->
+                SmartPlaylistRuleEditDialog.show(requireContext(), rule, feeds, () ->
                         ruleAdapter.notifyDataSetChanged()));
         rulesRecycler.setAdapter(ruleAdapter);
+        loadFeeds();
 
         view.findViewById(R.id.add_rule_button).setOnClickListener(v -> {
             playlist.getRules().add(new SmartPlaylistRule());
@@ -107,6 +115,27 @@ public class SmartPlaylistEditFragment extends Fragment {
             loadExistingPlaylist();
         }
         return view;
+    }
+
+    private void loadFeeds() {
+        feedsDisposable = Observable.fromCallable(() -> {
+            List<Feed> loaded = DBReader.getFeedList();
+            Collections.sort(loaded, (a, b) -> {
+                String titleA = a.getTitle() != null ? a.getTitle() : "";
+                String titleB = b.getTitle() != null ? b.getTitle() : "";
+                return titleA.compareToIgnoreCase(titleB);
+            });
+            return loaded;
+        })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(result -> {
+                    feeds.clear();
+                    feeds.addAll(result);
+                    if (ruleAdapter != null) {
+                        ruleAdapter.setFeeds(feeds);
+                    }
+                }, error -> { });
     }
 
     private void loadExistingPlaylist() {
@@ -149,6 +178,9 @@ public class SmartPlaylistEditFragment extends Fragment {
         super.onDestroyView();
         if (disposable != null) {
             disposable.dispose();
+        }
+        if (feedsDisposable != null) {
+            feedsDisposable.dispose();
         }
     }
 }

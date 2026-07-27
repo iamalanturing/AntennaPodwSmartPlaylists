@@ -1073,6 +1073,11 @@
     <string name="smart_queue_delete_confirm">Delete this smart queue?</string>
     <string name="smart_queue_rule_filter">Filter</string>
     <string name="smart_queue_rule_feeds">Podcasts</string>
+    <string name="smart_queue_rule_feeds_all">All podcasts</string>
+    <plurals name="smart_queue_rule_feeds_count">
+        <item quantity="one">%d podcast</item>
+        <item quantity="other">%d podcasts</item>
+    </plurals>
     <string name="smart_queue_rule_tags">Tags</string>
     <string name="smart_queue_rule_tags_hint">e.g. tech, science</string>
     <string name="smart_queue_rule_max_age">Max age (days)</string>

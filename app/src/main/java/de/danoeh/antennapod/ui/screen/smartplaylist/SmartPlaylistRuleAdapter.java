@@ -8,12 +8,15 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import de.danoeh.antennapod.R;
+import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylistRuleAdapter.ViewHolder> {
     private List<SmartPlaylistRule> rules;
+    private List<Feed> feeds = new ArrayList<>();
     private final OnRuleClickListener listener;
 
     public interface OnRuleClickListener {
@@ -27,6 +30,11 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
 
     public void setRules(List<SmartPlaylistRule> rules) {
         this.rules = rules;
+        notifyDataSetChanged();
+    }
+
+    public void setFeeds(List<Feed> feeds) {
+        this.feeds = feeds;
         notifyDataSetChanged();
     }
 
@@ -61,7 +69,8 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
             if (sb.length() > 0) {
                 sb.append(" · ");
             }
-            sb.append(holder.itemView.getContext().getString(R.string.smart_queue_rule_feeds));
+            sb.append(SmartPlaylistFeedNames.describe(holder.itemView.getContext(),
+                    SmartPlaylistFeedNames.parseFeedIds(rule.getFeedIds()), feeds));
         }
         if (!rule.getFeedTags().isEmpty()) {
             if (sb.length() > 0) {

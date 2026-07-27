@@ -125,7 +125,9 @@ unlimited, or well above the backlog.
    downloaded by hand once. Watch the episode cache instead — see below.
 5. **One UX gap** left from removing dead strings: there is no media-type control in the rule
    editor (the model supports `mediaType`, nothing exposes it). The smart queue list screen still
-   has no empty state, but it now has an app bar to hang one on.
+   has no empty state, but it now has an app bar to hang one on. The podcast picker that was
+   missing from the rule editor is done — rules restored from the older branch had feed ids the v2
+   editor could neither show nor change.
 
 ## Decisions worth not relitigating
 

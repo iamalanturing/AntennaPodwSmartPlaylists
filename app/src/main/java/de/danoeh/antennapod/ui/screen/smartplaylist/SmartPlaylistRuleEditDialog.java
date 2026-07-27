@@ -4,12 +4,14 @@ import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import de.danoeh.antennapod.R;
+import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 import java.util.ArrayList;
@@ -24,9 +26,18 @@ public class SmartPlaylistRuleEditDialog {
         void onRuleChanged();
     }
 
-    public static void show(Context context, SmartPlaylistRule rule, OnRuleChangedListener listener) {
+    public static void show(Context context, SmartPlaylistRule rule, List<Feed> feeds,
+                            OnRuleChangedListener listener) {
         View dialogView = LayoutInflater.from(context).inflate(
                 R.layout.dialog_smart_playlist_rule_edit, null);
+
+        // Podcast selection
+        Set<Long> selectedFeedIds = SmartPlaylistFeedNames.parseFeedIds(rule.getFeedIds());
+        Button feedsButton = dialogView.findViewById(R.id.rule_feeds_button);
+        feedsButton.setText(SmartPlaylistFeedNames.describe(context, selectedFeedIds, feeds));
+        feedsButton.setOnClickListener(v -> showFeedPicker(context, feeds, selectedFeedIds,
+                () -> feedsButton.setText(
+                        SmartPlaylistFeedNames.describe(context, selectedFeedIds, feeds))));
 
         // Playback state chips
         ChipGroup filterChips = dialogView.findViewById(R.id.filter_chip_group);
@@ -85,6 +96,7 @@ public class SmartPlaylistRuleEditDialog {
                         }
                     }
                     rule.setFilterProperties(String.join(",", props));
+                    rule.setFeedIds(SmartPlaylistFeedNames.joinFeedIds(selectedFeedIds));
                     rule.setFeedTags(tagsEdit.getText().toString().trim());
 
                     String maxAgeStr = maxAgeEdit.getText().toString().trim();
@@ -104,6 +116,35 @@ public class SmartPlaylistRuleEditDialog {
                     listener.onRuleChanged();
                 })
                 .setNegativeButton(R.string.cancel_label, null)
+                .show();
+    }
+
+    private static void showFeedPicker(Context context, List<Feed> feeds, Set<Long> selectedFeedIds,
+                                       Runnable onPicked) {
+        String[] titles = new String[feeds.size()];
+        boolean[] checked = new boolean[feeds.size()];
+        for (int i = 0; i < feeds.size(); i++) {
+            String title = feeds.get(i).getTitle();
+            titles[i] = title != null ? title : "";
+            checked[i] = selectedFeedIds.contains(feeds.get(i).getId());
+        }
+        new MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.smart_queue_rule_feeds)
+                .setMultiChoiceItems(titles, checked, (d, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton(android.R.string.ok, (d, w) -> {
+                    selectedFeedIds.clear();
+                    for (int i = 0; i < feeds.size(); i++) {
+                        if (checked[i]) {
+                            selectedFeedIds.add(feeds.get(i).getId());
+                        }
+                    }
+                    onPicked.run();
+                })
+                .setNegativeButton(R.string.cancel_label, null)
+                .setNeutralButton(R.string.smart_queue_rule_feeds_all, (d, w) -> {
+                    selectedFeedIds.clear();
+                    onPicked.run();
+                })
                 .show();
     }
 
