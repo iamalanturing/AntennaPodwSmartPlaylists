@@ -24,9 +24,9 @@ media-type dropdown is verified on a device, and the list empty state is **delib
 unverified** — showing it needs a queue-less app and the user did not want to delete a queue to
 get there. It is cosmetic, and its failure mode is invisible rather than harmful.
 
-The per-queue home screen widget is built and green in CI but **has never been run**. That is the
-next thing to do: install the APK, put one on a home screen, and work through the watch-list in
-*The Smart Queue widget* below.
+The per-queue home screen widget **works on a device** — two widgets, each starting and pausing its
+own queue. Read *The Smart Queue widget* below before touching it; it cost six rounds of device
+testing and every fault compiled and passed CI.
 
 Read *Skipping leaves episodes behind the cursor* and *The rebuild only fires during playback*
 before touching queue contents or anything that counts episodes. Both are behaviours the code does
