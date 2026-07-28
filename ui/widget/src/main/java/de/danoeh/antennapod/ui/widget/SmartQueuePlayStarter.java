@@ -4,7 +4,6 @@ import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.view.KeyEvent;
 
 /**
  * Builds the intent behind a smart queue widget's play button.
@@ -22,17 +21,18 @@ import android.view.KeyEvent;
 public abstract class SmartQueuePlayStarter {
     private static final String PLAYBACK_SERVICE =
             "de.danoeh.antennapod.playback.service.Media3PlaybackService";
+    public static final String ACTION_PLAY_SMART_QUEUE =
+            "de.danoeh.antennapod.intents.PLAY_SMART_QUEUE";
     public static final String EXTRA_PLAYLIST_ID = "smart_queue_playlist_id";
 
     public static PendingIntent createPendingIntent(Context context, int widgetId, long playlistId) {
-        // Carries a media button as well as the queue id. The working button sends
-        // ACTION_MEDIA_BUTTON, and an intent with no action at all appears to be one media3 does
-        // not treat as a reason to keep the service alive, so the queue lookup completes into a
-        // service that has already gone. The override reads the queue id before delegating.
-        Intent intent = new Intent(Intent.ACTION_MEDIA_BUTTON)
+        // Deliberately NOT ACTION_MEDIA_BUTTON. Media3 handles that action itself, synchronously,
+        // by dispatching the key to the session -- which toggles whatever is already playing while
+        // the queue lookup is still running behind it. Every widget then behaves as one global
+        // play/pause button regardless of which queue it is bound to. An action of our own keeps
+        // the intent non-empty without media3 claiming it.
+        Intent intent = new Intent(ACTION_PLAY_SMART_QUEUE)
                 .setComponent(new ComponentName(context, PLAYBACK_SERVICE))
-                .putExtra(Intent.EXTRA_KEY_EVENT,
-                        new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY))
                 .putExtra(EXTRA_PLAYLIST_ID, playlistId);
         // The widget id keeps one widget's button from replacing another's pending intent
         return PendingIntent.getService(context, widgetId, intent,

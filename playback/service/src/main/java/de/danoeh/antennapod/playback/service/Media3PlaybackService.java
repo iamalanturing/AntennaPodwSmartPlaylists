@@ -391,10 +391,12 @@ public class Media3PlaybackService extends MediaLibraryService {
     // only ever reaches whatever is already playing.
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && intent.hasExtra(SmartQueuePlayStarter.EXTRA_PLAYLIST_ID)) {
+        if (intent != null && SmartQueuePlayStarter.ACTION_PLAY_SMART_QUEUE.equals(intent.getAction())) {
             smartQueueDiagnostic("onStartCommand reached, queue "
                     + intent.getLongExtra(SmartQueuePlayStarter.EXTRA_PLAYLIST_ID, 0));
             startSmartQueue(intent.getLongExtra(SmartQueuePlayStarter.EXTRA_PLAYLIST_ID, 0));
+            // Not passed to super: media3 would look for a media button in it and find nothing
+            return START_NOT_STICKY;
         }
         return super.onStartCommand(intent, flags, startId);
     }

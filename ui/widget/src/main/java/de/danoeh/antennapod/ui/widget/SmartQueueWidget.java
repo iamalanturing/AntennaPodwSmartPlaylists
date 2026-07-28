@@ -17,8 +17,17 @@ public class SmartQueueWidget extends AppWidgetProvider {
     public static final String KEY_INITIALS = "smart_queue_widget_initials";
     public static final int DEFAULT_COLOR = 0xff262C31;
 
+    /**
+     * A widget's tap targets are pending intents baked into the views the launcher holds, so they
+     * only change when the widget is redrawn. Deferring that to a background job means an app
+     * update can leave a widget wired to the previous build for an unbounded time — tapping it
+     * then does whatever the old code did, or nothing at all if that code is gone. Redraw on a
+     * thread of our own so an update takes effect at once.
+     */
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
+        final Context appContext = context.getApplicationContext();
+        new Thread(() -> SmartQueueWidgetUpdater.updateWidgets(appContext), "SmartQueueWidgetUpdate").start();
         SmartQueueWidgetWorker.enqueueWork(context);
     }
 
