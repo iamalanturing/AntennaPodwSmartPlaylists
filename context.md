@@ -187,43 +187,49 @@ below for what to check first. One thing is parked:
 
 ## The Smart Queue widget
 
-Built, CI green, **not yet run on a device**. Widgets are the least testable part of Android from
-CI, so treat all of the below as unverified.
-
-Watch these first, in this order — they are where it is most likely to be wrong:
-
-- **The one-cell threshold.** `isSingleCell` calls a widget small below `minWidth` 110dp. Whether
-  that trips at the size a launcher calls 1x1 is a guess; check on a real home screen.
-- **Cold start of the play button.** `SmartQueueWidgetPlayReceiver` reads the database on a worker
-  thread and then hops to the main thread, because building a `MediaController` needs a `Looper`.
-  Whether that reliably starts a queue with the app killed is the untested part.
-- **The config screen's theme.** It deliberately uses no Material3 theme attributes, because an
-  unresolvable attr there is an inflation crash.
-
-Four traps already paid for, which the code now avoids — do not undo them:
+**Working on a device.** Two widgets, one per queue, each starting and pausing its own queue.
+Getting there cost six rounds of device testing; every one of the faults below compiled, passed
+lint and passed CI.
 
 - **An activity here must extend `ToolbarActivity`, never `AppCompatActivity`.** The application
   theme descends from `Theme.SplashScreen`, which is not an AppCompat theme, so AppCompatActivity
-  throws before drawing. `ToolbarActivity` calls `setTheme(ThemeSwitcher.getNoTitleTheme(this))`
-  first, which is the only reason the player widget's config screen works. This cost a device
-  round trip: a configuration activity that dies returns no result, the launcher reads that as
-  cancelled, and the widget silently vanishes as it is dropped. There is no error anywhere the
-  user can see, and CI cannot catch it — the class compiles perfectly.
-
+  throws before drawing. A configuration activity that dies returns no result, the launcher reads
+  that as cancelled, and the widget vanishes as it is dropped with no error anywhere.
+- **`MediaItemAdapter.fromPlayable` must not be called on the main thread.** It loads artwork and
+  asserts, so it throws on every call. Assemble the media item, start position and id on the
+  background thread; leave the main thread only to hand them to the player.
+- **A stub media item is not playable.** `fromMediaIdStub` carries only an id and is enriched as it
+  passes through the session from a *controller*. Setting one directly on the player skips that and
+  media3 throws on the missing URI.
+- **Never give the widget's intent `ACTION_MEDIA_BUTTON`.** Media3 claims that action and handles
+  it synchronously by dispatching the key to the session, so every widget becomes one global
+  play/pause regardless of which queue it is bound to. Use the fork's own action and do not pass it
+  to `super.onStartCommand`.
+- **Decide play-versus-pause in the service, not in the widget.** A widget only learns its queue
+  started playing when it is next redrawn, so a button that depends on the pending intent it is
+  holding cannot pause when pressed.
 - **`MainActivityStarter.getPendingIntent` uses one fixed request code.** Several widgets would
-  share a single pending intent and every one of them would open whichever queue was drawn last.
-  `perWidgetIntent` builds the intent with the widget id as the request code instead.
-- **`:playback:service` depends on `:ui:widget`**, never the other way round. The play receiver is
-  therefore reached by fully-qualified name, the same trick `MediaButtonStarter` uses.
-- **Pausing is not the receiver's job.** Once a queue is the active one the widget wires its button
-  straight to the media button, which is the only thing that reaches what is actually playing.
+  share a single pending intent and all open whichever queue was drawn last. `perWidgetIntent`
+  keys on the widget id instead.
+- **Tap targets live in the views the launcher holds.** They change only on redraw, so an app
+  update can leave a widget wired to the previous build. `onUpdate` now redraws immediately rather
+  than waiting for the background job — but a build that changes the *intent's action* still needs
+  each widget reconfigured once, because the old target is only replaced when it is rewritten.
 
-The count heals: `countAfterHealing` regenerates an exhausted queue that is set to rebuild itself.
-It skips the queue currently playing, and any queue generated within five minutes, because a
-rebuild posts `SmartPlaylistEvent`, which comes straight back to the widget.
+`:ui:widget` cannot depend on `:playback:service` — that module already depends on this one — so
+the service is addressed by fully-qualified name, as `MediaButtonStarter` does.
 
-`SmartQueueWidgetRefresher` lives for the life of the application so widgets follow rebuilds, rule
-changes, finished episodes and playback state whether or not a screen is open.
+The count heals: `countAfterHealing` regenerates an exhausted queue set to rebuild itself, skipping
+the queue currently playing and anything generated within five minutes, because a rebuild posts
+`SmartPlaylistEvent` and comes straight back.
+
+**Still to do:** remove the temporary `smartQueueDiagnostic` writer from `Media3PlaybackService`;
+debounce `SmartQueueWidgetRefresher`, which does a database read per widget on every player status
+change and may be part of the delay before playback starts.
+
+**A trap in the diagnostic itself:** it appends to the crash-report file, and the bug report screen
+shows that file's last-modified time, so a stale stack trace reads as though it just happened. Read
+the appended lines, not the trace.
 
 ## Skipping leaves episodes behind the cursor
 
