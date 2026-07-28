@@ -416,6 +416,19 @@ public class Media3PlaybackService extends MediaLibraryService {
         }
     }
 
+    /** Everything needed to start a queue, all of it assembled off the main thread. */
+    private static class SmartQueueStart {
+        private final long mediaId;
+        private final MediaItem mediaItem;
+        private final long startPosition;
+
+        SmartQueueStart(long mediaId, MediaItem mediaItem, long startPosition) {
+            this.mediaId = mediaId;
+            this.mediaItem = mediaItem;
+            this.startPosition = startPosition;
+        }
+    }
+
     /**
      * Picks what the queue's own detail screen would pick: the episode already in progress, else
      * the first unplayed one, else the top of the queue. Recording the queue as active is what
@@ -423,6 +436,14 @@ public class Media3PlaybackService extends MediaLibraryService {
      */
     private void startSmartQueue(long playlistId) {
         if (playlistId == 0) {
+            return;
+        }
+        // Toggling is decided here rather than by which pending intent the widget happens to be
+        // holding: a widget only learns that its queue started playing when it is next redrawn,
+        // so a button that depended on that would refuse to pause until the redraw caught up.
+        if (PlaybackPreferences.getActiveSmartQueueId() == playlistId && player.isPlaying()) {
+            player.pause();
+            smartQueueDiagnostic("paused queue " + playlistId);
             return;
         }
         Maybe.fromCallable(() -> {
@@ -443,20 +464,26 @@ public class Media3PlaybackService extends MediaLibraryService {
                 List<FeedItem> episodes = DBReader.getSmartPlaylistEpisodes(playlistId);
                 startItem = episodes.isEmpty() ? null : episodes.get(0);
             }
-            return startItem == null ? null : startItem.getMedia();
+            if (startItem == null || startItem.getMedia() == null) {
+                return null;
+            }
+            // Everything the player needs is prepared here, on a background thread. A stub media
+            // item carries only an id and is enriched on its way through the session, so building
+            // the real one is not optional -- and building it loads artwork, which is why
+            // fromPlayable refuses to run on the main thread and threw when it was called there.
+            FeedMedia media = startItem.getMedia();
+            long startPosition = RewindAfterPauseUtils.calculatePositionWithRewind(
+                    (int) SkipUtils.skipIntroIfNecessary(this, media),
+                    media.getLastPlayedTimeStatistics());
+            return new SmartQueueStart(media.getId(),
+                    MediaItemAdapter.fromPlayable(this, media, false), startPosition);
         })
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(media -> {
-                    smartQueueDiagnostic("found media " + media.getId() + ", asking player to play");
-                    PlaybackPreferences.writeActiveSmartQueue(playlistId, media.getId());
-                    // A stub carries only a media id and is enriched into something playable on
-                    // its way through the session. Handing one straight to the player skips that
-                    // and media3 throws on the missing URI, so build the real item here.
-                    long startPosition = SkipUtils.skipIntroIfNecessary(this, media);
-                    startPosition = RewindAfterPauseUtils.calculatePositionWithRewind(
-                            (int) startPosition, media.getLastPlayedTimeStatistics());
-                    player.setMediaItem(MediaItemAdapter.fromPlayable(this, media, false), startPosition);
+                .subscribe(start -> {
+                    smartQueueDiagnostic("prepared media " + start.mediaId + ", asking player to play");
+                    PlaybackPreferences.writeActiveSmartQueue(playlistId, start.mediaId);
+                    player.setMediaItem(start.mediaItem, start.startPosition);
                     player.prepare();
                     player.play();
                     smartQueueDiagnostic("play() returned, isPlaying=" + player.isPlaying());

@@ -9,7 +9,6 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 import android.util.SizeF;
-import android.view.KeyEvent;
 import android.widget.RemoteViews;
 
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
@@ -17,7 +16,6 @@ import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.ui.appstartintent.MainActivityStarter;
-import de.danoeh.antennapod.ui.appstartintent.MediaButtonStarter;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -119,14 +117,13 @@ public class SmartQueueWidgetUpdater {
         views.setTextViewText(R.id.txtvCount, countText);
         views.setContentDescription(R.id.widgetLayout, playlist.getName() + ", " + episodes);
 
-        // When this queue is already the active one, the plain media button is both simpler and
-        // the only thing that can pause: it reaches whatever is playing without a database read.
-        boolean active = PlaybackPreferences.getActiveSmartQueueId() == playlistId;
-        boolean playing = active
+        // One intent whatever the state. The service decides between starting and pausing, because
+        // it knows what is playing right now, whereas this only knows what was true when the widget
+        // was last drawn -- and a button that waits for a redraw to learn it should pause will not
+        // pause when it is pressed.
+        boolean playing = PlaybackPreferences.getActiveSmartQueueId() == playlistId
                 && PlaybackPreferences.getCurrentPlayerStatus() == PlaybackPreferences.PLAYER_STATUS_PLAYING;
-        PendingIntent play = active
-                ? MediaButtonStarter.createPendingIntent(context, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
-                : SmartQueuePlayStarter.createPendingIntent(context, widgetId, playlistId);
+        PendingIntent play = SmartQueuePlayStarter.createPendingIntent(context, widgetId, playlistId);
 
         if (small) {
             views.setTextViewText(R.id.txtvInitials, prefs.getString(
