@@ -173,7 +173,10 @@ jobs:
             echo "org.gradle.caching=true"
           } >> gradle.properties
       - name: Checkstyle, Lint
-        run: ./gradlew checkstyle lint
+        # :app-wearos is excluded: this fork never touches the watch app, and linting it drags in
+        # compiling its Kotlin and running ktlint, which its lint task depends on. Everything else
+        # is still checked. Drop the exclusion if the fork ever starts changing the watch app.
+        run: ./gradlew checkstyle lint -x :app-wearos:lint
       - name: Print full lint report
         # Lint prints only the first failure to the console ("Lint found N errors. First
         # failure:"), which turns fixing a batch into one CI round trip per error. Dump the
