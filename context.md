@@ -24,11 +24,13 @@ media-type dropdown is verified on a device, and the list empty state is **delib
 unverified** — showing it needs a queue-less app and the user did not want to delete a queue to
 get there. It is cosmetic, and its failure mode is invisible rather than harmful.
 
-**Outstanding** now holds design work that is discussed but not started: a per-queue home screen
-widget, and a parser finding the user chose not to report. Read the two sections after it —
-*Skipping leaves episodes behind the cursor* and *The rebuild only fires during playback* — before
-touching queue contents or anything that counts episodes. Both are behaviours the code does not
-advertise.
+The per-queue home screen widget is built and green in CI but **has never been run**. That is the
+next thing to do: install the APK, put one on a home screen, and work through the watch-list in
+*The Smart Queue widget* below.
+
+Read *Skipping leaves episodes behind the cursor* and *The rebuild only fires during playback*
+before touching queue contents or anything that counts episodes. Both are behaviours the code does
+not advertise, and they are why the widget counts the way it does.
 
 Read `FORK.md` first if the work touches a screen or an upstream merge.
 
