@@ -19,17 +19,12 @@ deleted; `fqUHX` stays.
 
 ## Pick up here
 
-Everything is pushed and the verification backlog is empty. One thing is in flight:
+Everything is pushed, CI is green, and nothing is in flight. Every behaviour the fork adds has
+been exercised on a device, including the last one — dragging a rule across several positions in a
+single gesture, with the list auto-scrolling and the counts staying with their rules.
 
-- **The drag fix has not been tried on a device.** Rules could only be dragged one position per
-  grab, because `onMove` recounted the rules and the count result rebuilt the whole list, which
-  loses the view `ItemTouchHelper` holds. Recounting now waits for `clearView`, counts travel with
-  their rule during a move, and `moveRule` inserts rather than swaps. CI run 39 is green
-  (artifact `8672386759`). On that APK: drag a rule several positions in one gesture, drag to the
-  very top and bottom (the list should auto-scroll), and confirm counts still sit against the right
-  rules after the drop.
-
-Anything after that is from **Outstanding** below; nothing there is a defect.
+Start from **Outstanding** below. Neither item is a defect; both are features the fork never
+finished. Read `FORK.md` first if the work touches a screen or an upstream merge.
 
 The APK for a green run is its `app-play-debug` artifact:
 `https://github.com/iamalanturing/AntennaPodwSmartPlaylists/actions/runs/<run id>/artifacts/<artifact id>`
@@ -55,8 +50,10 @@ working on a Pixel 10 (API 36), not merely green in CI:
   there; an exhausted queue rebuilds and plays something new
 - The detail screen refreshes when a queue is rebuilt, an episode finishes, rules change or a
   queue is deleted
-- The rule editor: podcast picker, tag picker, drag to reorder, and a rule list that scrolls to
-  every rule (a queue here has fourteen)
+- The rule editor: podcast picker, tag picker, and a rule list that scrolls to every rule (a queue
+  here has fourteen)
+- Dragging a rule several positions in one gesture, with the list auto-scrolling at the edges and
+  each count staying with its own rule
 - Deleting a queue mid-playback: the episode keeps playing and the normal queue takes over
 - Playback speed carries to the next episode, and streaming over mobile data asks first (both
   from the `upstream/master` merge)
