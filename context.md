@@ -171,11 +171,18 @@ Watch these first, in this order — they are where it is most likely to be wron
 - **Cold start of the play button.** `SmartQueueWidgetPlayReceiver` reads the database on a worker
   thread and then hops to the main thread, because building a `MediaController` needs a `Looper`.
   Whether that reliably starts a queue with the app killed is the untested part.
-- **The config screen's theme.** It inherits the app's splash theme, as the player widget's config
-  activity does. Deliberately uses no Material3 theme attributes, because an unresolvable attr
-  there is an inflation crash.
+- **The config screen's theme.** It deliberately uses no Material3 theme attributes, because an
+  unresolvable attr there is an inflation crash.
 
-Three traps already paid for, which the code now avoids — do not undo them:
+Four traps already paid for, which the code now avoids — do not undo them:
+
+- **An activity here must extend `ToolbarActivity`, never `AppCompatActivity`.** The application
+  theme descends from `Theme.SplashScreen`, which is not an AppCompat theme, so AppCompatActivity
+  throws before drawing. `ToolbarActivity` calls `setTheme(ThemeSwitcher.getNoTitleTheme(this))`
+  first, which is the only reason the player widget's config screen works. This cost a device
+  round trip: a configuration activity that dies returns no result, the launcher reads that as
+  cancelled, and the widget silently vanishes as it is dropped. There is no error anywhere the
+  user can see, and CI cannot catch it — the class compiles perfectly.
 
 - **`MainActivityStarter.getPendingIntent` uses one fixed request code.** Several widgets would
   share a single pending intent and every one of them would open whichever queue was drawn last.
