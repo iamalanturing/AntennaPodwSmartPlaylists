@@ -136,8 +136,45 @@ unlimited, or well above the backlog.
 
 ## Outstanding
 
-Nothing. Both UX gaps are closed: the rule editor now has a media-type dropdown (Any/Audio/Video,
-shown in the rule summary too), and the list screen has an empty state built on `EmptyViewHandler`.
+Both UX gaps are closed: the rule editor now has a media-type dropdown (Any/Audio/Video, shown in
+the rule summary too), and the list screen has an empty state built on `EmptyViewHandler`.
+
+Two things are parked. Neither is started, and neither is urgent.
+
+1. **A per-queue home screen widget.** Wanted, not scheduled. Findings from a feasibility read of
+   `:ui:widget`, so the next session does not have to redo it:
+   - Per-instance config already exists and is the enabler. `WidgetConfigActivity` is registered
+     via `android:configure`, the provider is `reconfigurable`, and every setting is stored as
+     `KEY + appWidgetId` in `PlayerWidgetPrefs` and cleaned up in `PlayerWidget.onDeleted`. A
+     bound playlist id follows that pattern exactly.
+   - `:ui:widget` already depends on `:storage:database` and `:storage:preferences`, so
+     `DBReader.getSmartPlaylistEpisodes` and `PlaybackPreferences.writeActiveSmartQueue` are
+     reachable with no new module wiring.
+   - Prefer a **separate** `AppWidgetProvider` over extending `PlayerWidget`. `:ui:widget` is
+     upstream code; a new receiver plus layout plus config activity is additive and keeps the
+     merge surface near zero, which is the same reasoning that chose v2 over fqUHX.
+   - **Play/pause cannot reuse the existing button.** `WidgetUpdater` wires play to
+     `MediaButtonStarter` with `KEYCODE_MEDIA_PLAY_PAUSE`, which is a global toggle and cannot
+     start a named queue. Starting one means repeating `SmartPlaylistDetailFragment.startPlayback`:
+     read the episodes, pick first in-progress else first unplayed else start over, call
+     `writeActiveSmartQueue(playlistId, mediaId)`, then play. That is a database read, so it has
+     to run off the click thread — a receiver into WorkManager, as `WidgetUpdaterWorker` does.
+   - The button should be state-aware: if `getActiveSmartQueueId()` is this playlist and it is
+     playing, pause via the global media button; otherwise start this queue. The fork already
+     stores the state needed to tell those apart.
+   - Size it 4x1 with `minResizeWidth` at one cell rather than building a 1x1. `WidgetUpdater`
+     already adapts by cell count via `getCellsForSize`, and a 1x1-only widget cannot show the
+     queue name, which is what distinguishes several of them on one home screen.
+   - Refresh on `SmartPlaylistEvent`, which the fork already posts on rebuild, rule change,
+     episode finish and delete. Without that the widget goes silently stale.
+2. **Upstream feed parser has no XXE hardening.** `parser/feed/.../FeedHandler.java` builds a
+   `SAXParserFactory` without `disallow-doctype-decl` or external-entity features, and no
+   `EntityResolver` is set anywhere. Attacker-controlled XML reaches it, and
+   `OnlineFeedViewActivity` is exported and BROWSABLE, so any app or web page can choose the URL.
+   **Unconfirmed:** Android's SAX is Expat-based and may not resolve external entities at all; a
+   JVM or Robolectric test would exercise Xerces and answer the wrong question, so this needs an
+   on-device check. The user decided **not** to report it upstream for now — do not open an issue
+   without asking. Keep it here in case it becomes worth doing.
 
 **Do not propose auto-download awareness of Smart Queues.** The user was asked directly and does
 not want it — "I may never want it". The mechanism, for reference only: auto-download selects from
