@@ -40,9 +40,25 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ hashFiles('**/*.gradle*') }}-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
-      - name: Configure parallel build
-        run: echo "org.gradle.parallel=true" >> local.properties
+          # The commit is in the key so every run writes a fresh cache. actions/cache only saves
+          # on a miss, so a key that never varies is frozen after its first write and the build
+          # cache below could never accumulate anything. restore-keys then falls back to the
+          # closest earlier cache, so editing a build file no longer re-downloads every dependency.
+          key: gradle-${{ hashFiles('**/*.gradle*') }}-${{ github.sha }}
+          restore-keys: |
+            gradle-${{ hashFiles('**/*.gradle*') }}-
+            gradle-
+      - name: Configure Gradle
+        # Must be gradle.properties: Gradle does not read org.gradle.* from local.properties, which
+        # is an Android SDK file for sdk.dir and nothing in this build reads it at all. Writing the
+        # parallel flag there left it silently off -- the same trap that once dropped the signing
+        # config. Caching reuses task outputs between runs, so an edit in one module stops
+        # recompiling the other twenty-odd.
+        run: |
+          {
+            echo "org.gradle.parallel=true"
+            echo "org.gradle.caching=true"
+          } >> gradle.properties
       - name: Create temporary release keystore
         # app/build.gradle resolves signingConfigs at configuration time, so this has to exist
         # even for a debug assemble.
@@ -137,9 +153,25 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ hashFiles('**/*.gradle*') }}-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
-      - name: Configure parallel build
-        run: echo "org.gradle.parallel=true" >> local.properties
+          # The commit is in the key so every run writes a fresh cache. actions/cache only saves
+          # on a miss, so a key that never varies is frozen after its first write and the build
+          # cache below could never accumulate anything. restore-keys then falls back to the
+          # closest earlier cache, so editing a build file no longer re-downloads every dependency.
+          key: gradle-${{ hashFiles('**/*.gradle*') }}-${{ github.sha }}
+          restore-keys: |
+            gradle-${{ hashFiles('**/*.gradle*') }}-
+            gradle-
+      - name: Configure Gradle
+        # Must be gradle.properties: Gradle does not read org.gradle.* from local.properties, which
+        # is an Android SDK file for sdk.dir and nothing in this build reads it at all. Writing the
+        # parallel flag there left it silently off -- the same trap that once dropped the signing
+        # config. Caching reuses task outputs between runs, so an edit in one module stops
+        # recompiling the other twenty-odd.
+        run: |
+          {
+            echo "org.gradle.parallel=true"
+            echo "org.gradle.caching=true"
+          } >> gradle.properties
       - name: Checkstyle, Lint
         run: ./gradlew checkstyle lint
       - name: Print full lint report
