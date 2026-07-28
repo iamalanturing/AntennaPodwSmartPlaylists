@@ -9,6 +9,7 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 import android.util.SizeF;
+import android.view.KeyEvent;
 import android.widget.RemoteViews;
 
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
@@ -16,6 +17,7 @@ import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.ui.appstartintent.MainActivityStarter;
+import de.danoeh.antennapod.ui.appstartintent.MediaButtonStarter;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -143,11 +145,14 @@ public class SmartQueueWidgetUpdater {
         views.setInt(R.id.widgetBorder, "setBackgroundResource",
                 playing ? R.drawable.widget_playing_ring : 0);
 
-        // One intent whatever the state. The service decides between starting and pausing, because
-        // it knows what is playing right now, whereas this only knows what was true when the widget
-        // was last drawn -- and a button that waits for a redraw to learn it should pause will not
-        // pause when it is pressed.
-        PendingIntent play = SmartQueuePlayStarter.createPendingIntent(context, widgetId, playlistId);
+        // Starting and pausing have to travel different roads. Starting a queue when nothing is
+        // playing needs a foreground service start, and that is a promise to begin playing within
+        // seconds or be killed for breaking it -- so it cannot be used to pause, which is the
+        // opposite. Pausing goes by the ordinary media button instead, which is allowed precisely
+        // because something is playing and the service is therefore alive.
+        PendingIntent play = playing
+                ? MediaButtonStarter.createPendingIntent(context, KeyEvent.KEYCODE_MEDIA_PAUSE)
+                : SmartQueuePlayStarter.createPendingIntent(context, widgetId, playlistId);
 
         if (small) {
             views.setTextViewText(R.id.txtvInitials, prefs.getString(

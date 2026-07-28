@@ -415,13 +415,16 @@ public class Media3PlaybackService extends MediaLibraryService {
      */
     private void startSmartQueue(long playlistId) {
         if (playlistId == 0) {
+            // Nothing to play, and the foreground start still has to be answered for
+            stopIfNothingToPlay();
             return;
         }
-        // Toggling is decided here rather than by which pending intent the widget happens to be
-        // holding: a widget only learns that its queue started playing when it is next redrawn,
-        // so a button that depended on that would refuse to pause until the redraw caught up.
+        // This only ever ends up playing. It is reached by a foreground service start, which is a
+        // promise to be playing within seconds, so pausing here would break that promise and the
+        // system kills the process for it -- which is exactly what happened when it did pause.
+        // Pausing is the widget's business, by way of the ordinary media button. If the queue is
+        // already playing there is nothing to do, and carrying on playing keeps the promise.
         if (PlaybackPreferences.getActiveSmartQueueId() == playlistId && player.isPlaying()) {
-            player.pause();
             return;
         }
         Maybe.fromCallable(() -> {
