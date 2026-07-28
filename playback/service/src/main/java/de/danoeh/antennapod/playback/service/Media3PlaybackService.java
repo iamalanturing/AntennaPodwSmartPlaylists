@@ -77,6 +77,11 @@ import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
@@ -400,8 +405,9 @@ public class Media3PlaybackService extends MediaLibraryService {
      * and reading logcat needs a cable. Remove once the widget's play button is settled.
      */
     private void smartQueueDiagnostic(String message) {
-        try (java.io.PrintWriter out = new java.io.PrintWriter(new java.io.FileWriter(
-                new java.io.File(UserPreferences.getDataFolder(null), "crash-report.log"), true))) {
+        File file = new File(UserPreferences.getDataFolder(null), "crash-report.log");
+        try (PrintWriter out = new PrintWriter(new OutputStreamWriter(
+                new FileOutputStream(file, true), StandardCharsets.UTF_8))) {
             out.println(new Date() + " SmartQueueWidget: " + message);
         } catch (Exception e) {
             Log.e(TAG, "Could not write smart queue diagnostic", e);
