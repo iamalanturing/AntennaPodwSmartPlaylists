@@ -6,85 +6,81 @@
     android:layout_height="match_parent"
     android:padding="@dimen/widget_margin">
 
-    <!-- See the one-cell layout: dark ring outside light, shown only while this queue plays. -->
+    <!-- Padded so the ring behind shows through as a dark edge around a lighter one. The padding
+         is always here and only the background changes, so nothing moves when playback starts. -->
     <FrameLayout
-        android:id="@+id/widgetBorderOuter"
+        android:id="@+id/widgetBorder"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="@dimen/widget_border_outer">
+        android:background="@drawable/widget_playing_ring"
+        android:padding="@dimen/widget_border_total">
 
-        <FrameLayout
-            android:id="@+id/widgetBorderInner"
+        <RelativeLayout
+            android:id="@+id/widgetLayout"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="@dimen/widget_border_inner">
+            android:background="#262C31"
+            tools:ignore="UselessParent">
 
-            <RelativeLayout
-                android:id="@+id/widgetLayout"
+            <ImageButton
+                android:id="@+id/butPlay"
+                android:layout_width="@android:dimen/app_icon_size"
+                android:layout_height="match_parent"
+                android:layout_alignParentEnd="true"
+                android:layout_margin="12dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:contentDescription="@string/play_label"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_play" />
+
+            <TextView
+                android:id="@+id/txtvCount"
+                android:layout_width="48dp"
+                android:layout_height="match_parent"
+                android:layout_alignParentStart="true"
+                android:layout_marginStart="8dp"
+                android:gravity="center"
+                android:maxLines="1"
+                android:textColor="#FFFFFF"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                tools:text="12" />
+
+            <LinearLayout
+                android:id="@+id/layout_name"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="#262C31">
-
-                <ImageButton
-                    android:id="@+id/butPlay"
-                    android:layout_width="@android:dimen/app_icon_size"
-                    android:layout_height="match_parent"
-                    android:layout_alignParentEnd="true"
-                    android:layout_margin="12dp"
-                    android:background="?android:attr/selectableItemBackground"
-                    android:contentDescription="@string/play_label"
-                    android:padding="8dp"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ic_widget_play" />
+                android:layout_marginStart="8dp"
+                android:layout_toStartOf="@id/butPlay"
+                android:layout_toEndOf="@id/txtvCount"
+                android:gravity="center_vertical"
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/txtvCount"
-                    android:layout_width="48dp"
-                    android:layout_height="match_parent"
-                    android:layout_alignParentStart="true"
-                    android:layout_marginStart="8dp"
-                    android:gravity="center"
+                    android:id="@+id/txtvName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
                     android:maxLines="1"
                     android:textColor="#FFFFFF"
-                    android:textSize="24sp"
+                    android:textSize="14sp"
                     android:textStyle="bold"
-                    tools:text="12" />
+                    tools:text="Morning News" />
 
-                <LinearLayout
-                    android:id="@+id/layout_name"
+                <TextView
+                    android:id="@+id/txtvSubtitle"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="8dp"
-                    android:layout_toStartOf="@id/butPlay"
-                    android:layout_toEndOf="@id/txtvCount"
-                    android:gravity="center_vertical"
-                    android:orientation="vertical">
+                    android:layout_height="wrap_content"
+                    android:alpha="0.7"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    tools:text="12 unplayed" />
 
-                    <TextView
-                        android:id="@+id/txtvName"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        tools:text="Morning News" />
+            </LinearLayout>
 
-                    <TextView
-                        android:id="@+id/txtvSubtitle"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:alpha="0.7"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="#FFFFFF"
-                        android:textSize="12sp"
-                        tools:text="12 unplayed" />
-
-                </LinearLayout>
-
-            </RelativeLayout>
-        </FrameLayout>
+        </RelativeLayout>
     </FrameLayout>
 </FrameLayout>

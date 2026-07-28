@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The ring drawn round a Smart Queue widget while its queue is playing. Dark underneath, light
+    inset over it, so what shows through the host layout's padding is a thin dark edge around a
+    lighter one. Neither shade alone survives both a pale wallpaper and a dark one, nor every
+    colour a widget might be given. The centre is covered by the widget's own background.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#000000" />
+        </shape>
+    </item>
+    <item
+        android:bottom="@dimen/widget_border_outer"
+        android:left="@dimen/widget_border_outer"
+        android:right="@dimen/widget_border_outer"
+        android:top="@dimen/widget_border_outer">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

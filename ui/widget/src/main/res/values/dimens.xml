@@ -4,5 +4,5 @@
     <dimen name="widget_inner_radius">4dp</dimen>
     <dimen name="widget_cover_large">72dp</dimen>
     <dimen name="widget_border_outer">1dp</dimen>
-    <dimen name="widget_border_inner">2dp</dimen>
+    <dimen name="widget_border_total">3dp</dimen>
 </resources>

@@ -6,7 +6,6 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.os.Build;
 import android.util.Log;
 import android.util.SizeF;
@@ -34,8 +33,6 @@ public class SmartQueueWidgetUpdater {
     /** Full strength against a little over a third: enough of a gap to read without comparing. */
     private static final int ALPHA_PLAYING = 255;
     private static final int ALPHA_IDLE = 95;
-    private static final int BORDER_OUTER_COLOR = 0xFF000000;
-    private static final int BORDER_INNER_COLOR = 0xFFFFFFFF;
     /**
      * Launchers report a widget's width as roughly {@code 70n - 30} dp, so one cell is 40, two is
      * 110, three is 180. The wide layout needs three: at two cells the name has almost no room
@@ -141,13 +138,10 @@ public class SmartQueueWidgetUpdater {
         views.setTextViewText(R.id.txtvCount, countText);
         views.setContentDescription(R.id.widgetLayout, playlist.getName() + ", " + episodes);
 
-        // A ring round the whole widget carries much further than a glyph in a corner. Dark
-        // outside light so it reads against a pale wallpaper and a dark one alike, and against
-        // whichever colour the widget itself was given.
-        views.setInt(R.id.widgetBorderOuter, "setBackgroundColor",
-                playing ? BORDER_OUTER_COLOR : Color.TRANSPARENT);
-        views.setInt(R.id.widgetBorderInner, "setBackgroundColor",
-                playing ? BORDER_INNER_COLOR : Color.TRANSPARENT);
+        // A ring round the whole widget carries much further than a glyph in a corner. The layout
+        // reserves the space for it always, so switching it on and off moves nothing.
+        views.setInt(R.id.widgetBorder, "setBackgroundResource",
+                playing ? R.drawable.widget_playing_ring : 0);
 
         // One intent whatever the state. The service decides between starting and pausing, because
         // it knows what is playing right now, whereas this only knows what was true when the widget
@@ -199,6 +193,8 @@ public class SmartQueueWidgetUpdater {
     /** The queue was deleted while its widget stayed on the home screen. */
     private static void showMissingQueue(Context context, RemoteViews views, boolean small) {
         String missing = context.getString(R.string.smart_queue_widget_missing);
+        // The ring is the layout's default background, so it has to be taken off explicitly here
+        views.setInt(R.id.widgetBorder, "setBackgroundResource", 0);
         views.setTextViewText(R.id.txtvCount, "–");
         views.setContentDescription(R.id.widgetLayout, missing);
         if (small) {
