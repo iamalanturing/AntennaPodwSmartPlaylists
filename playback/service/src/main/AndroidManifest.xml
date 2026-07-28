@@ -81,9 +81,6 @@
             </intent-filter>
         </receiver>
 
-        <receiver
-            android:name="de.danoeh.antennapod.playback.service.SmartQueueWidgetPlayReceiver"
-            android:exported="false" />
     </application>
 
     <queries>

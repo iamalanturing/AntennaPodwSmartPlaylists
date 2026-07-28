@@ -65,6 +65,7 @@ import de.danoeh.antennapod.ui.appstartintent.MainActivityStarter;
 import de.danoeh.antennapod.ui.chapters.ChapterUtils;
 import de.danoeh.antennapod.ui.episodes.PlaybackSpeedUtils;
 import de.danoeh.antennapod.ui.notifications.NotificationUtils;
+import de.danoeh.antennapod.ui.widget.SmartQueuePlayStarter;
 import de.danoeh.antennapod.ui.widget.WidgetUpdater;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Maybe;
@@ -376,6 +377,58 @@ public class Media3PlaybackService extends MediaLibraryService {
     @Override
     public MediaLibrarySession onGetSession(@NonNull MediaSession.ControllerInfo controllerInfo) {
         return mediaSession;
+    }
+
+    // FORK: Smart Queue — a queue widget starts its queue by starting this service, so the
+    // background start exemption the widget tap grants is spent here rather than on a broadcast
+    // that then has to bind back to us. Nothing else can start a *named* queue: a media button
+    // only ever reaches whatever is already playing.
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && intent.hasExtra(SmartQueuePlayStarter.EXTRA_PLAYLIST_ID)) {
+            startSmartQueue(intent.getLongExtra(SmartQueuePlayStarter.EXTRA_PLAYLIST_ID, 0));
+        }
+        return super.onStartCommand(intent, flags, startId);
+    }
+
+    /**
+     * Picks what the queue's own detail screen would pick: the episode already in progress, else
+     * the first unplayed one, else the top of the queue. Recording the queue as active is what
+     * makes playback carry on through it afterwards.
+     */
+    private void startSmartQueue(long playlistId) {
+        if (playlistId == 0) {
+            return;
+        }
+        Maybe.fromCallable(() -> {
+            FeedItem startItem = null;
+            for (FeedItem episode : DBReader.getSmartPlaylistEpisodes(playlistId)) {
+                if (episode.getMedia() == null || episode.isPlayed()) {
+                    continue;
+                }
+                if (episode.getMedia().getPosition() > 0) {
+                    startItem = episode;
+                    break;
+                }
+                if (startItem == null) {
+                    startItem = episode;
+                }
+            }
+            if (startItem == null) {
+                List<FeedItem> episodes = DBReader.getSmartPlaylistEpisodes(playlistId);
+                startItem = episodes.isEmpty() ? null : episodes.get(0);
+            }
+            return startItem == null ? null : startItem.getMedia();
+        })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(media -> {
+                    PlaybackPreferences.writeActiveSmartQueue(playlistId, media.getId());
+                    player.setMediaItem(MediaItemAdapter.fromMediaIdStub(media.getId()));
+                    player.prepare();
+                    player.play();
+                }, error -> Log.e(TAG, "Failed to start smart queue " + playlistId, error),
+                        () -> Log.d(TAG, "Smart queue " + playlistId + " had nothing to play"));
     }
 
     @UnstableApi

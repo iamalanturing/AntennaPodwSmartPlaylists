@@ -32,9 +32,14 @@ public class SmartQueueWidgetUpdater {
     private static final String DETAIL_FRAGMENT_ARG = "playlistId";
     private static final String LIST_FRAGMENT_TAG = "SmartPlaylistListFragment";
     private static final int MAX_DISPLAYED_COUNT = 99;
+    /**
+     * Launchers report a widget's width as roughly {@code 70n - 30} dp, so one cell is 40, two is
+     * 110, three is 180. The wide layout needs three: at two cells the name has almost no room
+     * left once the count and the button have taken theirs.
+     */
     private static final float SMALL_WIDTH_DP = 40f;
     private static final float SMALL_HEIGHT_DP = 40f;
-    private static final float WIDE_WIDTH_DP = 160f;
+    private static final float WIDE_WIDTH_DP = 180f;
 
     /**
      * A rebuild posts a SmartPlaylistEvent, which brings us straight back here. Refusing to
@@ -220,8 +225,8 @@ public class SmartQueueWidgetUpdater {
     private static boolean isSingleCell(AppWidgetManager manager, int widgetId) {
         int minWidth = manager.getAppWidgetOptions(widgetId)
                 .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH);
-        // Two cells is where the queue name starts to fit; below that only the count is shown.
-        // A zero means the host never reported a size, in which case assume the default width.
-        return minWidth > 0 && minWidth < 110;
+        // Must agree with WIDE_WIDTH_DP above. A zero means the host never reported a size, in
+        // which case assume the default width rather than the cramped layout.
+        return minWidth > 0 && minWidth < WIDE_WIDTH_DP;
     }
 }
