@@ -448,7 +448,13 @@ public class Media3PlaybackService extends MediaLibraryService {
                 .subscribe(media -> {
                     smartQueueDiagnostic("found media " + media.getId() + ", asking player to play");
                     PlaybackPreferences.writeActiveSmartQueue(playlistId, media.getId());
-                    player.setMediaItem(MediaItemAdapter.fromMediaIdStub(media.getId()));
+                    // A stub carries only a media id and is enriched into something playable on
+                    // its way through the session. Handing one straight to the player skips that
+                    // and media3 throws on the missing URI, so build the real item here.
+                    long startPosition = SkipUtils.skipIntroIfNecessary(this, media);
+                    startPosition = RewindAfterPauseUtils.calculatePositionWithRewind(
+                            (int) startPosition, media.getLastPlayedTimeStatistics());
+                    player.setMediaItem(MediaItemAdapter.fromPlayable(this, media, false), startPosition);
                     player.prepare();
                     player.play();
                     smartQueueDiagnostic("play() returned, isPlaying=" + player.isPlaying());
