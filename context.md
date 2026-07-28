@@ -24,10 +24,10 @@ Everything is pushed and the verification backlog is empty. One thing is in flig
 - **The drag fix has not been tried on a device.** Rules could only be dragged one position per
   grab, because `onMove` recounted the rules and the count result rebuilt the whole list, which
   loses the view `ItemTouchHelper` holds. Recounting now waits for `clearView`, counts travel with
-  their rule during a move, and `moveRule` inserts rather than swaps. CI run 39 was still building
-  at the end of the session — check it went green, then on the APK: drag a rule several positions
-  in one gesture, drag to the very top and bottom (the list should auto-scroll), and confirm counts
-  still sit against the right rules after the drop.
+  their rule during a move, and `moveRule` inserts rather than swaps. CI run 39 is green
+  (artifact `8672386759`). On that APK: drag a rule several positions in one gesture, drag to the
+  very top and bottom (the list should auto-scroll), and confirm counts still sit against the right
+  rules after the drop.
 
 Anything after that is from **Outstanding** below; nothing there is a defect.
 
