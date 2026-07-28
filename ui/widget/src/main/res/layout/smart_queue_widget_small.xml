@@ -46,15 +46,17 @@
 
         <!-- Small, and not a separate tap target: the whole face plays. It is here so the widget
              looks like something you can press, which the bare number did not. -->
+        <!-- Bigger than it looks it needs to be, and with no alpha of its own: the updater dims it
+             with setImageAlpha, and a view alpha here would multiply with that and flatten the
+             difference between playing and not to almost nothing. -->
         <ImageView
             android:id="@+id/imgvPlayHint"
-            android:layout_width="16dp"
-            android:layout_height="16dp"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
             android:layout_alignParentBottom="true"
             android:layout_alignParentEnd="true"
-            android:layout_marginEnd="4dp"
-            android:layout_marginBottom="4dp"
-            android:alpha="0.7"
+            android:layout_marginEnd="3dp"
+            android:layout_marginBottom="3dp"
             android:importantForAccessibility="no"
             android:src="@drawable/ic_widget_play" />
 

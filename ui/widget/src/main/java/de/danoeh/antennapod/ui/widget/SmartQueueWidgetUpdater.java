@@ -30,8 +30,9 @@ public class SmartQueueWidgetUpdater {
     private static final String DETAIL_FRAGMENT_ARG = "playlistId";
     private static final String LIST_FRAGMENT_TAG = "SmartPlaylistListFragment";
     private static final int MAX_DISPLAYED_COUNT = 99;
+    /** Full strength against a little over a third: enough of a gap to read without comparing. */
     private static final int ALPHA_PLAYING = 255;
-    private static final int ALPHA_IDLE = 178;
+    private static final int ALPHA_IDLE = 95;
     /**
      * Launchers report a widget's width as roughly {@code 70n - 30} dp, so one cell is 40, two is
      * 110, three is 180. The wide layout needs three: at two cells the name has almost no room
