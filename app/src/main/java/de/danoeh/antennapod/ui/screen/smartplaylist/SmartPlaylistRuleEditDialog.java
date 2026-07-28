@@ -73,6 +73,16 @@ public class SmartPlaylistRuleEditDialog {
             maxDurEdit.setText(String.valueOf(rule.getMaxDurationMs() / 60000));
         }
 
+        // Media type
+        AutoCompleteTextView mediaTypeInput = dialogView.findViewById(R.id.rule_media_type_spinner);
+        String[] mediaTypeValues = {"", "audio", "video"};
+        String[] mediaTypeLabels = context.getResources().getStringArray(R.array.smart_queue_media_type_entries);
+        mediaTypeInput.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_list_item_1, mediaTypeLabels));
+        int storedMediaTypeIdx = Arrays.asList(mediaTypeValues).indexOf(rule.getMediaType());
+        final int[] mediaTypeIdx = {storedMediaTypeIdx >= 0 ? storedMediaTypeIdx : 0};
+        mediaTypeInput.setText(mediaTypeLabels[mediaTypeIdx[0]], false);
+        mediaTypeInput.setOnItemClickListener((parent, v, position, id) -> mediaTypeIdx[0] = position);
+
         // Sort order
         AutoCompleteTextView sortInput = dialogView.findViewById(R.id.rule_sort_spinner);
         String[] sortValues = {"NEWEST", "OLDEST", "SHORTEST", "LONGEST", "RANDOM"};
@@ -112,6 +122,8 @@ public class SmartPlaylistRuleEditDialog {
 
                     String maxDurStr = maxDurEdit.getText().toString().trim();
                     rule.setMaxDurationMs(minutesToMillis(maxDurStr));
+
+                    rule.setMediaType(mediaTypeValues[mediaTypeIdx[0]]);
 
                     rule.setSortOrder(sortValues[sortIdx[0]]);
 

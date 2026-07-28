@@ -1086,6 +1086,10 @@
     <string name="smart_queue_rule_min_duration">Min duration (min)</string>
     <string name="smart_queue_rule_max_duration">Max duration (min)</string>
     <string name="smart_queue_rule_episode_limit">Episode limit (per rule)</string>
+    <string name="smart_queue_rule_media_type">Media type</string>
+    <string name="smart_queue_media_type_any">Any</string>
+    <string name="smart_queue_media_type_audio">Audio</string>
+    <string name="smart_queue_media_type_video">Video</string>
     <string name="smart_queue_rule_sort_order">Sort order (per rule)</string>
     <string name="smart_queue_sort_newest">Newest first</string>
     <string name="smart_queue_sort_oldest">Oldest first</string>

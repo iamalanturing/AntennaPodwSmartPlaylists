@@ -141,6 +141,13 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
             }
             sb.append("Tags: ").append(rule.getFeedTags());
         }
+        if (!rule.getMediaType().isEmpty()) {
+            if (sb.length() > 0) {
+                sb.append(" · ");
+            }
+            sb.append(holder.itemView.getContext().getString("video".equals(rule.getMediaType())
+                    ? R.string.smart_queue_media_type_video : R.string.smart_queue_media_type_audio));
+        }
         if (sb.length() == 0) {
             sb.append(holder.itemView.getContext().getString(R.string.smart_queue_rule_filter));
         }

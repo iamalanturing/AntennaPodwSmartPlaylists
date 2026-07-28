@@ -247,6 +247,13 @@
         <item>@string/smart_queue_sort_random</item>
     </string-array>
 
+    <!-- FORK: Smart Queue media type entries -->
+    <string-array name="smart_queue_media_type_entries">
+        <item>@string/smart_queue_media_type_any</item>
+        <item>@string/smart_queue_media_type_audio</item>
+        <item>@string/smart_queue_media_type_video</item>
+    </string-array>
+
     <string-array name="home_section_titles">
         <item>@string/smart_queue_home_section_title</item>
         <item>@string/home_continue_title</item>
