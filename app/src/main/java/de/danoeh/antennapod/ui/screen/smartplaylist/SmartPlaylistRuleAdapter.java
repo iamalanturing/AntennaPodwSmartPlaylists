@@ -15,7 +15,6 @@ import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 import de.danoeh.antennapod.ui.common.ThemeUtils;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylistRuleAdapter.ViewHolder> {
@@ -44,14 +43,19 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
         notifyDataSetChanged();
     }
 
+    /**
+     * Both of these only change what a row says, never which rows exist. Rebinding in place rather
+     * than invalidating the whole list matters during a drag: a full dataset change loses the view
+     * ItemTouchHelper is holding and ends the gesture.
+     */
     public void setFeeds(List<Feed> feeds) {
         this.feeds = feeds;
-        notifyDataSetChanged();
+        notifyItemRangeChanged(0, getItemCount());
     }
 
     public void setMatchCounts(List<Integer> matchCounts) {
         this.matchCounts = matchCounts;
-        notifyDataSetChanged();
+        notifyItemRangeChanged(0, getItemCount());
     }
 
     public void setOnStartDragListener(OnStartDragListener dragListener) {
@@ -70,7 +74,10 @@ public class SmartPlaylistRuleAdapter extends RecyclerView.Adapter<SmartPlaylist
         if (from < 0 || to < 0 || from >= rules.size() || to >= rules.size()) {
             return;
         }
-        Collections.swap(rules, from, to);
+        rules.add(to, rules.remove(from));
+        if (from < matchCounts.size() && to < matchCounts.size()) {
+            matchCounts.add(to, matchCounts.remove(from));
+        }
         notifyItemMoved(from, to);
     }
 

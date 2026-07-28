@@ -118,8 +118,16 @@ public class SmartPlaylistEditFragment extends Fragment {
                                   @NonNull RecyclerView.ViewHolder target) {
                 ruleAdapter.moveRule(viewHolder.getBindingAdapterPosition(),
                         target.getBindingAdapterPosition());
-                loadRuleCounts();
                 return true;
+            }
+
+            @Override
+            public void clearView(@NonNull RecyclerView recyclerView,
+                                  @NonNull RecyclerView.ViewHolder viewHolder) {
+                super.clearView(recyclerView, viewHolder);
+                // Counting reloads the whole list, which would tear the view out of the drag.
+                // Wait until the finger is off it.
+                loadRuleCounts();
             }
 
             @Override
