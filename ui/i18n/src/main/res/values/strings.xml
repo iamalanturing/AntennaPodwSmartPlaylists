@@ -1097,6 +1097,8 @@
     <string name="smart_queue_sort_longest">Longest first</string>
     <string name="smart_queue_sort_random">Random</string>
     <string name="smart_queue_rules">Rules</string>
+    <string name="smart_queue_list_empty_title">No Smart Queues yet</string>
+    <string name="smart_queue_list_empty_message">A Smart Queue fills itself from rules you set, such as unplayed episodes of a few podcasts. Tap the plus button to create one.</string>
     <string name="save_label">Save</string>
 </resources>
 

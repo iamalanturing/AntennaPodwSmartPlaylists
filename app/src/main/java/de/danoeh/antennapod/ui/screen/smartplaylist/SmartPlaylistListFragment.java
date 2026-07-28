@@ -16,6 +16,7 @@ import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.event.SmartPlaylistEvent;
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.storage.database.DBReader;
+import de.danoeh.antennapod.ui.view.EmptyViewHandler;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
@@ -32,6 +33,7 @@ public class SmartPlaylistListFragment extends Fragment {
 
     private RecyclerView recyclerView;
     private SmartPlaylistListAdapter adapter;
+    private EmptyViewHandler emptyView;
     private Disposable disposable;
     private List<SmartPlaylist> playlists = new ArrayList<>();
 
@@ -53,6 +55,12 @@ public class SmartPlaylistListFragment extends Fragment {
         });
         recyclerView.setAdapter(adapter);
 
+        emptyView = new EmptyViewHandler(getContext());
+        emptyView.setIcon(R.drawable.ic_playlist_play);
+        emptyView.setTitle(R.string.smart_queue_list_empty_title);
+        emptyView.setMessage(R.string.smart_queue_list_empty_message);
+        emptyView.attachToRecyclerView(recyclerView);
+
         FloatingActionButton fab = view.findViewById(R.id.smart_playlist_fab);
         fab.setOnClickListener(v ->
                 ((MainActivity) requireActivity()).loadChildFragment(
@@ -63,6 +71,9 @@ public class SmartPlaylistListFragment extends Fragment {
     }
 
     private void loadPlaylists() {
+        // Keep the empty state hidden while the read is in flight, so it does not flash up
+        // in front of queues that are about to arrive
+        emptyView.hide();
         disposable = Observable.fromCallable(DBReader::getSmartPlaylists)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
