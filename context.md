@@ -95,6 +95,10 @@ working on a Pixel 10 (API 36), not merely green in CI:
   not downloaded
 - The rule editor's media-type filter: the same rule set to video matched 0 episodes and to audio
   matched 1, which is the count proving the value reaches the SQL rather than only the database
+- **The Smart Queue widget**: two widgets, one per queue, each starting and pausing its own queue;
+  the configured colour; the unplayed count, which matches the queue's unplayed episodes
+  **including ones skipped past** — the position-blind count is right; tapping a wide widget's body
+  opens a queue detail screen
 
 Everything the fork does has now been exercised on a device at least once.
 
