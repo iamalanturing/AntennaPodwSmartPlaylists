@@ -9,9 +9,32 @@ v2 screen looks wrong: v2's UI was written fresh rather than ported, so details 
 (window insets, for one) were silently dropped.
 
 **Upstream base:** `b7ee12c` (2026-07-21) from `upstream/develop`, plus `b25adc2` from
-`upstream/master` (3.12.0-beta, 20 commits). 45 commits on top.
+`upstream/master` (3.12.0-beta, 20 commits). 47 commits on top.
+
+**Tip:** `e35486c` (2026-07-28). The side branches this work passed through
+(`claude/merge-upstream-master`, `claude/status-bar-overlap-fix-dxla5j`) were folded into v2 and
+deleted; `fqUHX` stays.
 
 ---
+
+## Pick up here
+
+Everything is pushed and the verification backlog is empty. One thing is in flight:
+
+- **The drag fix has not been tried on a device.** Rules could only be dragged one position per
+  grab, because `onMove` recounted the rules and the count result rebuilt the whole list, which
+  loses the view `ItemTouchHelper` holds. Recounting now waits for `clearView`, counts travel with
+  their rule during a move, and `moveRule` inserts rather than swaps. CI run 39 was still building
+  at the end of the session — check it went green, then on the APK: drag a rule several positions
+  in one gesture, drag to the very top and bottom (the list should auto-scroll), and confirm counts
+  still sit against the right rules after the drop.
+
+Anything after that is from **Outstanding** below; nothing there is a defect.
+
+The APK for a green run is its `app-play-debug` artifact:
+`https://github.com/iamalanturing/AntennaPodwSmartPlaylists/actions/runs/<run id>/artifacts/<artifact id>`
+— list them with the GitHub Actions tooling rather than guessing ids. Always give the user the
+link; they cannot build either.
 
 ## Verified on a real device
 
@@ -143,4 +166,15 @@ unlimited, or well above the backlog.
   `SmartPlaylistsSection` had no `@Subscribe` method — invisible to the compiler, invisible to
   lint, fatal at runtime. Several defects only appeared once the thing was built and run.
 - **Silent fallbacks hide failures.** The signing key was ignored for a whole build because
-  properties went to the wrong file, and nothing failed. Assert, do not print.
+  properties went to the wrong file, and nothing failed. Assert, do not print. The same mistake
+  reappeared in `getSmartPlaylistRuleMatchCount`, which caught every exception and returned zero —
+  indistinguishable from a rule that matches nothing, and it cost several CI rounds before the
+  catch was removed and the real cause showed up.
+- **Read the defaults before asserting on them.** A new `SmartPlaylistRule` filters on
+  `unplayed,downloaded`. Tests written assuming a bare rule matches everything failed against
+  fixtures whose episodes were never downloaded, and the production code was right all along.
+- **Never notify a whole dataset while a gesture is running.** `notifyDataSetChanged` during a
+  drag ends the drag. Rebind in place; do structural refreshes when the finger lifts.
+- **A screen with little data proves nothing.** The rule list clipped at seven rows and the add
+  button looked inert, both only visible once content exceeded the display. `FORK.md` carries the
+  full list of UI traps.
