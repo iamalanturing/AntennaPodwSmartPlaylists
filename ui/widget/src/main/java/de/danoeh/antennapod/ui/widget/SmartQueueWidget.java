@@ -1,0 +1,49 @@
+package de.danoeh.antennapod.ui.widget;
+
+import android.appwidget.AppWidgetManager;
+import android.appwidget.AppWidgetProvider;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+
+/**
+ * A widget bound to one Smart Queue. Unlike {@link PlayerWidget} there can be several of these,
+ * one per queue, so everything it shows is stored per {@code appWidgetId}.
+ */
+public class SmartQueueWidget extends AppWidgetProvider {
+    public static final String PREFS_NAME = "SmartQueueWidgetPrefs";
+    public static final String KEY_PLAYLIST_ID = "smart_queue_widget_playlist_id";
+    public static final String KEY_COLOR = "smart_queue_widget_color";
+    public static final String KEY_INITIALS = "smart_queue_widget_initials";
+    public static final int DEFAULT_COLOR = 0xff262C31;
+
+    @Override
+    public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
+        SmartQueueWidgetWorker.enqueueWork(context);
+    }
+
+    @Override
+    public void onAppWidgetOptionsChanged(Context context, AppWidgetManager appWidgetManager,
+                                          int appWidgetId, Bundle newOptions) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions);
+        SmartQueueWidgetWorker.enqueueWork(context);
+    }
+
+    @Override
+    public void onDeleted(Context context, int[] appWidgetIds) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        for (int appWidgetId : appWidgetIds) {
+            editor.remove(KEY_PLAYLIST_ID + appWidgetId);
+            editor.remove(KEY_COLOR + appWidgetId);
+            editor.remove(KEY_INITIALS + appWidgetId);
+        }
+        editor.apply();
+        super.onDeleted(context, appWidgetIds);
+    }
+
+    public static long getPlaylistId(Context context, int appWidgetId) {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getLong(KEY_PLAYLIST_ID + appWidgetId, 0);
+    }
+}

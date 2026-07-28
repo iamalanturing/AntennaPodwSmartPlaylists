@@ -1,0 +1,195 @@
+package de.danoeh.antennapod.ui.widget;
+
+import android.app.PendingIntent;
+import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.util.Log;
+import android.view.KeyEvent;
+import android.widget.RemoteViews;
+
+import de.danoeh.antennapod.model.feed.SmartPlaylist;
+import de.danoeh.antennapod.storage.database.DBReader;
+import de.danoeh.antennapod.storage.database.DBWriter;
+import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
+import de.danoeh.antennapod.ui.appstartintent.MainActivityStarter;
+import de.danoeh.antennapod.ui.appstartintent.MediaButtonStarter;
+
+/**
+ * Draws every {@link SmartQueueWidget} instance. Must be called from a background thread: it reads
+ * the database, and may rebuild an exhausted queue before counting it.
+ */
+public class SmartQueueWidgetUpdater {
+    private static final String TAG = "SmartQueueWidgetUpdater";
+    private static final String DETAIL_FRAGMENT_TAG = "SmartPlaylistDetailFrag";
+    private static final String DETAIL_FRAGMENT_ARG = "playlistId";
+    private static final String LIST_FRAGMENT_TAG = "SmartPlaylistListFragment";
+    private static final int MAX_DISPLAYED_COUNT = 99;
+
+    /**
+     * A rebuild posts a SmartPlaylistEvent, which brings us straight back here. Refusing to
+     * rebuild a queue that was generated moments ago is what stops that becoming a loop, and it
+     * also spares a queue whose rules match nothing from being regenerated on every refresh.
+     */
+    private static final long REBUILD_MIN_INTERVAL_MS = 5 * 60 * 1000L;
+
+    private SmartQueueWidgetUpdater() {
+        // Must not be instantiated
+    }
+
+    public static void updateWidgets(Context context) {
+        AppWidgetManager manager = AppWidgetManager.getInstance(context);
+        int[] widgetIds = manager.getAppWidgetIds(new ComponentName(context, SmartQueueWidget.class));
+        for (int widgetId : widgetIds) {
+            try {
+                updateWidget(context, manager, widgetId);
+            } catch (Exception e) {
+                // One broken widget must not stop the others being drawn
+                Log.e(TAG, "Failed to update smart queue widget " + widgetId, e);
+            }
+        }
+    }
+
+    private static void updateWidget(Context context, AppWidgetManager manager, int widgetId) {
+        long playlistId = SmartQueueWidget.getPlaylistId(context, widgetId);
+        SmartPlaylist playlist = playlistId == 0 ? null : DBReader.getSmartPlaylist(playlistId);
+
+        boolean small = isSingleCell(manager, widgetId);
+        RemoteViews views = new RemoteViews(context.getPackageName(),
+                small ? R.layout.smart_queue_widget_small : R.layout.smart_queue_widget);
+
+        SharedPreferences prefs = context.getSharedPreferences(
+                SmartQueueWidget.PREFS_NAME, Context.MODE_PRIVATE);
+        views.setInt(R.id.widgetLayout, "setBackgroundColor",
+                prefs.getInt(SmartQueueWidget.KEY_COLOR + widgetId, SmartQueueWidget.DEFAULT_COLOR));
+
+        if (playlist == null) {
+            showMissingQueue(context, views, small);
+            views.setOnClickPendingIntent(R.id.widgetLayout, perWidgetIntent(context, widgetId,
+                    new MainActivityStarter(context).withFragmentLoaded(LIST_FRAGMENT_TAG).getIntent()));
+            manager.updateAppWidget(widgetId, views);
+            return;
+        }
+
+        int unplayed = countAfterHealing(playlist);
+        String countText = unplayed > MAX_DISPLAYED_COUNT
+                ? MAX_DISPLAYED_COUNT + "+" : String.valueOf(unplayed);
+        String episodes = context.getResources().getQuantityString(
+                R.plurals.smart_queue_n_episodes_plural, unplayed, unplayed);
+
+        views.setTextViewText(R.id.txtvCount, countText);
+        views.setContentDescription(R.id.widgetLayout, playlist.getName() + ", " + episodes);
+
+        // When this queue is already the active one, the plain media button is both simpler and
+        // the only thing that can pause: it reaches whatever is playing without a database read.
+        boolean active = PlaybackPreferences.getActiveSmartQueueId() == playlistId;
+        boolean playing = active
+                && PlaybackPreferences.getCurrentPlayerStatus() == PlaybackPreferences.PLAYER_STATUS_PLAYING;
+        PendingIntent play = active
+                ? MediaButtonStarter.createPendingIntent(context, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                : SmartQueuePlayStarter.createPendingIntent(context, widgetId, playlistId);
+
+        if (small) {
+            views.setTextViewText(R.id.txtvInitials, prefs.getString(
+                    SmartQueueWidget.KEY_INITIALS + widgetId, deriveInitials(playlist.getName())));
+            // No room for a separate button, so the whole face starts the queue
+            views.setOnClickPendingIntent(R.id.widgetLayout, play);
+        } else {
+            views.setTextViewText(R.id.txtvName, playlist.getName());
+            views.setTextViewText(R.id.txtvSubtitle, episodes);
+            views.setOnClickPendingIntent(R.id.widgetLayout, perWidgetIntent(context, widgetId,
+                    new MainActivityStarter(context)
+                            .withFragmentLoaded(DETAIL_FRAGMENT_TAG)
+                            .withFragmentArgs(DETAIL_FRAGMENT_ARG, playlistId)
+                            .getIntent()));
+            views.setOnClickPendingIntent(R.id.butPlay, play);
+            views.setImageViewResource(R.id.butPlay,
+                    playing ? R.drawable.ic_widget_pause : R.drawable.ic_widget_play);
+            views.setContentDescription(R.id.butPlay,
+                    context.getString(playing ? R.string.pause_label : R.string.play_label));
+        }
+
+        manager.updateAppWidget(widgetId, views);
+    }
+
+    /**
+     * {@code MainActivityStarter.getPendingIntent} uses one fixed request code, so with several
+     * queue widgets on screen they would all share a single pending intent and every one of them
+     * would open whichever queue was drawn last. The widget id keeps them apart.
+     */
+    private static PendingIntent perWidgetIntent(Context context, int widgetId, Intent intent) {
+        return PendingIntent.getActivity(context, widgetId, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** The queue was deleted while its widget stayed on the home screen. */
+    private static void showMissingQueue(Context context, RemoteViews views, boolean small) {
+        String missing = context.getString(R.string.smart_queue_widget_missing);
+        views.setTextViewText(R.id.txtvCount, "–");
+        views.setContentDescription(R.id.widgetLayout, missing);
+        if (small) {
+            views.setTextViewText(R.id.txtvInitials, "");
+        } else {
+            views.setTextViewText(R.id.txtvName, missing);
+            views.setTextViewText(R.id.txtvSubtitle, "");
+        }
+    }
+
+    /**
+     * Counts what is left to listen to, rebuilding first if the queue is exhausted and set to
+     * rebuild itself. Without this the count reaches zero and stays there, because nothing else
+     * refills a queue unless playback happens to run off the end of it.
+     */
+    private static int countAfterHealing(SmartPlaylist playlist) {
+        int unplayed = DBReader.getSmartPlaylistUnplayedCount(playlist.getId());
+        if (unplayed > 0 || !playlist.isAutoRegenerate()) {
+            return unplayed;
+        }
+        if (PlaybackPreferences.getActiveSmartQueueId() == playlist.getId()) {
+            // The playback service rebuilds this one itself when it runs off the end. Doing it
+            // here as well would reshuffle the queue under whoever is listening to it.
+            return unplayed;
+        }
+        if (System.currentTimeMillis() - playlist.getGeneratedAt() < REBUILD_MIN_INTERVAL_MS) {
+            return unplayed;
+        }
+        try {
+            DBWriter.generateSmartPlaylist(playlist).get();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to rebuild exhausted queue " + playlist.getId(), e);
+            return unplayed;
+        }
+        return DBReader.getSmartPlaylistUnplayedCount(playlist.getId());
+    }
+
+    /**
+     * Two letters taken from the queue name, for where there is no room to print the name. The
+     * config screen can override this, because names collide readily once abbreviated.
+     */
+    public static String deriveInitials(String name) {
+        if (name == null) {
+            return "";
+        }
+        String trimmed = name.trim();
+        StringBuilder initials = new StringBuilder();
+        for (String word : trimmed.split("\\s+")) {
+            if (!word.isEmpty() && initials.length() < 2) {
+                initials.append(Character.toUpperCase(word.charAt(0)));
+            }
+        }
+        if (initials.length() == 1 && trimmed.length() > 1) {
+            initials.append(Character.toUpperCase(trimmed.charAt(1)));
+        }
+        return initials.toString();
+    }
+
+    private static boolean isSingleCell(AppWidgetManager manager, int widgetId) {
+        int minWidth = manager.getAppWidgetOptions(widgetId)
+                .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH);
+        // Two cells is where the queue name starts to fit; below that only the count is shown.
+        // A zero means the host never reported a size, in which case assume the default width.
+        return minWidth > 0 && minWidth < 110;
+    }
+}

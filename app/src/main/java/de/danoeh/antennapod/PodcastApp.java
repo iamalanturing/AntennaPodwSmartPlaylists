@@ -19,6 +19,9 @@ import org.greenrobot.eventbus.EventBusException;
 public class PodcastApp extends Application {
     private static final String TAG = "PodcastApp";
 
+    // Held for the life of the app so EventBus does not drop the subscription
+    private SmartQueueWidgetRefresher widgetRefresher;
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -39,6 +42,8 @@ public class PodcastApp extends Application {
         ClientConfigurator.initialize(this);
         PreferenceUpgrader.checkUpgrades(this);
         registerMediaBrowserService(); // FORK: Bluetooth registration
+        widgetRefresher = new SmartQueueWidgetRefresher(this);
+        widgetRefresher.register();
     }
 
     // FORK: Eagerly register the media browser service so the app appears in car Bluetooth

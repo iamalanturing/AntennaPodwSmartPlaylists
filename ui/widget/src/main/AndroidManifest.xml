@@ -12,6 +12,27 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".SmartQueueWidgetConfigActivity"
+            android:label="@string/smart_queue_widget_settings"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE"/>
+            </intent-filter>
+        </activity>
+
+        <receiver
+            android:name=".SmartQueueWidget"
+            android:label="@string/smart_queue_widget_picker_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                    android:name="android.appwidget.provider"
+                    android:resource="@xml/smart_queue_widget_info"/>
+        </receiver>
+
         <receiver
             android:name=".PlayerWidget"
             android:exported="true">
