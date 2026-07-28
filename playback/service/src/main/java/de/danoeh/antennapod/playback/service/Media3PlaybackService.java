@@ -77,14 +77,8 @@ import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.nio.charset.StandardCharsets;
 import java.util.Calendar;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -392,28 +386,11 @@ public class Media3PlaybackService extends MediaLibraryService {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && SmartQueuePlayStarter.ACTION_PLAY_SMART_QUEUE.equals(intent.getAction())) {
-            smartQueueDiagnostic("onStartCommand reached, queue "
-                    + intent.getLongExtra(SmartQueuePlayStarter.EXTRA_PLAYLIST_ID, 0));
             startSmartQueue(intent.getLongExtra(SmartQueuePlayStarter.EXTRA_PLAYLIST_ID, 0));
             // Not passed to super: media3 would look for a media button in it and find nothing
             return START_NOT_STICKY;
         }
         return super.onStartCommand(intent, flags, startId);
-    }
-
-    /**
-     * FORK: temporary. Appends to the file the in-app bug report screen shows, because a widget
-     * that silently does nothing cannot be told apart from one whose service was never started,
-     * and reading logcat needs a cable. Remove once the widget's play button is settled.
-     */
-    private void smartQueueDiagnostic(String message) {
-        File file = new File(UserPreferences.getDataFolder(null), "crash-report.log");
-        try (PrintWriter out = new PrintWriter(new OutputStreamWriter(
-                new FileOutputStream(file, true), StandardCharsets.UTF_8))) {
-            out.println(new Date() + " SmartQueueWidget: " + message);
-        } catch (Exception e) {
-            Log.e(TAG, "Could not write smart queue diagnostic", e);
-        }
     }
 
     /** Everything needed to start a queue, all of it assembled off the main thread. */
@@ -443,7 +420,6 @@ public class Media3PlaybackService extends MediaLibraryService {
         // so a button that depended on that would refuse to pause until the redraw caught up.
         if (PlaybackPreferences.getActiveSmartQueueId() == playlistId && player.isPlaying()) {
             player.pause();
-            smartQueueDiagnostic("paused queue " + playlistId);
             return;
         }
         Maybe.fromCallable(() -> {
@@ -481,16 +457,11 @@ public class Media3PlaybackService extends MediaLibraryService {
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(start -> {
-                    smartQueueDiagnostic("prepared media " + start.mediaId + ", asking player to play");
                     PlaybackPreferences.writeActiveSmartQueue(playlistId, start.mediaId);
                     player.setMediaItem(start.mediaItem, start.startPosition);
                     player.prepare();
                     player.play();
-                    smartQueueDiagnostic("play() returned, isPlaying=" + player.isPlaying());
-                }, error -> {
-                    smartQueueDiagnostic("failed: " + error);
-                    Log.e(TAG, "Failed to start smart queue " + playlistId, error);
-                }, () -> smartQueueDiagnostic("queue " + playlistId + " had nothing to play"));
+                }, error -> Log.e(TAG, "Failed to start smart queue " + playlistId, error));
     }
 
     @UnstableApi

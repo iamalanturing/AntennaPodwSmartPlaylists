@@ -30,6 +30,8 @@ public class SmartQueueWidgetUpdater {
     private static final String DETAIL_FRAGMENT_ARG = "playlistId";
     private static final String LIST_FRAGMENT_TAG = "SmartPlaylistListFragment";
     private static final int MAX_DISPLAYED_COUNT = 99;
+    private static final int ALPHA_PLAYING = 255;
+    private static final int ALPHA_IDLE = 178;
     /**
      * Launchers report a widget's width as roughly {@code 70n - 30} dp, so one cell is 40, two is
      * 110, three is 180. The wide layout needs three: at two cells the name has almost no room
@@ -51,11 +53,21 @@ public class SmartQueueWidgetUpdater {
     }
 
     public static void updateWidgets(Context context) {
+        updateWidgets(context, true);
+    }
+
+    /**
+     * @param healExhaustedQueues whether an exhausted queue may be rebuilt while counting. Redraws
+     *     caused by playback starting or stopping pass false: they happen often, they only need to
+     *     flip an icon, and rebuilding a queue on each one would put a regenerate in the way of the
+     *     episode the user is waiting to hear.
+     */
+    public static void updateWidgets(Context context, boolean healExhaustedQueues) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         int[] widgetIds = manager.getAppWidgetIds(new ComponentName(context, SmartQueueWidget.class));
         for (int widgetId : widgetIds) {
             try {
-                updateWidget(context, manager, widgetId);
+                updateWidget(context, manager, widgetId, healExhaustedQueues);
             } catch (Exception e) {
                 // One broken widget must not stop the others being drawn
                 Log.e(TAG, "Failed to update smart queue widget " + widgetId, e);
@@ -63,10 +75,15 @@ public class SmartQueueWidgetUpdater {
         }
     }
 
-    private static void updateWidget(Context context, AppWidgetManager manager, int widgetId) {
+    private static void updateWidget(Context context, AppWidgetManager manager, int widgetId,
+                                     boolean healExhaustedQueues) {
         long playlistId = SmartQueueWidget.getPlaylistId(context, widgetId);
         SmartPlaylist playlist = playlistId == 0 ? null : DBReader.getSmartPlaylist(playlistId);
-        int unplayed = playlist == null ? 0 : countAfterHealing(playlist);
+        int unplayed = 0;
+        if (playlist != null) {
+            unplayed = healExhaustedQueues ? countAfterHealing(playlist)
+                    : DBReader.getSmartPlaylistUnplayedCount(playlistId);
+        }
 
         manager.updateAppWidget(widgetId,
                 buildForAllSizes(context, manager, widgetId, playlist, unplayed));
@@ -128,6 +145,14 @@ public class SmartQueueWidgetUpdater {
         if (small) {
             views.setTextViewText(R.id.txtvInitials, prefs.getString(
                     SmartQueueWidget.KEY_INITIALS + widgetId, deriveInitials(playlist.getName())));
+            // At one cell this glyph is the only thing saying which queue is the one playing, and
+            // so which one to press to stop it. Brighten it as well as changing it: a 16dp shape
+            // at a glance reads more by weight than by outline.
+            views.setImageViewResource(R.id.imgvPlayHint,
+                    playing ? R.drawable.ic_widget_pause : R.drawable.ic_widget_play);
+            views.setInt(R.id.imgvPlayHint, "setImageAlpha", playing ? ALPHA_PLAYING : ALPHA_IDLE);
+            views.setContentDescription(R.id.widgetLayout, playlist.getName() + ", " + episodes
+                    + ", " + context.getString(playing ? R.string.pause_label : R.string.play_label));
             // No room for a separate button, so the whole face starts the queue
             views.setOnClickPendingIntent(R.id.widgetLayout, play);
         } else {
