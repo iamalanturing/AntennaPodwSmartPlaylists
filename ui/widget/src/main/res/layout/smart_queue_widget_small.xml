@@ -18,7 +18,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/widget_playing_ring"
-        android:padding="@dimen/widget_border_total">
+        android:padding="@dimen/widget_border_total"
+        tools:ignore="UselessParent">
 
         <RelativeLayout
             android:id="@+id/widgetLayout"
