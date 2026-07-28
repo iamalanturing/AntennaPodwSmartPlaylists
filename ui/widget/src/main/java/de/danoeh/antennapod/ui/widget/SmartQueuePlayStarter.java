@@ -4,6 +4,7 @@ import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 
 /**
  * Builds the intent behind a smart queue widget's play button.
@@ -35,7 +36,13 @@ public abstract class SmartQueuePlayStarter {
                 .setComponent(new ComponentName(context, PLAYBACK_SERVICE))
                 .putExtra(EXTRA_PLAYLIST_ID, playlistId);
         // The widget id keeps one widget's button from replacing another's pending intent
-        return PendingIntent.getService(context, widgetId, intent,
-                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        int flags = PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // A plain service start is refused from the background, so with nothing already
+            // playing the tap did nothing at all and said nothing about it. Asking for a
+            // foreground start is what buys the service the window it needs to begin playing.
+            return PendingIntent.getForegroundService(context, widgetId, intent, flags);
+        }
+        return PendingIntent.getService(context, widgetId, intent, flags);
     }
 }

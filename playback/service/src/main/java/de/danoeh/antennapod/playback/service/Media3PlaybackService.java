@@ -387,9 +387,11 @@ public class Media3PlaybackService extends MediaLibraryService {
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && SmartQueuePlayStarter.ACTION_PLAY_SMART_QUEUE.equals(intent.getAction())) {
             startSmartQueue(intent.getLongExtra(SmartQueuePlayStarter.EXTRA_PLAYLIST_ID, 0));
-            // Not passed to super: media3 would look for a media button in it and find nothing
-            return START_NOT_STICKY;
         }
+        // Always handed on. Returning early skipped the point at which media3 takes the service
+        // into the foreground, so a cold start was torn down before the queue lookup finished --
+        // silently, because a service being stopped is not an exception anyone can catch. The
+        // action is ours alone, so there is no media button in it for media3 to act on.
         return super.onStartCommand(intent, flags, startId);
     }
 
@@ -461,7 +463,21 @@ public class Media3PlaybackService extends MediaLibraryService {
                     player.setMediaItem(start.mediaItem, start.startPosition);
                     player.prepare();
                     player.play();
-                }, error -> Log.e(TAG, "Failed to start smart queue " + playlistId, error));
+                }, error -> {
+                    Log.e(TAG, "Failed to start smart queue " + playlistId, error);
+                    stopIfNothingToPlay();
+                }, this::stopIfNothingToPlay);
+    }
+
+    /**
+     * The widget asks for a foreground start, which obliges the service to become one shortly or
+     * be killed with an exception. Playing does that; finding nothing to play does not, so an
+     * empty or broken queue has to release the service rather than leave the promise unmet.
+     */
+    private void stopIfNothingToPlay() {
+        if (!player.isPlaying()) {
+            stopSelf();
+        }
     }
 
     @UnstableApi
