@@ -95,10 +95,12 @@ working on a Pixel 10 (API 36), not merely green in CI:
   not downloaded
 - The rule editor's media-type filter: the same rule set to video matched 0 episodes and to audio
   matched 1, which is the count proving the value reaches the SQL rather than only the database
-- **The Smart Queue widget**: two widgets, one per queue, each starting and pausing its own queue;
-  the configured colour; the unplayed count, which matches the queue's unplayed episodes
-  **including ones skipped past** — the position-blind count is right; tapping a wide widget's body
-  opens a queue detail screen
+- **The Smart Queue widget**, end to end: starting a queue from a force-stopped app, and pausing it
+  again without the crash that used to follow; two widgets each bound to their own queue; the
+  configured colour; the ring and the bright-pause/dim-play glyph tracking which queue is playing;
+  the unplayed count, which matches the queue's unplayed episodes **including ones skipped past**,
+  so the position-blind count is right; resizing between layouts; a wide widget's body opening a
+  queue detail screen
 
 Everything the fork does has now been exercised on a device at least once.
 
@@ -117,6 +119,46 @@ merge; re-check it against upstream's during each sync.
 Documentation-only pushes are skipped: the push trigger carries `paths-ignore: '**.md'`, so
 editing this file alone does not compile the app. A push touching code as well as documentation
 still builds.
+
+### What was done to make it faster, and what is left
+
+`org.gradle.parallel` and `org.gradle.caching` go in **`gradle.properties`**. They were previously
+written to `local.properties`, which Gradle does not read them from — the parallel build had
+therefore never once run in parallel. Upstream still does this in three places.
+
+The cache key carries the commit (`gradle-<hash>-<sha>`) with `restore-keys` falling back.
+`actions/cache` only writes on a miss, so a key that never varies is frozen after its first write
+and the build cache could never accumulate anything. This is the part that made caching work at all.
+
+Measured on identical work, before and after:
+
+| | before | after |
+|---|---|---|
+| Build and Unit Test | 4m 13s | **1m 50s** |
+| Static Code Analysis | 5m 31s | **4m 13s** |
+| wall clock (the two run in parallel) | 5.6 min | **4.4 min** |
+| runner-minutes billed | 9m 44s | **6m 03s** |
+
+Gradle reports the reuse directly, and it is the number to check if this ever seems not to work:
+`1154 actionable tasks: 227 executed, 225 from cache, 702 up-to-date`, against `1871 executed` and
+nothing reused beforehand.
+
+**Read per-job times, not the total.** The total is the slower of two parallel jobs, so halving the
+build job moved it barely at all. That nearly led to the caching being taken out as useless.
+
+Static analysis is now the whole of the wall clock. `:app-wearos:lint` is excluded — its lint task
+depends on `ktlintCheck`, so it also compiled that module's Kotlin for both flavours, to check code
+this fork has never touched.
+
+**Lint runs one variant per module**, not several: `lintFreeDebug` for the twenty-two flavoured
+modules, `lintDebug` for the rest. So there is no variant narrowing left to do. Note that lint
+therefore checks the **free** flavour while the fork builds and ships **playDebug**, so anything in
+`src/play/java` goes unlinted. Checkstyle covers both flavours explicitly, and the fork's own code
+is almost entirely in `src/main/java`, so the gap is narrow. It is upstream's arrangement, not the
+fork's.
+
+The cache is about 1.2 GB per run against a 10 GB per-repository limit, so roughly eight runs are
+retained before oldest-first eviction. That is the price of a key that updates.
 
 Two behaviours worth knowing:
 
