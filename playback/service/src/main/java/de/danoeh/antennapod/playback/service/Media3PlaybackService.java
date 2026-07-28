@@ -79,6 +79,7 @@ import org.greenrobot.eventbus.ThreadMode;
 
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -386,9 +387,25 @@ public class Media3PlaybackService extends MediaLibraryService {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && intent.hasExtra(SmartQueuePlayStarter.EXTRA_PLAYLIST_ID)) {
+            smartQueueDiagnostic("onStartCommand reached, queue "
+                    + intent.getLongExtra(SmartQueuePlayStarter.EXTRA_PLAYLIST_ID, 0));
             startSmartQueue(intent.getLongExtra(SmartQueuePlayStarter.EXTRA_PLAYLIST_ID, 0));
         }
         return super.onStartCommand(intent, flags, startId);
+    }
+
+    /**
+     * FORK: temporary. Appends to the file the in-app bug report screen shows, because a widget
+     * that silently does nothing cannot be told apart from one whose service was never started,
+     * and reading logcat needs a cable. Remove once the widget's play button is settled.
+     */
+    private void smartQueueDiagnostic(String message) {
+        try (java.io.PrintWriter out = new java.io.PrintWriter(new java.io.FileWriter(
+                new java.io.File(UserPreferences.getDataFolder(null), "crash-report.log"), true))) {
+            out.println(new Date() + " SmartQueueWidget: " + message);
+        } catch (Exception e) {
+            Log.e(TAG, "Could not write smart queue diagnostic", e);
+        }
     }
 
     /**
@@ -423,12 +440,16 @@ public class Media3PlaybackService extends MediaLibraryService {
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(media -> {
+                    smartQueueDiagnostic("found media " + media.getId() + ", asking player to play");
                     PlaybackPreferences.writeActiveSmartQueue(playlistId, media.getId());
                     player.setMediaItem(MediaItemAdapter.fromMediaIdStub(media.getId()));
                     player.prepare();
                     player.play();
-                }, error -> Log.e(TAG, "Failed to start smart queue " + playlistId, error),
-                        () -> Log.d(TAG, "Smart queue " + playlistId + " had nothing to play"));
+                    smartQueueDiagnostic("play() returned, isPlaying=" + player.isPlaying());
+                }, error -> {
+                    smartQueueDiagnostic("failed: " + error);
+                    Log.e(TAG, "Failed to start smart queue " + playlistId, error);
+                }, () -> smartQueueDiagnostic("queue " + playlistId + " had nothing to play"));
     }
 
     @UnstableApi

@@ -4,6 +4,7 @@ import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.view.KeyEvent;
 
 /**
  * Builds the intent behind a smart queue widget's play button.
@@ -24,8 +25,14 @@ public abstract class SmartQueuePlayStarter {
     public static final String EXTRA_PLAYLIST_ID = "smart_queue_playlist_id";
 
     public static PendingIntent createPendingIntent(Context context, int widgetId, long playlistId) {
-        Intent intent = new Intent()
+        // Carries a media button as well as the queue id. The working button sends
+        // ACTION_MEDIA_BUTTON, and an intent with no action at all appears to be one media3 does
+        // not treat as a reason to keep the service alive, so the queue lookup completes into a
+        // service that has already gone. The override reads the queue id before delegating.
+        Intent intent = new Intent(Intent.ACTION_MEDIA_BUTTON)
                 .setComponent(new ComponentName(context, PLAYBACK_SERVICE))
+                .putExtra(Intent.EXTRA_KEY_EVENT,
+                        new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY))
                 .putExtra(EXTRA_PLAYLIST_ID, playlistId);
         // The widget id keeps one widget's button from replacing another's pending intent
         return PendingIntent.getService(context, widgetId, intent,
