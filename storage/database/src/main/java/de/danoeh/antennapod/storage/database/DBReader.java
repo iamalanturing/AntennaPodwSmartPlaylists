@@ -891,6 +891,22 @@ public final class DBReader {
     }
 
     /**
+     * How many episodes in a smart playlist are still unplayed. This is what a home screen widget
+     * shows, so it counts the whole playlist rather than only the part after the current episode:
+     * only the active queue has a cursor at all, and a position-aware count would mean different
+     * things on two widgets at the same time.
+     */
+    public static synchronized int getSmartPlaylistUnplayedCount(long playlistId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try {
+            return adapter.getSmartPlaylistUnplayedCount(playlistId);
+        } finally {
+            adapter.close();
+        }
+    }
+
+    /**
      * How many episodes a single rule currently matches, so the rule editor can show what each
      * rule contributes before the playlist is generated.
      */

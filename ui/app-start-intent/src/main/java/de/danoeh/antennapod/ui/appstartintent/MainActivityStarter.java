@@ -94,4 +94,12 @@ public class MainActivityStarter {
         fragmentArgs.putBoolean(name, value);
         return this;
     }
+
+    public MainActivityStarter withFragmentArgs(String name, long value) {
+        if (fragmentArgs == null) {
+            fragmentArgs = new Bundle();
+        }
+        fragmentArgs.putLong(name, value);
+        return this;
+    }
 }

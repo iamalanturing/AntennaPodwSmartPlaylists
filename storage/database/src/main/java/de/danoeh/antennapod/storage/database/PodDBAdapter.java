@@ -1722,6 +1722,27 @@ public class PodDBAdapter {
         return db.rawQuery(query, new String[]{String.valueOf(playlistId)});
     }
 
+    /**
+     * Counts episodes in a smart playlist that have not been played, ignoring their position in
+     * the queue. Episodes skipped past stay unplayed and sit behind the queue's cursor, so a
+     * position-aware count would only be meaningful for whichever queue is currently active.
+     */
+    public int getSmartPlaylistUnplayedCount(long playlistId) {
+        final String query = "SELECT COUNT(*)"
+                + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
+                + " INNER JOIN " + TABLE_NAME_FEED_ITEMS
+                + " ON " + TABLE_NAME_FEED_ITEMS + "." + KEY_ID + " = "
+                + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_EPISODE_ID
+                + " WHERE " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_ID + " = ?"
+                + " AND " + TABLE_NAME_FEED_ITEMS + "." + KEY_READ + " != " + FeedItem.PLAYED;
+        try (Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(playlistId)})) {
+            if (cursor.moveToFirst()) {
+                return cursor.getInt(0);
+            }
+            return 0;
+        }
+    }
+
     public Cursor getSmartPlaylistRuleMatchesCursor(SmartPlaylistRule rule) {
         String whereClause = SmartPlaylistRuleQuery.generateWhereClause(rule);
         String orderClause = SmartPlaylistRuleQuery.generateOrderClause(rule);

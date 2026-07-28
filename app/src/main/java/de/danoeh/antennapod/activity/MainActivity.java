@@ -74,6 +74,7 @@ import de.danoeh.antennapod.ui.screen.drawer.NavigationNames;
 import de.danoeh.antennapod.ui.screen.episode.ItemPagerFragment;
 import de.danoeh.antennapod.ui.screen.feed.FeedItemlistFragment;
 import de.danoeh.antennapod.ui.screen.home.HomeFragment;
+import de.danoeh.antennapod.ui.screen.smartplaylist.SmartPlaylistDetailFragment;
 import de.danoeh.antennapod.ui.screen.smartplaylist.SmartPlaylistListFragment;
 import de.danoeh.antennapod.ui.screen.playback.audio.AudioPlayerFragment;
 import de.danoeh.antennapod.ui.screen.preferences.PreferenceActivity;
@@ -456,6 +457,12 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
                 break;
             case SmartPlaylistListFragment.TAG:
                 fragment = new SmartPlaylistListFragment();
+                break;
+            case SmartPlaylistDetailFragment.TAG:
+                // Reached from a home screen widget, which knows only the id
+                fragment = SmartPlaylistDetailFragment.newInstance(
+                        args != null ? args.getLong("playlistId") : 0);
+                args = null;
                 break;
             default:
                 // default to home screen
