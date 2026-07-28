@@ -19,12 +19,12 @@ deleted; `fqUHX` stays.
 
 ## Pick up here
 
-Everything is pushed, CI is green, and nothing is in flight. Every behaviour the fork adds has
-been exercised on a device, including the last one — dragging a rule across several positions in a
-single gesture, with the list auto-scrolling and the counts staying with their rules.
+The backlog in **Outstanding** is empty — the two remaining UX gaps were closed. The media-type
+dropdown and the list empty state are pushed but **not yet exercised on a device**: everything
+above them in *Verified on a real device* has been, these two have not. Check them on the phone
+before treating them as done, and add them to that list when you have.
 
-Start from **Outstanding** below. Neither item is a defect; both are features the fork never
-finished. Read `FORK.md` first if the work touches a screen or an upstream merge.
+Read `FORK.md` first if the work touches a screen or an upstream merge.
 
 The APK for a green run is its `app-play-debug` artifact:
 `https://github.com/iamalanturing/AntennaPodwSmartPlaylists/actions/runs/<run id>/artifacts/<artifact id>`
@@ -134,16 +134,14 @@ unlimited, or well above the backlog.
 
 ## Outstanding
 
-1. **Auto-download does not know about Smart Queues.** It selects from episodes marked NEW plus
-   the regular queue, so a queue filtered on `downloaded` only fills as new episodes arrive and
-   get downloaded. Making smart-queue membership a download candidate source would be a natural
-   feature addition. Deferred: new episodes do arrive on their own, and a backlog can be
-   downloaded by hand once. Watch the episode cache instead — see below.
-2. **One UX gap** left from removing dead strings: there is no media-type control in the rule
-   editor (the model supports `mediaType`, nothing exposes it). The smart queue list screen still
-   has no empty state, but it now has an app bar to hang one on. The podcast picker that was
-   missing from the rule editor is done — rules restored from the older branch had feed ids the v2
-   editor could neither show nor change.
+Nothing. Both UX gaps are closed: the rule editor now has a media-type dropdown (Any/Audio/Video,
+shown in the rule summary too), and the list screen has an empty state built on `EmptyViewHandler`.
+
+**Do not propose auto-download awareness of Smart Queues.** The user was asked directly and does
+not want it — "I may never want it". The mechanism, for reference only: auto-download selects from
+episodes marked NEW plus the regular queue, so a queue filtered on `downloaded` only fills as new
+episodes arrive. Watch the episode cache instead — see above. This is a settled decision, not a
+backlog item.
 
 ## Decisions worth not relitigating
 
