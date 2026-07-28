@@ -167,6 +167,45 @@ Two things are parked. Neither is started, and neither is urgent.
      queue name, which is what distinguishes several of them on one home screen.
    - Refresh on `SmartPlaylistEvent`, which the fork already posts on rebuild, rule change,
      episode finish and delete. Without that the widget goes silently stale.
+   - **Identity at one cell: colour plus one or two letters, not either alone.** Per-widget colour
+     already exists (`KEY_WIDGET_COLOR + appWidgetId`, with a picker in `WidgetConfigActivity`);
+     letters are derived from the queue name and must be user-overridable, because derivation
+     collides ("Morning News" and "Music Nonstop" both give MN). Colour alone fails for colour
+     vision deficiency and stops scaling past three or four queues. Do **not** use cover art as
+     the identifier: it changes as the queue advances, and identity has to be stable.
+     `contentDescription` should always carry the full name and count.
+   - **The number is unplayed episodes in the queue, ignoring position.** Counting forward from
+     the current episode was considered and rejected: `PlaybackPreferences` holds one global
+     `activeSmartQueueId` / `activeSmartQueueMediaId` pair, so only the active queue has a cursor
+     at all, and the count would mean different things on different widgets at the same time.
+     Cap the display at `99+`.
+   - No regenerate button — see the rebuild gap below; the rebuild should be automatic.
+
+## Skipping leaves episodes behind the cursor
+
+Not obvious from the code, and it decides what a queue's episode count means.
+
+Skipping does **not** mark an episode played: `markItemsPlayed` runs only on `ended || almostEnded`
+(`Media3PlaybackService`). A skip adds to playback history and removes from the *normal* queue,
+which does not touch smart queue membership — that is a separate table. Advancement is
+`position > current` with no played check, so skipped episodes stay unplayed *behind* the cursor
+and normal advancement never returns to them in that generation of the queue.
+
+They come back when the queue exhausts and auto-rebuild re-materialises them, since they still
+match `unplayed`. With auto-rebuild **off** they stay stranded until a manual Regenerate — the one
+case where counting all unplayed actively misleads, and an argument for the rebuild gap below.
+
+## The rebuild only fires during playback
+
+`generateSmartPlaylist` has exactly three callers: the manual Regenerate menu item, saving the edit
+screen, and the playback service advancing past the last episode when `isAutoRegenerate()` is set.
+So a queue exhausted while **idle** never rebuilds, and new episodes arriving from a feed refresh
+never enter an existing queue — a queue is a materialised snapshot, not a live view.
+
+Today this mostly hides behind the Regenerate button. A widget showing a count would make it
+obvious: the number decays to 0 and parks there. The cheap self-healing fix is to rebuild when the
+count is computed if the queue is exhausted and `isAutoRegenerate()` is on — bounded, because it
+only fires at zero.
 2. **Upstream feed parser has no XXE hardening.** `parser/feed/.../FeedHandler.java` builds a
    `SAXParserFactory` without `disallow-doctype-decl` or external-entity features, and no
    `EntityResolver` is set anywhere. Attacker-controlled XML reaches it, and
