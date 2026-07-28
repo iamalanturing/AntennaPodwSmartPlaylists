@@ -11,54 +11,67 @@
     android:layout_height="match_parent"
     android:padding="@dimen/widget_margin">
 
-    <RelativeLayout
-        android:id="@+id/widgetLayout"
+    <!-- Two rings, dark outside light, drawn only while this queue is playing. The pair survives
+         any wallpaper and any chosen widget colour, which a single ring of either shade does not.
+         The insets are always present so nothing moves when playback starts or stops. -->
+    <FrameLayout
+        android:id="@+id/widgetBorderOuter"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#262C31"
-        tools:ignore="UselessParent">
+        android:padding="@dimen/widget_border_outer">
 
-        <TextView
-            android:id="@+id/txtvInitials"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentStart="true"
-            android:layout_alignParentTop="true"
-            android:layout_marginStart="6dp"
-            android:layout_marginTop="4dp"
-            android:alpha="0.7"
-            android:maxLines="1"
-            android:textColor="#FFFFFF"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            tools:text="MN" />
-
-        <TextView
-            android:id="@+id/txtvCount"
+        <FrameLayout
+            android:id="@+id/widgetBorderInner"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:gravity="center"
-            android:maxLines="1"
-            android:textColor="#FFFFFF"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            tools:text="12" />
+            android:padding="@dimen/widget_border_inner">
 
-        <!-- Small, and not a separate tap target: the whole face plays. It is here so the widget
-             looks like something you can press, which the bare number did not. -->
-        <!-- Bigger than it looks it needs to be, and with no alpha of its own: the updater dims it
-             with setImageAlpha, and a view alpha here would multiply with that and flatten the
-             difference between playing and not to almost nothing. -->
-        <ImageView
-            android:id="@+id/imgvPlayHint"
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:layout_alignParentBottom="true"
-            android:layout_alignParentEnd="true"
-            android:layout_marginEnd="3dp"
-            android:layout_marginBottom="3dp"
-            android:importantForAccessibility="no"
-            android:src="@drawable/ic_widget_play" />
+            <RelativeLayout
+                android:id="@+id/widgetLayout"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#262C31">
 
-    </RelativeLayout>
+                <TextView
+                    android:id="@+id/txtvInitials"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:layout_alignParentTop="true"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginTop="4dp"
+                    android:alpha="0.7"
+                    android:maxLines="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    tools:text="MN" />
+
+                <TextView
+                    android:id="@+id/txtvCount"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    tools:text="12" />
+
+                <!-- No alpha of its own: the updater dims it with setImageAlpha, and a view alpha
+                     here would multiply with that and flatten the difference to almost nothing. -->
+                <ImageView
+                    android:id="@+id/imgvPlayHint"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_alignParentBottom="true"
+                    android:layout_alignParentEnd="true"
+                    android:layout_marginEnd="3dp"
+                    android:layout_marginBottom="3dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_widget_play" />
+
+            </RelativeLayout>
+        </FrameLayout>
+    </FrameLayout>
 </FrameLayout>

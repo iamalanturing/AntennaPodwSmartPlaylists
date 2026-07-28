@@ -6,73 +6,85 @@
     android:layout_height="match_parent"
     android:padding="@dimen/widget_margin">
 
-    <RelativeLayout
-        android:id="@+id/widgetLayout"
+    <!-- See the one-cell layout: dark ring outside light, shown only while this queue plays. -->
+    <FrameLayout
+        android:id="@+id/widgetBorderOuter"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#262C31"
-        tools:ignore="UselessParent">
+        android:padding="@dimen/widget_border_outer">
 
-        <ImageButton
-            android:id="@+id/butPlay"
-            android:layout_width="@android:dimen/app_icon_size"
-            android:layout_height="match_parent"
-            android:layout_alignParentEnd="true"
-            android:layout_margin="12dp"
-            android:background="?android:attr/selectableItemBackground"
-            android:contentDescription="@string/play_label"
-            android:padding="8dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ic_widget_play" />
-
-        <!-- Identity: the letters stay put while the count changes, so two widgets stay
-             distinguishable at a glance even when their counts happen to match. -->
-        <TextView
-            android:id="@+id/txtvCount"
-            android:layout_width="48dp"
-            android:layout_height="match_parent"
-            android:layout_alignParentStart="true"
-            android:layout_marginStart="8dp"
-            android:gravity="center"
-            android:maxLines="1"
-            android:textColor="#FFFFFF"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            tools:text="12" />
-
-        <LinearLayout
-            android:id="@+id/layout_name"
+        <FrameLayout
+            android:id="@+id/widgetBorderInner"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginStart="8dp"
-            android:layout_toStartOf="@id/butPlay"
-            android:layout_toEndOf="@id/txtvCount"
-            android:gravity="center_vertical"
-            android:orientation="vertical">
+            android:padding="@dimen/widget_border_inner">
 
-            <TextView
-                android:id="@+id/txtvName"
+            <RelativeLayout
+                android:id="@+id/widgetLayout"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                tools:text="Morning News" />
+                android:layout_height="match_parent"
+                android:background="#262C31">
 
-            <TextView
-                android:id="@+id/txtvSubtitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:alpha="0.7"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp"
-                tools:text="12 unplayed" />
+                <ImageButton
+                    android:id="@+id/butPlay"
+                    android:layout_width="@android:dimen/app_icon_size"
+                    android:layout_height="match_parent"
+                    android:layout_alignParentEnd="true"
+                    android:layout_margin="12dp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:contentDescription="@string/play_label"
+                    android:padding="8dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_widget_play" />
 
-        </LinearLayout>
+                <TextView
+                    android:id="@+id/txtvCount"
+                    android:layout_width="48dp"
+                    android:layout_height="match_parent"
+                    android:layout_alignParentStart="true"
+                    android:layout_marginStart="8dp"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    tools:text="12" />
 
-    </RelativeLayout>
+                <LinearLayout
+                    android:id="@+id/layout_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    android:layout_toStartOf="@id/butPlay"
+                    android:layout_toEndOf="@id/txtvCount"
+                    android:gravity="center_vertical"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/txtvName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        tools:text="Morning News" />
+
+                    <TextView
+                        android:id="@+id/txtvSubtitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:alpha="0.7"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        tools:text="12 unplayed" />
+
+                </LinearLayout>
+
+            </RelativeLayout>
+        </FrameLayout>
+    </FrameLayout>
 </FrameLayout>
