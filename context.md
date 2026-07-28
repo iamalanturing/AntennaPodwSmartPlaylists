@@ -114,6 +114,10 @@ an installable APK as the `app-play-debug` artifact.
 It is fork-owned and deliberately separate from upstream's `checks.yml` so it never conflicts on
 merge; re-check it against upstream's during each sync.
 
+Documentation-only pushes are skipped: the push trigger carries `paths-ignore: '**.md'`, so
+editing this file alone does not compile the app. A push touching code as well as documentation
+still builds.
+
 Two behaviours worth knowing:
 
 - **Lint prints only its first error.** The workflow dumps the full report on failure, otherwise

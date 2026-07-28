@@ -14,6 +14,12 @@ name: Fork Checks
 on:
   push:
     branches: [ 'claude/**' ]
+    # Documentation-only pushes do not need an Android build. context.md and FORK.md change often
+    # and on their own, and compiling the app to find out that Markdown still parses costs about
+    # thirteen runner-minutes and seven minutes of waiting. A push that touches code as well as
+    # documentation still builds: this skips a run only when every changed file is Markdown.
+    paths-ignore:
+      - '**.md'
   workflow_dispatch:
 
 jobs:
