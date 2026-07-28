@@ -39,6 +39,32 @@ The APK for a green run is its `app-play-debug` artifact:
 — list them with the GitHub Actions tooling rather than guessing ids. Always give the user the
 link; they cannot build either.
 
+## Upstream: follow `master`
+
+Settled. `FORK.md` carries the reasoning; the short version is that upstream runs the later betas
+on `master`, so `master` is the stabilisation line while `develop` carries the refactors that have
+historically cost this fork work. The fork's **base** stays `develop`; only new work is taken from
+`master`.
+
+**The exception, and the reason to keep checking:** when a bug is actually being experienced, look
+at `develop` for a fix rather than waiting for it to reach `master`.
+
+State as of 2026-07-28:
+
+- `master` is `b25adc2` — unchanged, and already fully merged into the fork. Nothing to take.
+- `develop` is `07b7475`, three commits past the fork's base `b7ee12c`: a statistics chart
+  animation, a feed playback speed label refresh, and `2c9111e` "invisible crash when episode does
+  not have chapters".
+- None of the three touch a file the fork touches, so they will merge cleanly whenever they arrive.
+- Checked against symptoms currently being seen: **none of them apply.** `2c9111e` is the only one
+  worth remembering — a null check on `media.getChapters()` in `CoverFragment`, which the fork does
+  not modify. If chapterless episodes ever start behaving oddly on the player screen, cherry-pick
+  it instead of waiting.
+
+There is no `upstream` remote configured in the container. Reach it directly:
+`git fetch --depth=150 https://github.com/AntennaPod/AntennaPod.git master`. Adding
+`AntennaPod/AntennaPod` as a second session source is refused — cross-owner adds are unsupported.
+
 ## Verified on a real device
 
 The branch had never been compiled or run until recently — everything below is confirmed

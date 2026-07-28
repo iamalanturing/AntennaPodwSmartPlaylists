@@ -103,11 +103,38 @@ them:
 After merging anything that touches home sections, open the home screen and confirm the Smart
 Queue card is there.
 
+### Follow `master`; the base stays `develop`
+
+These are two different things and the distinction matters. The fork is **based** on `develop` and
+stays there — rebasing the fork's commits onto `master` would mean undoing the build conversions
+below for no gain. But **new upstream work is taken from `master`**, not from `develop`.
+
+Upstream accumulates on `develop` through the early betas, pushes that to `master`, and then runs
+the later betas on `master`, which is ahead of `develop` until the next sync. `master` is therefore
+the stabilisation line: at the 3.12.0-beta merge it carried the beta5 and beta6 version bumps and
+about eighteen playback fixes — media3 memory leaks, cast reconnection, sleep timer, playback
+position resets, buffering over mobile data without confirmation. `develop` over the same window
+carried refactors, and those cost this fork work: `#8611 Use fixed IDs for home sections` is why
+`HomeFragment` needs the three-part registration described above.
+
+Taking `master` means `develop`'s churn arrives later, already beta-stabilised, in one reviewed
+batch instead of continuously.
+
+**The exception: when a bug is actually being experienced, check `develop` for a fix before
+waiting.** `develop` gets fixes first, and a fix already written there is worth cherry-picking
+rather than living with. Check `develop` against the symptom, not on a schedule.
+
+Expect long silences on `master`. It moves during a beta window and goes quiet after a release
+while `develop` accumulates. That is the policy working, not a stall.
+
 ### `master` and `develop` are not interchangeable bases
 
-The fork sits on `develop`. Files arriving from `master` can be written against the older
-conventions that line still uses, and nothing about the merge flags it — Gradle only fails at
-configuration time, and only when that script is applied.
+Files arriving from `master` can be written against the older conventions that line still uses, and
+nothing about the merge flags it — Gradle only fails at configuration time, and only when that
+script is applied.
+
+`mockitoAgent.gradle` is the standing example: it exists on `master`, does **not** exist on
+`develop` at all, and the fork carries its own converted copy. Every `master` merge touches it.
 
 The 3.12.0-beta merge brought in `mockitoAgent.gradle` referencing `$mockitoVersion`, an ext
 property `develop` had already replaced with the version catalog. Same for the test dependencies
