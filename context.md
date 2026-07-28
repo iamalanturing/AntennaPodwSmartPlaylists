@@ -142,50 +142,53 @@ unlimited, or well above the backlog.
 
 ## Outstanding
 
-Both UX gaps are closed: the rule editor now has a media-type dropdown (Any/Audio/Video, shown in
-the rule summary too), and the list screen has an empty state built on `EmptyViewHandler`.
+Both UX gaps are closed: the rule editor has a media-type dropdown (Any/Audio/Video, shown in the
+rule summary too), and the list screen has an empty state built on `EmptyViewHandler`.
 
-Two things are parked. Neither is started, and neither is urgent.
+The per-queue widget is **built and green in CI, but never run**. See *The Smart Queue widget*
+below for what to check first. One thing is parked:
 
-1. **A per-queue home screen widget.** Wanted, not scheduled. Findings from a feasibility read of
-   `:ui:widget`, so the next session does not have to redo it:
-   - Per-instance config already exists and is the enabler. `WidgetConfigActivity` is registered
-     via `android:configure`, the provider is `reconfigurable`, and every setting is stored as
-     `KEY + appWidgetId` in `PlayerWidgetPrefs` and cleaned up in `PlayerWidget.onDeleted`. A
-     bound playlist id follows that pattern exactly.
-   - `:ui:widget` already depends on `:storage:database` and `:storage:preferences`, so
-     `DBReader.getSmartPlaylistEpisodes` and `PlaybackPreferences.writeActiveSmartQueue` are
-     reachable with no new module wiring.
-   - Prefer a **separate** `AppWidgetProvider` over extending `PlayerWidget`. `:ui:widget` is
-     upstream code; a new receiver plus layout plus config activity is additive and keeps the
-     merge surface near zero, which is the same reasoning that chose v2 over fqUHX.
-   - **Play/pause cannot reuse the existing button.** `WidgetUpdater` wires play to
-     `MediaButtonStarter` with `KEYCODE_MEDIA_PLAY_PAUSE`, which is a global toggle and cannot
-     start a named queue. Starting one means repeating `SmartPlaylistDetailFragment.startPlayback`:
-     read the episodes, pick first in-progress else first unplayed else start over, call
-     `writeActiveSmartQueue(playlistId, mediaId)`, then play. That is a database read, so it has
-     to run off the click thread — a receiver into WorkManager, as `WidgetUpdaterWorker` does.
-   - The button should be state-aware: if `getActiveSmartQueueId()` is this playlist and it is
-     playing, pause via the global media button; otherwise start this queue. The fork already
-     stores the state needed to tell those apart.
-   - Size it 4x1 with `minResizeWidth` at one cell rather than building a 1x1. `WidgetUpdater`
-     already adapts by cell count via `getCellsForSize`, and a 1x1-only widget cannot show the
-     queue name, which is what distinguishes several of them on one home screen.
-   - Refresh on `SmartPlaylistEvent`, which the fork already posts on rebuild, rule change,
-     episode finish and delete. Without that the widget goes silently stale.
-   - **Identity at one cell: colour plus one or two letters, not either alone.** Per-widget colour
-     already exists (`KEY_WIDGET_COLOR + appWidgetId`, with a picker in `WidgetConfigActivity`);
-     letters are derived from the queue name and must be user-overridable, because derivation
-     collides ("Morning News" and "Music Nonstop" both give MN). Colour alone fails for colour
-     vision deficiency and stops scaling past three or four queues. Do **not** use cover art as
-     the identifier: it changes as the queue advances, and identity has to be stable.
-     `contentDescription` should always carry the full name and count.
-   - **The number is unplayed episodes in the queue, ignoring position.** Counting forward from
-     the current episode was considered and rejected: `PlaybackPreferences` holds one global
-     `activeSmartQueueId` / `activeSmartQueueMediaId` pair, so only the active queue has a cursor
-     at all, and the count would mean different things on different widgets at the same time.
-     Cap the display at `99+`.
-   - No regenerate button — see the rebuild gap below; the rebuild should be automatic.
+1. **Upstream feed parser has no XXE hardening.** `parser/feed/.../FeedHandler.java` builds a
+   `SAXParserFactory` without `disallow-doctype-decl` or external-entity features, and no
+   `EntityResolver` is set anywhere. Attacker-controlled XML reaches it, and
+   `OnlineFeedViewActivity` is exported and BROWSABLE, so any app or web page can choose the URL.
+   **Unconfirmed:** Android's SAX is Expat-based and may not resolve external entities at all; a
+   JVM or Robolectric test would exercise Xerces and answer the wrong question, so this needs an
+   on-device check. The user decided **not** to report it upstream for now — do not open an issue
+   without asking.
+
+## The Smart Queue widget
+
+Built, CI green, **not yet run on a device**. Widgets are the least testable part of Android from
+CI, so treat all of the below as unverified.
+
+Watch these first, in this order — they are where it is most likely to be wrong:
+
+- **The one-cell threshold.** `isSingleCell` calls a widget small below `minWidth` 110dp. Whether
+  that trips at the size a launcher calls 1x1 is a guess; check on a real home screen.
+- **Cold start of the play button.** `SmartQueueWidgetPlayReceiver` reads the database on a worker
+  thread and then hops to the main thread, because building a `MediaController` needs a `Looper`.
+  Whether that reliably starts a queue with the app killed is the untested part.
+- **The config screen's theme.** It inherits the app's splash theme, as the player widget's config
+  activity does. Deliberately uses no Material3 theme attributes, because an unresolvable attr
+  there is an inflation crash.
+
+Three traps already paid for, which the code now avoids — do not undo them:
+
+- **`MainActivityStarter.getPendingIntent` uses one fixed request code.** Several widgets would
+  share a single pending intent and every one of them would open whichever queue was drawn last.
+  `perWidgetIntent` builds the intent with the widget id as the request code instead.
+- **`:playback:service` depends on `:ui:widget`**, never the other way round. The play receiver is
+  therefore reached by fully-qualified name, the same trick `MediaButtonStarter` uses.
+- **Pausing is not the receiver's job.** Once a queue is the active one the widget wires its button
+  straight to the media button, which is the only thing that reaches what is actually playing.
+
+The count heals: `countAfterHealing` regenerates an exhausted queue that is set to rebuild itself.
+It skips the queue currently playing, and any queue generated within five minutes, because a
+rebuild posts `SmartPlaylistEvent`, which comes straight back to the widget.
+
+`SmartQueueWidgetRefresher` lives for the life of the application so widgets follow rebuilds, rule
+changes, finished episodes and playback state whether or not a screen is open.
 
 ## Skipping leaves episodes behind the cursor
 
