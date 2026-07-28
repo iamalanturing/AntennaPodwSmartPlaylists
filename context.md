@@ -19,10 +19,16 @@ deleted; `fqUHX` stays.
 
 ## Pick up here
 
-The backlog in **Outstanding** is empty — the two remaining UX gaps were closed. The media-type
-dropdown is verified on a device. The list empty state is **deliberately unverified**: showing it
-needs a queue-less app and the user did not want to delete a queue to get there. It is cosmetic,
-and its failure mode is invisible rather than harmful.
+Nothing is in flight and CI is green. The two UX gaps that were the old backlog are closed: the
+media-type dropdown is verified on a device, and the list empty state is **deliberately
+unverified** — showing it needs a queue-less app and the user did not want to delete a queue to
+get there. It is cosmetic, and its failure mode is invisible rather than harmful.
+
+**Outstanding** now holds design work that is discussed but not started: a per-queue home screen
+widget, and a parser finding the user chose not to report. Read the two sections after it —
+*Skipping leaves episodes behind the cursor* and *The rebuild only fires during playback* — before
+touching queue contents or anything that counts episodes. Both are behaviours the code does not
+advertise.
 
 Read `FORK.md` first if the work touches a screen or an upstream merge.
 
