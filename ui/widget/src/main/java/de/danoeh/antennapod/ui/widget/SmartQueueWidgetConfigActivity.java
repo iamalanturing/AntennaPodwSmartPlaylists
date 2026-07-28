@@ -35,8 +35,10 @@ import java.util.List;
  */
 public class SmartQueueWidgetConfigActivity extends ToolbarActivity {
     private static final String TAG = "SmartQueueWidgetConfig";
+    // Clearly distinct from each other and from the default at a glance on a home screen. The
+    // first palette was dark enough that "blue" was indistinguishable from the default charcoal.
     private static final int[] COLOURS = {
-        SmartQueueWidget.DEFAULT_COLOR, 0xff1B4F72, 0xff186A3B, 0xff512E5F, 0xff7B241C, 0xff7E5109};
+        SmartQueueWidget.DEFAULT_COLOR, 0xff1565C0, 0xff2E7D32, 0xff6A1B9A, 0xffC62828, 0xffE65100};
     private static final int[] COLOUR_LABELS = {
         R.string.smart_queue_widget_colour_default, R.string.smart_queue_widget_colour_blue,
         R.string.smart_queue_widget_colour_green, R.string.smart_queue_widget_colour_purple,
@@ -49,6 +51,7 @@ public class SmartQueueWidgetConfigActivity extends ToolbarActivity {
     private EditText initialsEdit;
     private boolean initialsEditedByUser = false;
     private boolean settingInitialsProgrammatically = false;
+    private int selectedColour = SmartQueueWidget.DEFAULT_COLOR;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,19 +83,24 @@ public class SmartQueueWidgetConfigActivity extends ToolbarActivity {
         loadPlaylists(confirm);
     }
 
+    /**
+     * The chosen colour is tracked in a field rather than read back from the group on confirm.
+     * {@link RadioGroup#getCheckedRadioButtonId()} is unreliable when children are checked before
+     * being added to the group, and silently falling back to the default is indistinguishable
+     * from the colour never having been applied.
+     */
     private void buildColourChoices() {
         SharedPreferences prefs = getSharedPreferences(SmartQueueWidget.PREFS_NAME, Context.MODE_PRIVATE);
-        int stored = prefs.getInt(SmartQueueWidget.KEY_COLOR + appWidgetId, SmartQueueWidget.DEFAULT_COLOR);
+        selectedColour = prefs.getInt(SmartQueueWidget.KEY_COLOR + appWidgetId,
+                SmartQueueWidget.DEFAULT_COLOR);
         for (int i = 0; i < COLOURS.length; i++) {
+            final int colour = COLOURS[i];
             RadioButton button = new RadioButton(this);
             button.setId(View.generateViewId());
             button.setText(COLOUR_LABELS[i]);
-            button.setTag(COLOURS[i]);
-            button.setChecked(COLOURS[i] == stored);
             colourGroup.addView(button);
-        }
-        if (colourGroup.getCheckedRadioButtonId() == -1 && colourGroup.getChildCount() > 0) {
-            ((RadioButton) colourGroup.getChildAt(0)).setChecked(true);
+            button.setChecked(colour == selectedColour);
+            button.setOnClickListener(v -> selectedColour = colour);
         }
     }
 
@@ -207,11 +215,6 @@ public class SmartQueueWidgetConfigActivity extends ToolbarActivity {
         if (selected == null) {
             return;
         }
-        int colour = SmartQueueWidget.DEFAULT_COLOR;
-        int checkedColour = colourGroup.getCheckedRadioButtonId();
-        if (checkedColour != -1) {
-            colour = (int) colourGroup.findViewById(checkedColour).getTag();
-        }
         String initials = initialsEdit.getText().toString().trim();
         if (initials.isEmpty()) {
             initials = SmartQueueWidgetUpdater.deriveInitials(selected.getName());
@@ -220,7 +223,7 @@ public class SmartQueueWidgetConfigActivity extends ToolbarActivity {
         SharedPreferences.Editor editor =
                 getSharedPreferences(SmartQueueWidget.PREFS_NAME, Context.MODE_PRIVATE).edit();
         editor.putLong(SmartQueueWidget.KEY_PLAYLIST_ID + appWidgetId, selected.getId());
-        editor.putInt(SmartQueueWidget.KEY_COLOR + appWidgetId, colour);
+        editor.putInt(SmartQueueWidget.KEY_COLOR + appWidgetId, selectedColour);
         editor.putString(SmartQueueWidget.KEY_INITIALS + appWidgetId, initials);
         editor.apply();
 

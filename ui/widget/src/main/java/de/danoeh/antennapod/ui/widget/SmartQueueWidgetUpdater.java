@@ -6,7 +6,9 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.util.Log;
+import android.util.SizeF;
 import android.view.KeyEvent;
 import android.widget.RemoteViews;
 
@@ -16,6 +18,9 @@ import de.danoeh.antennapod.storage.database.DBWriter;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.ui.appstartintent.MainActivityStarter;
 import de.danoeh.antennapod.ui.appstartintent.MediaButtonStarter;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Draws every {@link SmartQueueWidget} instance. Must be called from a background thread: it reads
@@ -27,6 +32,9 @@ public class SmartQueueWidgetUpdater {
     private static final String DETAIL_FRAGMENT_ARG = "playlistId";
     private static final String LIST_FRAGMENT_TAG = "SmartPlaylistListFragment";
     private static final int MAX_DISPLAYED_COUNT = 99;
+    private static final float SMALL_WIDTH_DP = 40f;
+    private static final float SMALL_HEIGHT_DP = 40f;
+    private static final float WIDE_WIDTH_DP = 160f;
 
     /**
      * A rebuild posts a SmartPlaylistEvent, which brings us straight back here. Refusing to
@@ -55,8 +63,33 @@ public class SmartQueueWidgetUpdater {
     private static void updateWidget(Context context, AppWidgetManager manager, int widgetId) {
         long playlistId = SmartQueueWidget.getPlaylistId(context, widgetId);
         SmartPlaylist playlist = playlistId == 0 ? null : DBReader.getSmartPlaylist(playlistId);
+        int unplayed = playlist == null ? 0 : countAfterHealing(playlist);
 
-        boolean small = isSingleCell(manager, widgetId);
+        manager.updateAppWidget(widgetId,
+                buildForAllSizes(context, manager, widgetId, playlist, unplayed));
+    }
+
+    /**
+     * Hands the launcher one layout per size where the platform supports it, so resizing switches
+     * between them immediately. Redrawing in response to a resize event is too late: the widget
+     * keeps the layout it was given until the background refresh lands, which is why a widget
+     * shrunk to one cell used to keep showing the wide one until it was reconfigured.
+     */
+    private static RemoteViews buildForAllSizes(Context context, AppWidgetManager manager,
+                                                int widgetId, SmartPlaylist playlist, int unplayed) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Map<SizeF, RemoteViews> bySize = new HashMap<>();
+            bySize.put(new SizeF(SMALL_WIDTH_DP, SMALL_HEIGHT_DP),
+                    buildViews(context, widgetId, playlist, unplayed, true));
+            bySize.put(new SizeF(WIDE_WIDTH_DP, SMALL_HEIGHT_DP),
+                    buildViews(context, widgetId, playlist, unplayed, false));
+            return new RemoteViews(bySize);
+        }
+        return buildViews(context, widgetId, playlist, unplayed, isSingleCell(manager, widgetId));
+    }
+
+    private static RemoteViews buildViews(Context context, int widgetId,
+                                          SmartPlaylist playlist, int unplayed, boolean small) {
         RemoteViews views = new RemoteViews(context.getPackageName(),
                 small ? R.layout.smart_queue_widget_small : R.layout.smart_queue_widget);
 
@@ -69,11 +102,10 @@ public class SmartQueueWidgetUpdater {
             showMissingQueue(context, views, small);
             views.setOnClickPendingIntent(R.id.widgetLayout, perWidgetIntent(context, widgetId,
                     new MainActivityStarter(context).withFragmentLoaded(LIST_FRAGMENT_TAG).getIntent()));
-            manager.updateAppWidget(widgetId, views);
-            return;
+            return views;
         }
+        long playlistId = playlist.getId();
 
-        int unplayed = countAfterHealing(playlist);
         String countText = unplayed > MAX_DISPLAYED_COUNT
                 ? MAX_DISPLAYED_COUNT + "+" : String.valueOf(unplayed);
         String episodes = context.getResources().getQuantityString(
@@ -111,7 +143,7 @@ public class SmartQueueWidgetUpdater {
                     context.getString(playing ? R.string.pause_label : R.string.play_label));
         }
 
-        manager.updateAppWidget(widgetId, views);
+        return views;
     }
 
     /**

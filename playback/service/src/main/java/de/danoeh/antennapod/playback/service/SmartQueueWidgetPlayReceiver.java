@@ -38,21 +38,32 @@ public class SmartQueueWidgetPlayReceiver extends BroadcastReceiver {
         // reaches whatever is playing without touching the database.
         final PendingResult result = goAsync();
         new Thread(() -> {
+            FeedMedia media = null;
             try {
-                final FeedMedia media = findStartingEpisode(playlistId);
-                if (media == null) {
-                    return;
+                media = findStartingEpisode(playlistId);
+                if (media != null) {
+                    PlaybackPreferences.writeActiveSmartQueue(playlistId, media.getId());
                 }
-                PlaybackPreferences.writeActiveSmartQueue(playlistId, media.getId());
-                // Starting playback builds a MediaController, which needs a Looper, so it cannot
-                // happen on this thread. The database work above must not happen on the main one.
-                new Handler(Looper.getMainLooper()).post(() ->
-                        new PlaybackServiceStarter(context, media).callEvenIfRunning(true).start());
             } catch (Exception e) {
-                Log.e(TAG, "Failed to start smart queue " + playlistId, e);
-            } finally {
-                result.finish();
+                Log.e(TAG, "Failed to find an episode in smart queue " + playlistId, e);
             }
+            final FeedMedia starting = media;
+            // Starting playback builds a MediaController, which needs a Looper, so it cannot happen
+            // on this thread; the database work above must not happen on the main one. finish() has
+            // to wait until playback has actually been asked for, because it ends the broadcast and
+            // with it the process's reason to keep running -- announcing completion first is how
+            // the button came to flash and then do nothing at all.
+            new Handler(Looper.getMainLooper()).post(() -> {
+                try {
+                    if (starting != null) {
+                        new PlaybackServiceStarter(context, starting).callEvenIfRunning(true).start();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to start smart queue " + playlistId, e);
+                } finally {
+                    result.finish();
+                }
+            });
         }, TAG).start();
     }
 
