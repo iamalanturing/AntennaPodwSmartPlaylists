@@ -20,9 +20,9 @@ deleted; `fqUHX` stays.
 ## Pick up here
 
 The backlog in **Outstanding** is empty — the two remaining UX gaps were closed. The media-type
-dropdown and the list empty state are pushed but **not yet exercised on a device**: everything
-above them in *Verified on a real device* has been, these two have not. Check them on the phone
-before treating them as done, and add them to that list when you have.
+dropdown is verified on a device. The list empty state is **deliberately unverified**: showing it
+needs a queue-less app and the user did not want to delete a queue to get there. It is cosmetic,
+and its failure mode is invisible rather than harmful.
 
 Read `FORK.md` first if the work touches a screen or an upstream merge.
 
@@ -59,6 +59,8 @@ working on a Pixel 10 (API 36), not merely green in CI:
   from the `upstream/master` merge)
 - Per-rule episode counts are accurate; rules reading 0 were correct, their episodes simply were
   not downloaded
+- The rule editor's media-type filter: the same rule set to video matched 0 episodes and to audio
+  matched 1, which is the count proving the value reaches the SQL rather than only the database
 
 Everything the fork does has now been exercised on a device at least once.
 
