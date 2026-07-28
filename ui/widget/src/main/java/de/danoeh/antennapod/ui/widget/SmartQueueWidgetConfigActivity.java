@@ -9,15 +9,16 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
-import androidx.appcompat.app.AppCompatActivity;
 
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.storage.database.DBReader;
+import de.danoeh.antennapod.ui.common.ToolbarActivity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,8 +26,15 @@ import java.util.List;
 /**
  * Binds one widget instance to a Smart Queue. Everything chosen here is stored per
  * {@code appWidgetId}, so several widgets can point at different queues.
+ *
+ * <p>Extends {@link ToolbarActivity} for the same reason {@code WidgetConfigActivity} does: the
+ * application theme descends from {@code Theme.SplashScreen}, which is not an AppCompat theme, and
+ * {@code ToolbarActivity} switches to a usable one before the activity is created. Extending
+ * AppCompatActivity directly throws at launch, and a configuration activity that dies takes the
+ * widget with it — the launcher reads the cancelled result and quietly drops it.
  */
-public class SmartQueueWidgetConfigActivity extends AppCompatActivity {
+public class SmartQueueWidgetConfigActivity extends ToolbarActivity {
+    private static final String TAG = "SmartQueueWidgetConfig";
     private static final int[] COLOURS = {
         SmartQueueWidget.DEFAULT_COLOR, 0xff1B4F72, 0xff186A3B, 0xff512E5F, 0xff7B241C, 0xff7E5109};
     private static final int[] COLOUR_LABELS = {
@@ -90,7 +98,16 @@ public class SmartQueueWidgetConfigActivity extends AppCompatActivity {
 
     private void loadPlaylists(Button confirm) {
         new Thread(() -> {
-            final List<SmartPlaylist> loaded = DBReader.getSmartPlaylists();
+            final List<SmartPlaylist> loaded;
+            try {
+                loaded = DBReader.getSmartPlaylists();
+            } catch (Exception e) {
+                // Leaving Confirm disabled would strand the user on a screen that cannot finish,
+                // and backing out of a config activity discards the widget
+                Log.e(TAG, "Could not load smart queues", e);
+                runOnUiThread(() -> showNothingToBind());
+                return;
+            }
             runOnUiThread(() -> {
                 if (isFinishing()) {
                     return;
@@ -98,13 +115,19 @@ public class SmartQueueWidgetConfigActivity extends AppCompatActivity {
                 playlists.clear();
                 playlists.addAll(loaded);
                 if (playlists.isEmpty()) {
-                    findViewById(R.id.empty_label).setVisibility(View.VISIBLE);
+                    showNothingToBind();
                     return;
                 }
                 buildPlaylistChoices();
                 confirm.setEnabled(true);
             });
         }, "SmartQueueWidgetConfig").start();
+    }
+
+    private void showNothingToBind() {
+        if (!isFinishing()) {
+            findViewById(R.id.empty_label).setVisibility(View.VISIBLE);
+        }
     }
 
     private void buildPlaylistChoices() {
