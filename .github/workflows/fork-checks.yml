@@ -19,8 +19,9 @@
 #      Markdown still parses is expensive. A push touching code as well as docs still runs.
 #   2. Gradle speed flags. Upstream writes org.gradle.parallel=true to local.properties, which
 #      Gradle does not read org.gradle.* from -- it is an Android SDK file for sdk.dir -- so their
-#      parallel flag has no effect. Here it goes to gradle.properties, where it works, together
-#      with the build cache. Affects wall-clock time only, not pass or fail.
+#      parallel flag has no effect. Here they go to ~/.gradle/gradle.properties, where they work
+#      and where they stay out of the tracked tree that the XML code style step diffs. Affects
+#      wall-clock time only, not pass or fail.
 #   3. Cache key. Upstream's key is stable across commits and has no restore-keys, so once written
 #      it is frozen and task outputs never accumulate. The commit is in the key here and
 #      restore-keys falls back to the closest earlier cache.
@@ -73,11 +74,19 @@ jobs:
             gradle-${{ hashFiles('**/*.gradle*') }}-
             gradle-
       - name: Configure parallel build
+        # Written to GRADLE_USER_HOME, not to the project's gradle.properties. Gradle reads
+        # org.gradle.* from ~/.gradle/gradle.properties at higher precedence than the project file,
+        # so the flags take effect -- unlike upstream's local.properties, which Gradle never reads
+        # org.gradle.* from at all. Writing them into the tracked project gradle.properties instead
+        # would work for Gradle but breaks the XML code style step below, which asserts a clean
+        # working tree with `git diff`: the two added lines are themselves a diff. That is why
+        # upstream's otherwise-ineffective choice of local.properties never trips their own check.
         run: |
+          mkdir -p ~/.gradle
           {
             echo "org.gradle.parallel=true"
             echo "org.gradle.caching=true"
-          } >> gradle.properties
+          } >> ~/.gradle/gradle.properties
       - name: XML code style
         run: |
           curl -s -L https://github.com/ByteHamster/android-xml-formatter/releases/download/1.1.0/android-xml-formatter.jar > android-xml-formatter.jar
@@ -140,11 +149,19 @@ jobs:
             gradle-${{ hashFiles('**/*.gradle*') }}-
             gradle-
       - name: Configure parallel build
+        # Written to GRADLE_USER_HOME, not to the project's gradle.properties. Gradle reads
+        # org.gradle.* from ~/.gradle/gradle.properties at higher precedence than the project file,
+        # so the flags take effect -- unlike upstream's local.properties, which Gradle never reads
+        # org.gradle.* from at all. Writing them into the tracked project gradle.properties instead
+        # would work for Gradle but breaks the XML code style step below, which asserts a clean
+        # working tree with `git diff`: the two added lines are themselves a diff. That is why
+        # upstream's otherwise-ineffective choice of local.properties never trips their own check.
         run: |
+          mkdir -p ~/.gradle
           {
             echo "org.gradle.parallel=true"
             echo "org.gradle.caching=true"
-          } >> gradle.properties
+          } >> ~/.gradle/gradle.properties
       - name: Create temporary release keystore
         run: |
           keytool -noprompt -genkey -v -keystore "app/keystore" -alias alias -storepass password -keypass password -keyalg RSA -validity 10 -dname "CN=antennapod.org, OU=dummy, O=dummy, L=dummy, S=dummy, C=US"
@@ -202,11 +219,19 @@ jobs:
             gradle-${{ hashFiles('**/*.gradle*') }}-
             gradle-
       - name: Configure parallel build
+        # Written to GRADLE_USER_HOME, not to the project's gradle.properties. Gradle reads
+        # org.gradle.* from ~/.gradle/gradle.properties at higher precedence than the project file,
+        # so the flags take effect -- unlike upstream's local.properties, which Gradle never reads
+        # org.gradle.* from at all. Writing them into the tracked project gradle.properties instead
+        # would work for Gradle but breaks the XML code style step below, which asserts a clean
+        # working tree with `git diff`: the two added lines are themselves a diff. That is why
+        # upstream's otherwise-ineffective choice of local.properties never trips their own check.
         run: |
+          mkdir -p ~/.gradle
           {
             echo "org.gradle.parallel=true"
             echo "org.gradle.caching=true"
-          } >> gradle.properties
+          } >> ~/.gradle/gradle.properties
       - name: Build with Gradle
         run: ./gradlew assemblePlayDebugAndroidTest
       - name: Enable KVM group perms
