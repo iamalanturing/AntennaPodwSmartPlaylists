@@ -56,6 +56,27 @@ such so `git rebase --onto` can remove them without touching the real work.
 Upstream's own gate, wider than the fork CI, before any PR:
 `./gradlew checkstyle lint spotbugsPlayDebug spotbugsDebug`
 
+## Where this stands (29 Jul 2026)
+
+Schema only. `Queues` table, `Queue.queue` column, migration `3110000` → `3120000`,
+`deleteDatabase()` re-inserting the default queue. **Nothing reads any of it yet** — `setQueue`
+still clears every row across all queues and `getQueueCursor` still ignores the column. Multi-queue
+is not functional until the read/write scoping and the remove-path split land.
+
+**CI is red and the cause is not yet known.** Runs
+[30466315328](https://github.com/iamalanturing/AntennaPodwSmartPlaylists/actions/runs/30466315328)
+and
+[30466643609](https://github.com/iamalanturing/AntennaPodwSmartPlaylists/actions/runs/30466643609)
+both failed. The first is the **baseline** — unmodified upstream `develop` plus this workflow — so
+the failure is **not** caused by the schema change. Its `Build` step passed (4m13s); the failure is
+in `Test` or `Static Code Analysis`. Find out which before writing more code: if upstream `develop`
+is simply red right now, that is worth knowing before chasing a phantom.
+
+Next, in order: scope the queue reads/writes by queue id; split remove-from-queue into all-queues
+(system-initiated) versus this-queue (the queue screen swipe) — that split is the biggest
+correctness trap in the feature; active-queue preference and queue CRUD; the switcher on the queue
+screen; tests.
+
 ## AI provenance
 
 This branch is AI-assisted. Every commit carries a `Co-Authored-By: Claude Opus 5` trailer, and the
