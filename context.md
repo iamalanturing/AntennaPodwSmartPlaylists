@@ -155,11 +155,30 @@ cut first from #8066 — fine for a fork built for one person, but the first thi
 went upstream. And any upstream submission from here would have to survive the AI-code critique
 above, which is a code-review problem, not a feature problem.
 
-**Two consequences for this fork.** It built the rule-based layer directly and skipped the manual
-queue foundation upstream wants underneath it, so the design is a structural mismatch with
-upstream's intent, not merely an unpolished version of it. But #307 is labelled `Needs: Decision`
-and `Needs: Mock-up or user story` — it is blocked on a *design*, not on code, and a working
-implementation with screenshots is close to the artifact it is waiting for.
+**How a feature actually reaches upstream, and why code-first fails.** From keunes' opening post in
+the forum thread "Player screen UX/UI work" (Feb 2025), the process is nine steps:
+
+1. explore/map how other apps solve the challenge
+2. two sets of wireframes, each with a different navigation approach
+3. interviews with end-users to test the wireframes
+4. pick one approach, revise with feedback
+5. feedback round with developers on technical feasibility
+6. interactive mock-ups incorporating developer feedback
+7. interviews with end-users to test the prototype
+8. **implementation**
+9. interviews with end-users to test the beta
+
+Implementation is step 8 of 9. So #307's `Needs: Mock-up or user story` label is *not* satisfied by
+arriving with working code — that skips steps 1–7, including the two user-interview rounds and the
+feasibility review meant to shape the design before anyone writes any of it. An earlier version of
+this section claimed a working implementation was "close to the artifact #307 is waiting for". That
+was wrong; treat an unsolicited implementation as a liability rather than a shortcut. It also
+explains #8066 and #8070 better than "too large" and "too slow" did: both were code-first
+submissions for a feature still parked at step 1.
+
+**Expect this to be slow.** That same thread runs Feb 2025 to Feb 2026 — twelve months of process
+on a single screen, still unshipped, and it is one of the three issues in the 4.0.0 milestone.
+Queues sit behind it.
 
 **Nothing has been posted upstream, and nothing should be without asking first.** This is the same
 standing instruction that parked the XXE finding.
