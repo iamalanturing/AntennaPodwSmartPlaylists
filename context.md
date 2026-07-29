@@ -74,6 +74,45 @@ There is no `upstream` remote configured in the container. Reach it directly:
 `git fetch --depth=150 https://github.com/AntennaPod/AntennaPod.git master`. Adding
 `AntennaPod/AntennaPod` as a second session source is refused — cross-owner adds are unsupported.
 
+## Upstream's own plans for playlists
+
+Checked 2026-07-29. Relevant whenever the question "could any of this go upstream?" comes back.
+
+**The forum is unreachable from this container.** `forum.antennapod.org` and `antennapod.org` both
+return 403 through the proxy, by WebFetch and by curl. `github.com` pages fetch fine. So forum
+threads can only be read as search-engine summaries — treat anything sourced that way as weaker
+evidence than the GitHub metadata below, which was read directly.
+
+**The request is old, recurring, and not unanimous.** Playlist threads run from 2016 (issue #1611)
+through 2025, including "Playlist support yes/no?" (t/6064) and "Multi-level Queue management"
+(t/8635) — and also "No to multiple playlists" (t/8636). Maintainers routinely redirect these to
+GitHub to be voted on rather than designed on the forum.
+
+**The order upstream wants:**
+
+- The planning artifact is the January 2023 forum thread "Multiple Queues Impact and Feature
+  Mapping" (t/2670), where keunes and ByteHamster mapped the work. It starts with **simple "dumb"
+  queues the user manages by hand**; rules come later, layered on top.
+- 4.0.0 holds three issues, all UI: bottom navigation (#7952), player screen redesign (#7953),
+  rounder player icons (#7062). The next major is **not** about queues.
+- #307 "Automatic / Smart queues" lives in the **Rework automatic download/deletion** milestone
+  (17 closed, 16 open), not under playlists — filed beside "keep the newest N episodes" (#2077)
+  and "choose where to queue the auto-downloaded episode" (#4345).
+- #2648 "Multiple / User Definable Queues" is the canonical multiple-queues issue and has **no
+  milestone**. #1611 and #4739 were closed as duplicates.
+
+So: 3.12.x → 4.0.0 UI redesign → the half-finished auto-download rework → manual queues → smart
+queues, gated on a decision.
+
+**Two consequences for this fork.** It built the rule-based layer directly and skipped the manual
+queue foundation upstream wants underneath it, so the design is a structural mismatch with
+upstream's intent, not merely an unpolished version of it. But #307 is labelled `Needs: Decision`
+and `Needs: Mock-up or user story` — it is blocked on a *design*, not on code, and a working
+implementation with screenshots is close to the artifact it is waiting for.
+
+**Nothing has been posted upstream, and nothing should be without asking first.** This is the same
+standing instruction that parked the XXE finding.
+
 ## Verified on a real device
 
 The branch had never been compiled or run until recently — everything below is confirmed
