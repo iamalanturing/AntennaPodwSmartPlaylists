@@ -14,6 +14,16 @@ and `QUEUE_ID_DEFAULT` always exists.
 means "in any queue". Auto-delete relies on this to protect episodes sitting in a queue the user is
 not currently viewing, so scoping it would silently make them eligible for deletion.
 
+An episode belongs to **exactly one queue**. A unique index on `Queue.feeditem` enforces it, so
+adding an episode to another queue moves it rather than copying it. This is what keeps "which queue
+is this episode in" a question with one answer, and it is why looking up the queue of an episode
+never needs a tie-break rule.
+
 Removing an episode splits in two. System-initiated removals — the file was deleted, playback
 ended, sync said so — must clear the episode from *every* queue. Only a user acting on the queue
 screen removes it from one.
+
+Migrations are plain `if (oldVersion < N)` blocks in `DBUpgrader`, and `DBUpgraderTest` covers them
+by building the old schema by hand, calling `DBUpgrader.upgrade` and asserting on the result. Add a
+case there for any migration that touches user data: no other test exercises the upgrade path,
+since a fresh install runs `onCreate` instead.

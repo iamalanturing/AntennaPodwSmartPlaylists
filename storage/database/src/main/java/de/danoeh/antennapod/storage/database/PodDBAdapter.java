@@ -257,6 +257,11 @@ public class PodDBAdapter {
             + TABLE_NAME_QUEUE + "_" + KEY_FEEDITEM + " ON " + TABLE_NAME_QUEUE + " ("
             + KEY_FEEDITEM + ")";
 
+    static final String INDEX_NAME_QUEUE_FEEDITEM = TABLE_NAME_QUEUE + "_" + KEY_FEEDITEM;
+
+    static final String CREATE_UNIQUE_INDEX_QUEUE_FEEDITEM = "CREATE UNIQUE INDEX "
+            + INDEX_NAME_QUEUE_FEEDITEM + " ON " + TABLE_NAME_QUEUE + " (" + KEY_FEEDITEM + ")";
+
     static final String CREATE_INDEX_FEEDMEDIA_FEEDITEM = "CREATE INDEX "
             + TABLE_NAME_FEED_MEDIA + "_" + KEY_FEEDITEM + " ON " + TABLE_NAME_FEED_MEDIA + " ("
             + KEY_FEEDITEM + ")";
@@ -1602,7 +1607,7 @@ public class PodDBAdapter {
             db.execSQL(CREATE_INDEX_FEEDITEMS_PUBDATE);
             db.execSQL(CREATE_INDEX_FEEDITEMS_READ);
             db.execSQL(CREATE_INDEX_FEEDMEDIA_FEEDITEM);
-            db.execSQL(CREATE_INDEX_QUEUE_FEEDITEM);
+            db.execSQL(CREATE_UNIQUE_INDEX_QUEUE_FEEDITEM);
             db.execSQL(CREATE_INDEX_SIMPLECHAPTERS_FEEDITEM);
         }
 

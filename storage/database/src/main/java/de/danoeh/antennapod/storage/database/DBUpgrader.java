@@ -361,6 +361,11 @@ class DBUpgrader {
             db.execSQL(PodDBAdapter.INSERT_DEFAULT_QUEUE);
             db.execSQL("ALTER TABLE " + PodDBAdapter.TABLE_NAME_QUEUE + " ADD COLUMN "
                     + PodDBAdapter.KEY_QUEUE + " INTEGER DEFAULT " + PodDBAdapter.QUEUE_ID_DEFAULT);
+            db.execSQL("DELETE FROM " + PodDBAdapter.TABLE_NAME_QUEUE + " WHERE " + PodDBAdapter.KEY_ID
+                    + " NOT IN (SELECT MIN(" + PodDBAdapter.KEY_ID + ") FROM " + PodDBAdapter.TABLE_NAME_QUEUE
+                    + " GROUP BY " + PodDBAdapter.KEY_FEEDITEM + ")");
+            db.execSQL("DROP INDEX IF EXISTS " + PodDBAdapter.INDEX_NAME_QUEUE_FEEDITEM);
+            db.execSQL(PodDBAdapter.CREATE_UNIQUE_INDEX_QUEUE_FEEDITEM);
         }
     }
 
