@@ -120,11 +120,40 @@ being wrong, and invited resubmission. His review sets the shape of the MVP:
 - "Please don't change the strings files, except for the English one" — already this fork's rule
   in `AGENTS.md`, and now known to be enforced in review.
 
-Two things follow for this fork. Upstream's manual-queue MVP is *the active queue plus membership
-tables*; ours is rules that materialise a queue, with no manual membership concept at all — so the
-mismatch is concrete, not stylistic. And if #8070 or a successor ever lands on `develop`, it adds
-tables to the storage layer this fork also modifies, which is the first upstream change in a long
-while with a real chance of a painful merge. Watch for it.
+**PR #8066 is the cautionary half of the pair.** seefood's "Multiple Named Queues" ran 18–28 Oct
+2025, overlapping #8070 by a different author — two people independently attacking the same feature
+at once. It was the thorough version: 45 commits, a `QueueRepository` interface, `Queues` +
+`QueueMembership` with migration 3090000 and cascade deletes, a LiveData ViewModel, colour and icon
+pickers, 33 new tests with all 887 existing ones passing. It was abandoned by its own author
+("branch was dumped and reimplemented") after this review:
+
+> "This is getting really large. To make it reasonable to review, please only implement the bare
+> minimum to support multiple queues. No icon picker, color picker, etc."
+
+> "This code looks like it was fully written by an AI that didn't really look at the existing code
+> first. This will need a lot of manual work without AI to clean it up."
+
+The specifics behind the second quote were all *didn't-read-the-codebase* faults: a custom
+`ExecutorService` where `DBWriter` already has a shared one, missing ViewBinding, exception-based
+validation where the UI should check. **Take this as a standing warning.** It is the exact failure
+mode this fork is exposed to, and it sinks a PR regardless of whether the code works.
+
+**Together the two PRs bracket the target.** #8066 died of too much, #8070 of too little; counting
+#3221 from 2019, three attempts have now failed and none merged. The feature is not waiting on
+volunteers. The asks that landed on both, so house style rather than one reviewer's mood: bare
+minimum scope, reuse existing patterns rather than inventing parallel ones, no cosmetics, English
+strings only, active queue rather than an add-time prompt. Note also that the schema is *not*
+settled — `QueueMembership` vs `QueueItems`, one migration version between them — so there is no
+upstream table layout to align with even if we wanted to.
+
+Four things follow for this fork. Upstream's manual-queue MVP is *the active queue plus membership
+tables*; ours is rules that materialise a queue, with no manual membership concept at all — the
+mismatch is concrete, not stylistic. If any of these lands on `develop` it adds tables to the
+storage layer this fork also modifies: the first upstream change in a long while with a real chance
+of a painful merge. The widget's colour picker and initials are cosmetics of exactly the category
+cut first from #8066 — fine for a fork built for one person, but the first thing to go if this ever
+went upstream. And any upstream submission from here would have to survive the AI-code critique
+above, which is a code-review problem, not a feature problem.
 
 **Two consequences for this fork.** It built the rule-based layer directly and skipped the manual
 queue foundation upstream wants underneath it, so the design is a structural mismatch with
