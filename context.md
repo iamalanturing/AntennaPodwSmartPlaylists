@@ -282,12 +282,28 @@ The count heals: `countAfterHealing` regenerates an exhausted queue set to rebui
 the queue currently playing and anything generated within five minutes, because a rebuild posts
 `SmartPlaylistEvent` and comes straight back.
 
-**Still to do:** remove the temporary `smartQueueDiagnostic` writer from `Media3PlaybackService`;
-debounce `SmartQueueWidgetRefresher`, which does a database read per widget on every player status
-change and may be part of the delay before playback starts.
+Both clean-ups are done: the temporary `smartQueueDiagnostic` writer is out of
+`Media3PlaybackService`, and `SmartQueueWidgetRefresher` now debounces `PlayerStatusEvent` by 300ms
+and redraws without healing, so a status change no longer costs a database read per widget.
 
-**A trap in the diagnostic itself:** it appends to the crash-report file, and the bug report screen
-shows that file's last-modified time, so a stale stack trace reads as though it just happened. Read
+**What is left of the start delay is cold start, and it is expected.** The user's reading after the
+debounce: "faster than it was at its worst… slower for the first play out of the blue, but faster
+after that." The first tap with the app not running pays for process creation, `ClientConfigurator`,
+opening the database, building the media3 session, a cold SQLite page cache for the smart playlist
+query, Glide initialising, and ExoPlayer's first `prepare`. Every one of those is warm on the next
+tap, which is exactly the shape observed.
+
+One cost inside our own code is worth knowing before anyone tries to shave it:
+`MediaItemAdapter.fromPlayable(context, media, false)` loads artwork synchronously with
+`.get(500, TimeUnit.MILLISECONDS)`, and on a miss falls back to the feed image for up to 500ms more.
+Cold, that is up to a second before the player is even handed the item. It is upstream code on the
+app's own play path too, so the fix is not ours to make casually — passing `forBrowse=true` would
+skip the artwork and strip the cover from the notification, and starting playback first and
+attaching metadata after is a real change to how the session reports itself. **Measure before
+touching it**; nothing here has been timed, and this session's record on untimed theories is poor.
+
+**A trap if a diagnostic is ever added back:** the old one appended to the crash-report file, and
+the bug report screen shows that file's last-modified time, so a stale stack trace reads as though it just happened. Read
 the appended lines, not the trace.
 
 ## Skipping leaves episodes behind the cursor
