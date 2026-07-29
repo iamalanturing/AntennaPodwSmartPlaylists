@@ -138,13 +138,41 @@ The specifics behind the second quote were all *didn't-read-the-codebase* faults
 validation where the UI should check. **Take this as a standing warning.** It is the exact failure
 mode this fork is exposed to, and it sinks a PR regardless of whether the code works.
 
-**Together the two PRs bracket the target.** #8066 died of too much, #8070 of too little; counting
-#3221 from 2019, three attempts have now failed and none merged. The feature is not waiting on
-volunteers. The asks that landed on both, so house style rather than one reviewer's mood: bare
+**But the team's verdict on #8066 was not the same as ByteHamster's review**, and this is the single
+most important fact in this section. From the fortnightly `Needs: Decision` meeting notes
+(forum t/4169), **19 November 2025**:
+
+> Multiple queues. Conclusions: we like the UX approach of the agentic PR but should probably be
+> implemented by a (skilled) human (to minimise the review overhead).
+> - Man-made: #8070 by dominikfill
+> - Agentic: #8066 by seefood
+
+So #8066 was the AI-written one, and **its UX approach won**. The scope critique and the design
+verdict landed on opposite sides: they cut its features and kept its shape. What was rejected was
+AI-generated *code*, on explicit review-cost grounds — not the design, and not the fact that code
+arrived before a mock-up.
+
+**This is the barrier for this fork, stated in upstream's own words.** They have decided what they
+want and have written down that they want a skilled human to build it *to minimise review
+overhead*. This fork is AI-written by construction. No amount of polish changes which category a
+submission from here falls into.
+
+**Together the PRs bracket the target.** Counting #3221 from 2019, three attempts have failed and
+none merged. The asks that landed on both, so house style rather than one reviewer's mood: bare
 minimum scope, reuse existing patterns rather than inventing parallel ones, no cosmetics, English
-strings only, active queue rather than an add-time prompt. Note also that the schema is *not*
-settled — `QueueMembership` vs `QueueItems`, one migration version between them — so there is no
-upstream table layout to align with even if we wanted to.
+strings only, active queue rather than an add-time prompt. The schema is *not* settled —
+`QueueMembership` vs `QueueItems`, one migration version between them — so there is no upstream
+table layout to align with even if we wanted to.
+
+**Current state: decided but unbuilt.** The UX direction has been settled since Nov 2025, and
+#8070 — the human implementation — was closed for inactivity in Feb 2026. Multiple queues is
+waiting on a skilled human who has not appeared.
+
+**Two adjacent decisions from the same meeting notes**, both signals about appetite: on
+**3 Dec 2025** they *rejected* "Auto-tag feeds from RSS/iTunes categories with user preference
+control" (#8105) — the nearest neighbour anyone has proposed to rule-based playlist membership. On
+**28 Jan 2026** they *closed* an MVI Architecture Migration (#8202). A team wary of automatic
+categorisation and of large structural changes proposed from outside.
 
 Four things follow for this fork. Upstream's manual-queue MVP is *the active queue plus membership
 tables*; ours is rules that materialise a queue, with no manual membership concept at all — the
@@ -152,11 +180,11 @@ mismatch is concrete, not stylistic. If any of these lands on `develop` it adds 
 storage layer this fork also modifies: the first upstream change in a long while with a real chance
 of a painful merge. The widget's colour picker and initials are cosmetics of exactly the category
 cut first from #8066 — fine for a fork built for one person, but the first thing to go if this ever
-went upstream. And any upstream submission from here would have to survive the AI-code critique
-above, which is a code-review problem, not a feature problem.
+went upstream. And any submission from here runs straight into the Nov 2025 conclusion above: a
+code-review problem, not a feature problem, and not one that better code solves.
 
-**How a feature actually reaches upstream, and why code-first fails.** From keunes' opening post in
-the forum thread "Player screen UX/UI work" (Feb 2025), the process is nine steps:
+**There is a heavyweight design process, but it is not applied to everything.** From keunes' opening
+post in the forum thread "Player screen UX/UI work" (Feb 2025), that redesign runs nine steps:
 
 1. explore/map how other apps solve the challenge
 2. two sets of wireframes, each with a different navigation approach
@@ -168,13 +196,17 @@ the forum thread "Player screen UX/UI work" (Feb 2025), the process is nine step
 8. **implementation**
 9. interviews with end-users to test the beta
 
-Implementation is step 8 of 9. So #307's `Needs: Mock-up or user story` label is *not* satisfied by
-arriving with working code — that skips steps 1–7, including the two user-interview rounds and the
-feasibility review meant to shape the design before anyone writes any of it. An earlier version of
-this section claimed a working implementation was "close to the artifact #307 is waiting for". That
-was wrong; treat an unsolicited implementation as a liability rather than a shortcut. It also
-explains #8066 and #8070 better than "too large" and "too slow" did: both were code-first
-submissions for a feature still parked at step 1.
+Implementation is step 8 of 9 — for that screen. **Do not generalise this to every feature.**
+Multiple queues took a much lighter path: two PRs appeared unsolicited, and the team looked at them
+in a fortnightly meeting and picked a direction from one. Code-first *did* set the UX direction
+there. Two earlier versions of this section got this wrong in opposite ways — first claiming a
+working implementation was "close to the artifact #307 is waiting for", then claiming code-first
+fails because implementation is step 8 of 9. Neither is right. The rule that actually holds across
+every piece of evidence here is narrower: **AI-written code is the disqualifier**, on review-cost
+grounds, whatever order it arrives in.
+
+Where the nine steps probably *do* apply is a screen-level redesign, and #307 is labelled
+`Needs: Mock-up or user story` — so smart queues specifically may still want a design before code.
 
 **Expect this to be slow.** That same thread runs Feb 2025 to Feb 2026 — twelve months of process
 on a single screen, still unshipped, and it is one of the three issues in the 4.0.0 milestone.
