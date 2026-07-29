@@ -104,6 +104,28 @@ GitHub to be voted on rather than designed on the forum.
 So: 3.12.x → 4.0.0 UI redesign → the half-finished auto-download rework → manual queues → smart
 queues, gated on a decision.
 
+**PR #8070 confirms all of this from a primary source**, and is the best single document of what
+upstream actually wants. dominikfill's "(Very) WIP: Enable Multi-Queue support" ran 2025-10-28 to
+2026-02-26 against `develop`, adding `Queues` and `QueueItems` tables, queue create/delete, and a
+dialog for picking a queue when adding an episode. ByteHamster closed it for inactivity, not for
+being wrong, and invited resubmission. His review sets the shape of the MVP:
+
+- **One level of navigation, not a stack.** Opening another queue should change what the existing
+  fragment shows and be remembered next time, rather than pushing a new fragment on top.
+- **An active queue, not a prompt.** "In this very first version… selecting the queue it should go
+  to first (on the queue screen), making this the active queue… So when going somewhere else and
+  adding to the queue, it ends up in that one." The add-time dialog was explicitly cut.
+- **The dialog is reserved for automation later** — that is the slot smart queues occupy, and it
+  comes after manual queues work.
+- "Please don't change the strings files, except for the English one" — already this fork's rule
+  in `AGENTS.md`, and now known to be enforced in review.
+
+Two things follow for this fork. Upstream's manual-queue MVP is *the active queue plus membership
+tables*; ours is rules that materialise a queue, with no manual membership concept at all — so the
+mismatch is concrete, not stylistic. And if #8070 or a successor ever lands on `develop`, it adds
+tables to the storage layer this fork also modifies, which is the first upstream change in a long
+while with a real chance of a painful merge. Watch for it.
+
 **Two consequences for this fork.** It built the rule-based layer directly and skipped the manual
 queue foundation upstream wants underneath it, so the design is a structural mismatch with
 upstream's intent, not merely an unpolished version of it. But #307 is labelled `Needs: Decision`
