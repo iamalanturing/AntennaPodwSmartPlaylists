@@ -242,6 +242,15 @@ inventory — the markers do not cover every touched line.
 then `testPlayDebugUnitTest testDebugUnitTest` (the second is what covers the library modules
 where the Smart Queue tests live), plus `checkstyle lint`.
 
+Those are **two independent jobs**, and only the first produces the APK. `Build and Unit Test`
+attaches the artifact about two minutes in; `Static Code Analysis` runs for a couple of minutes
+more and gates nothing, so a run whose lint failed still has a perfectly good APK on it. Hand the
+APK over as soon as the build job is green and report lint separately if it has anything to say —
+waiting for the whole run doubles the wait for no benefit.
+
+Markdown-only pushes are skipped (`paths-ignore: '**.md'`), so a documentation commit produces no
+run and no artifact. If someone is waiting on a build, make sure the push actually contained code.
+
 After a merge, beyond a green CI run, check on a device with a **backed-up** database:
 upgrading over an existing install keeps both playlists and their episode counts; a fresh
 install creates the tables; deleting a smart queue mid-playback falls back to the normal queue;
