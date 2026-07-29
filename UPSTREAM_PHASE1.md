@@ -195,13 +195,60 @@ stack, no navigation work, no ViewModel. The requirement that sank #8070's UX is
 `WearDataPaths.QUEUE` with `DBReader.getQueue()` and ships it to the watch. Active queue is the
 obvious answer. Note it is play-flavour only, so a free-flavour build will not catch a break here.
 
-## Still to study
+## Fourth pass: cleanup and auto-download, and a refactor not to do
 
-- `QueueRecyclerAdapter` and `queue.xml` menu — where a queue switcher control would live.
-- `APQueueCleanupAlgorithm` in full, to confirm union-of-queues is right for cleanup.
-- `AutomaticDownloadAlgorithm:66` in full, same question for downloads.
-- The `Favorites` table, which has the identical `(ID, FeedItem, Feed)` shape — worth checking
-  whether a shared helper already exists before writing a second one.
+**Auto-delete needs no changes at all, and this is the strongest argument for the design.**
+`APQueueCleanupAlgorithm.getCandidates()` protects an episode with
+`!item.isTagged(FeedItem.TAG_QUEUE)` — and `TAG_QUEUE` comes from the `is_in_queue` correlated
+subquery, which is unscoped. Leave that query alone and it means "in **any** queue", so episodes
+sitting in a non-active queue are automatically protected from cleanup. Union semantics, for free,
+in the one place where getting it wrong would silently delete a user's downloads. Keeping
+`is_in_queue` unscoped is therefore load-bearing, not merely harmless — write that down in the PR,
+because it looks like an oversight to a reviewer who has not traced it.
+
+**Auto-download is a one-line change.** `AutomaticDownloadAlgorithm` (~line 66) adds queue contents
+to the candidate list only when `UserPreferences.isEnableAutodownloadQueue()`. Swapping
+`DBReader.getQueue()` for a union-of-all-queues read is the whole edit, and union is clearly right:
+downloading only the active queue would break the "fill my commute queue overnight" case that
+motivates the feature.
+
+**Item deletion already works across queues.** Deleting episodes cleans membership rows by
+`FeedItem` (`PodDBAdapter:941` and its `Queue` counterpart), which removes them from every queue
+regardless of the new column. No change.
+
+**A refactor to deliberately not do.** `Favorites` is `(ID, FeedItem, Feed)` — the same shape as
+`Queue` — with its own parallel `setFavorites` / `addFavoriteItems` / `removeFavoriteItems`
+(`PodDBAdapter:849–890`) and its own unscoped `is_favorite` subquery. There is **no shared helper**;
+upstream simply duplicated the pattern. It is tempting to unify them while adding a third variant.
+Don't. ByteHamster already cut #8066 for scope once, and an unsolicited refactor of favourites is
+exactly the sort of thing that turns a reviewable diff into an unreviewable one. Follow the
+duplication.
+
+## Where the study lands
+
+Four passes in, the design holds. Category B — the part that looked like the blocker — collapsed to
+three small edits and one non-edit:
+
+| Consumer | Change |
+|---|---|
+| Auto-delete / cleanup | **none** — inherits union via unscoped `is_in_queue` |
+| Auto-download | one line — union read |
+| Next episode | one SQL predicate — follows the current episode's queue |
+| Android Auto, Wear | active queue |
+| Item deletion | **none** — already by `FeedItem` |
+| Enqueue position | **none** — already takes the queue as a parameter |
+| Queue screen | set preference, call `loadItems()` |
+
+Storage: one new `Queues` table, one column on `Queue`, `WHERE queue = ?` on four reads, migration
+above `3110000`. No new membership table, no row migration, no new executor, no ViewModel.
+
+**Open decisions for the issue, not for the code:** which queue wins when an episode is in several
+(propose: active, else lowest id); whether keep-sorted staying global is acceptable; and whether
+"add to a queue you are not playing" landing at the front is the intended behaviour.
+
+**Still unstudied:** `QueueRecyclerAdapter` and `res/menu/queue.xml`, where a switcher control would
+live. That is UI placement rather than architecture, and is better settled with a maintainer than
+guessed at.
 
 ## Constraints on doing this at all
 
