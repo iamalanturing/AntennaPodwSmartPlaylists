@@ -1,0 +1,193 @@
+# Fork-only CI. NOT FOR UPSTREAM.
+#
+# THIS FILE MUST BE DROPPED BEFORE OPENING A PULL REQUEST AGAINST AntennaPod/AntennaPod.
+# It exists only so this branch can be compiled at all: the development container cannot reach
+# dl.google.com or maven.google.com through its proxy, so there is no local Gradle build and CI is
+# the only compiler available. Upstream already has .github/workflows/checks.yml and does not want
+# a second one. It is deliberately kept as a single isolated commit so `git rebase --onto` can
+# remove it without touching any of the real work.
+#
+# Upstream's checks.yml only triggers on master/develop and on pull requests, so a fork branch
+# never runs it. This is a lean subset -- compile, unit tests, static analysis -- skipping the
+# emulator tests and the three-variant matrix.
+name: Fork Checks
+
+on:
+  push:
+    branches: [ 'multiple-queues', 'multiple-queues/**' ]
+    # Documentation-only pushes do not need an Android build. context.md and FORK.md change often
+    # and on their own, and compiling the app to find out that Markdown still parses costs about
+    # thirteen runner-minutes and seven minutes of waiting. A push that touches code as well as
+    # documentation still builds: this skips a run only when every changed file is Markdown.
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: "Build and Unit Test"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Cache Gradle
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          # The commit is in the key so every run writes a fresh cache. actions/cache only saves
+          # on a miss, so a key that never varies is frozen after its first write and the build
+          # cache below could never accumulate anything. restore-keys then falls back to the
+          # closest earlier cache, so editing a build file no longer re-downloads every dependency.
+          key: gradle-${{ hashFiles('**/*.gradle*') }}-${{ github.sha }}
+          restore-keys: |
+            gradle-${{ hashFiles('**/*.gradle*') }}-
+            gradle-
+      - name: Configure Gradle
+        # Must be gradle.properties: Gradle does not read org.gradle.* from local.properties, which
+        # is an Android SDK file for sdk.dir and nothing in this build reads it at all. Writing the
+        # parallel flag there left it silently off -- the same trap that once dropped the signing
+        # config. Caching reuses task outputs between runs, so an edit in one module stops
+        # recompiling the other twenty-odd.
+        run: |
+          {
+            echo "org.gradle.parallel=true"
+            echo "org.gradle.caching=true"
+          } >> gradle.properties
+      - name: Create temporary release keystore
+        # app/build.gradle resolves signingConfigs at configuration time, so this has to exist
+        # even for a debug assemble.
+        run: |
+          keytool -noprompt -genkey -v -keystore "app/keystore" -alias alias -storepass password -keypass password -keyalg RSA -validity 10 -dname "CN=antennapod.org, OU=dummy, O=dummy, L=dummy, S=dummy, C=US"
+          cp app/keystore app-wearos/keystore
+      - name: Install fork debug signing key
+        # Without this, every runner invents its own debug keystore and the resulting APKs
+        # cannot update one another -- Android refuses to install across signatures. Decoding a
+        # stable key from a secret means each CI build installs over the previous one.
+        # Optional: if the secret is absent (a fork of this fork, say) the build still works,
+        # it just falls back to the throwaway per-runner debug key.
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+          DEBUG_KEYSTORE_PASSWORD: ${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$DEBUG_KEYSTORE_BASE64" ]; then
+            echo "DEBUG_KEYSTORE_BASE64 not set - falling back to the per-runner debug key."
+            echo "APKs from this run will NOT install over one signed with the fork key."
+            exit 0
+          fi
+          echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > app/fork-debug.keystore
+          # gradle.properties, not local.properties: Gradle exposes the former as project
+          # properties, while nothing in this build reads the latter. Writing these to
+          # local.properties leaves project.hasProperty() false and the signing config
+          # silently unregistered, which is not visible until the APK fails to install.
+          {
+            echo "forkDebugStoreFile=fork-debug.keystore"
+            echo "forkDebugStorePassword=$DEBUG_KEYSTORE_PASSWORD"
+            echo "forkDebugKeyAlias=forkdebug"
+            echo "forkDebugKeyPassword=$DEBUG_KEYSTORE_PASSWORD"
+          } >> gradle.properties
+          echo "Fork debug signing key installed."
+      - name: Build
+        run: ./gradlew assemblePlayDebug
+      - name: Test
+        # testDebugUnitTest is the one that covers the library modules, which is where the
+        # Smart Queue tests live (storage/database/src/test).
+        run: ./gradlew testPlayDebugUnitTest testDebugUnitTest
+      - name: Verify APK signer
+        # Which key signed this APK decides whether it can update an existing install, and a
+        # wrong key is only discovered after an uninstall has already destroyed the database
+        # and downloads. Assert it here instead. The fingerprint is a public certificate
+        # digest, not a secret.
+        env:
+          EXPECTED: d4f2eaa35a361a9f9d26b426992f307e5f3ba975e36ce768201b10b704f5ecc8
+        run: |
+          APK=app/build/outputs/apk/play/debug/app-play-debug.apk
+          SIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)
+          ACTUAL=$("$SIGNER" verify --print-certs "$APK" \
+            | grep -ioE "SHA-256 digest: [0-9a-f]+" | head -1 | awk '{print $NF}')
+          echo "APK signer SHA-256: ${ACTUAL:-<none found>}"
+          if [ ! -f app/fork-debug.keystore ]; then
+            echo "No fork key was installed; this APK is signed with the throwaway per-runner"
+            echo "debug key and will NOT update an existing install."
+            exit 0
+          fi
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::APK is not signed with the fork debug key."
+            echo "  expected $EXPECTED"
+            echo "  actual   ${ACTUAL:-<none found>}"
+            exit 1
+          fi
+          echo "Signed with the fork debug key - installs over a previous fork-signed build."
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-play-debug
+          path: app/build/outputs/apk/play/debug/app-play-debug.apk
+          if-no-files-found: error
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: '**/build/reports/tests/'
+
+  static-analysis:
+    name: "Static Code Analysis"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Cache Gradle
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          # The commit is in the key so every run writes a fresh cache. actions/cache only saves
+          # on a miss, so a key that never varies is frozen after its first write and the build
+          # cache below could never accumulate anything. restore-keys then falls back to the
+          # closest earlier cache, so editing a build file no longer re-downloads every dependency.
+          key: gradle-${{ hashFiles('**/*.gradle*') }}-${{ github.sha }}
+          restore-keys: |
+            gradle-${{ hashFiles('**/*.gradle*') }}-
+            gradle-
+      - name: Configure Gradle
+        # Must be gradle.properties: Gradle does not read org.gradle.* from local.properties, which
+        # is an Android SDK file for sdk.dir and nothing in this build reads it at all. Writing the
+        # parallel flag there left it silently off -- the same trap that once dropped the signing
+        # config. Caching reuses task outputs between runs, so an edit in one module stops
+        # recompiling the other twenty-odd.
+        run: |
+          {
+            echo "org.gradle.parallel=true"
+            echo "org.gradle.caching=true"
+          } >> gradle.properties
+      - name: Checkstyle, Lint
+        # :app-wearos is excluded: this fork never touches the watch app, and linting it drags in
+        # compiling its Kotlin and running ktlint, which its lint task depends on. Everything else
+        # is still checked. Drop the exclusion if the fork ever starts changing the watch app.
+        run: ./gradlew checkstyle lint -x :app-wearos:lint
+      - name: Print full lint report
+        # Lint prints only the first failure to the console ("Lint found N errors. First
+        # failure:"), which turns fixing a batch into one CI round trip per error. Dump the
+        # full text report instead.
+        if: failure()
+        run: |
+          find . -name 'lint-results-*.txt' -not -path '*/node_modules/*' | while read -r f; do
+            echo "===== $f ====="
+            cat "$f"
+          done
+      - name: Generate readable error messages for GitHub
+        if: failure()
+        run: python .github/workflows/errorPrinter.py
