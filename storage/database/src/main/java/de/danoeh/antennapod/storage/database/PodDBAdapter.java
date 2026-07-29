@@ -55,7 +55,7 @@ public class PodDBAdapter {
 
     private static final String TAG = "PodDBAdapter";
     public static final String DATABASE_NAME = "Antennapod.db";
-    public static final int VERSION = 3110000;
+    public static final int VERSION = 3120000;
 
     /**
      * Maximum number of arguments for IN-operator.
@@ -88,6 +88,8 @@ public class PodDBAdapter {
     public static final String KEY_FEEDFILETYPE = "feedfile_type";
     public static final String KEY_COMPLETION_DATE = "completion_date";
     public static final String KEY_FEEDITEM = "feeditem";
+    public static final String KEY_QUEUE = "queue";
+    public static final String KEY_NAME = "name";
     public static final String KEY_PAYMENT_LINK = "payment_link";
     public static final String KEY_START = "start";
     public static final String KEY_LANGUAGE = "language";
@@ -136,8 +138,15 @@ public class PodDBAdapter {
     public static final String TABLE_NAME_FEED_MEDIA = "FeedMedia";
     public static final String TABLE_NAME_DOWNLOAD_LOG = "DownloadLog";
     public static final String TABLE_NAME_QUEUE = "Queue";
+    public static final String TABLE_NAME_QUEUES = "Queues";
     public static final String TABLE_NAME_SIMPLECHAPTERS = "SimpleChapters";
     public static final String TABLE_NAME_FAVORITES = "Favorites";
+
+    /**
+     * The queue every install starts with, and the one existing rows are migrated into. It always
+     * exists: deleting it is refused, so there is always somewhere for an episode to go.
+     */
+    public static final long QUEUE_ID_DEFAULT = 1;
 
     // SQL Statements for creating new tables
     private static final String TABLE_PRIMARY_KEY = KEY_ID
@@ -215,7 +224,16 @@ public class PodDBAdapter {
 
     private static final String CREATE_TABLE_QUEUE = "CREATE TABLE "
             + TABLE_NAME_QUEUE + "(" + KEY_ID + " INTEGER PRIMARY KEY,"
-            + KEY_FEEDITEM + " INTEGER," + KEY_FEED + " INTEGER)";
+            + KEY_FEEDITEM + " INTEGER," + KEY_FEED + " INTEGER,"
+            + KEY_QUEUE + " INTEGER DEFAULT " + QUEUE_ID_DEFAULT + ")";
+
+    private static final String CREATE_TABLE_QUEUES = "CREATE TABLE "
+            + TABLE_NAME_QUEUES + "(" + KEY_ID + " INTEGER PRIMARY KEY,"
+            + KEY_NAME + " TEXT)";
+
+    // Name is NULL so the UI can render the translated label
+    static final String INSERT_DEFAULT_QUEUE = "INSERT INTO " + TABLE_NAME_QUEUES
+            + " (" + KEY_ID + ", " + KEY_NAME + ") VALUES (" + QUEUE_ID_DEFAULT + ", NULL)";
 
     private static final String CREATE_TABLE_SIMPLECHAPTERS = "CREATE TABLE "
             + TABLE_NAME_SIMPLECHAPTERS + " (" + TABLE_PRIMARY_KEY + KEY_TITLE
@@ -260,6 +278,7 @@ public class PodDBAdapter {
             TABLE_NAME_FEED_MEDIA,
             TABLE_NAME_DOWNLOAD_LOG,
             TABLE_NAME_QUEUE,
+            TABLE_NAME_QUEUES,
             TABLE_NAME_SIMPLECHAPTERS,
             TABLE_NAME_FAVORITES
     };
@@ -440,6 +459,7 @@ public class PodDBAdapter {
             for (String tableName : ALL_TABLES) {
                 adapter.db.delete(tableName, "1", null);
             }
+            adapter.db.execSQL(INSERT_DEFAULT_QUEUE);
             return true;
         } finally {
             adapter.close();
@@ -1573,6 +1593,8 @@ public class PodDBAdapter {
             db.execSQL(CREATE_TABLE_FEED_MEDIA);
             db.execSQL(CREATE_TABLE_DOWNLOAD_LOG);
             db.execSQL(CREATE_TABLE_QUEUE);
+            db.execSQL(CREATE_TABLE_QUEUES);
+            db.execSQL(INSERT_DEFAULT_QUEUE);
             db.execSQL(CREATE_TABLE_SIMPLECHAPTERS);
             db.execSQL(CREATE_TABLE_FAVORITES);
 
