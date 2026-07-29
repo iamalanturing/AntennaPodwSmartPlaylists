@@ -34,10 +34,19 @@ not advertise, and they are why the widget counts the way it does.
 
 Read `FORK.md` first if the work touches a screen or an upstream merge.
 
-The APK for a green run is its `app-play-debug` artifact:
+The APK is the run's `app-play-debug` artifact:
 `https://github.com/iamalanturing/AntennaPodwSmartPlaylists/actions/runs/<run id>/artifacts/<artifact id>`
 — list them with the GitHub Actions tooling rather than guessing ids. Always give the user the
 link; they cannot build either.
+
+**Wait for the `Build and Unit Test` job, not the whole run.** The APK is uploaded about two
+minutes in; `Static Code Analysis` then runs for another two and a half and gates nothing — the two
+jobs are independent, and a run whose lint failed still has a perfectly good APK attached. Waiting
+for the run to finish before handing the link over doubled the user's wait for no benefit,
+repeatedly, before anyone noticed.
+
+So: give them the APK as soon as the build job is green, and report lint separately if it has
+anything to say.
 
 ## Upstream: follow `master`
 
