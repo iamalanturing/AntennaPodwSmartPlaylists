@@ -212,9 +212,10 @@ to the candidate list only when `UserPreferences.isEnableAutodownloadQueue()`. S
 downloading only the active queue would break the "fill my commute queue overnight" case that
 motivates the feature.
 
-**Item deletion already works across queues.** Deleting episodes cleans membership rows by
-`FeedItem` (`PodDBAdapter:941` and its `Queue` counterpart), which removes them from every queue
-regardless of the new column. No change.
+**~~Item deletion already works across queues.~~ Wrong — see the fifth pass below.** This section
+originally claimed deletion cleans membership rows by `FeedItem` at `PodDBAdapter:941` "and its
+`Queue` counterpart". Line 941 deletes from `Favorites`, and there is no `Queue` counterpart. The
+claim came from misreading a grep hit and is corrected below.
 
 **A refactor to deliberately not do.** `Favorites` is `(ID, FeedItem, Feed)` — the same shape as
 `Queue` — with its own parallel `setFavorites` / `addFavoriteItems` / `removeFavoriteItems`
@@ -235,7 +236,7 @@ three small edits and one non-edit:
 | Auto-download | one line — union read |
 | Next episode | one SQL predicate — follows the current episode's queue |
 | Android Auto, Wear | active queue |
-| Item deletion | **none** — already by `FeedItem` |
+| Item deletion | all-queues removal — **corrected in the fifth pass**, it is not free |
 | Enqueue position | **none** — already takes the queue as a parameter |
 | Queue screen | set preference, call `loadItems()` |
 
@@ -249,6 +250,50 @@ above `3110000`. No new membership table, no row migration, no new executor, no 
 **Still unstudied:** `QueueRecyclerAdapter` and `res/menu/queue.xml`, where a switcher control would
 live. That is UI placement rather than architecture, and is better settled with a maintainer than
 guessed at.
+
+## Fifth pass: hunting for holes rather than confirmation
+
+The first four passes each set out to check something and largely found it. This one set out to
+break the design, and did.
+
+**The deletion claim above was wrong.** Deleting episodes runs through
+`DBWriter.deleteFeedItemsSynchronous:213`, which does the same `DBReader.getQueue()` → mutate list
+→ `setQueue` dance as everything else. It is therefore fully exposed to scoping. Scoped to the
+active queue, deleting a feed's episodes would strand orphan rows in every other queue — exactly
+the bug the `3080000` migration had to patch for `Favorites`.
+
+**`removeQueueItem` has two callers with two different correct answers.** Eight production call
+sites:
+
+- *System-initiated, must clear **all** queues:* `DBWriter:113` (media file deleted),
+  `PlaybackService:1216` and `Media3PlaybackService:519` (episode ended), `SyncService:302`
+  (gpodder says removed remotely), `DownloadServiceInterfaceImpl:87` (download cancelled).
+- *User-initiated, the queue in front of them:* `RemoveFromQueueSwipeAction:53`.
+- *Ambiguous, but "all queues" reads better:* `FeedItemMenuHandler:201` and
+  `EpisodeMultiSelectActionHandler:88` — both fire from generic episode lists, where the user is
+  looking at an episode rather than at a position in a queue.
+
+Scope this to the active queue and deleted or finished episodes sit forever in the others. **This
+is the single biggest correctness trap in the feature**, and it is invisible from the schema.
+
+**`Queue.Feed` is a dead column.** Written by `setQueue`, declared in `CREATE TABLE`, never
+selected or filtered on by any query. Do not carry it into new code — and do not remove it either,
+which would be a migration for no benefit and precisely the scope creep that got #8066 cut.
+
+### The framing this forces
+
+Not "add `WHERE queue = ?` to the reads" but **two operation classes**:
+
+- **Class A, "remove this episode from everywhere."** System-initiated. A direct
+  `DELETE FROM Queue WHERE FeedItem IN (...)`, still posting `QueueEvent.removed` per item. This is
+  *simpler* than the read-mutate-write it replaces and is correct for any number of queues by
+  construction.
+- **Class B, "edit this queue."** User-initiated — add, reorder, move, swipe-remove, clear. Keeps
+  read-mutate-write, with the queue id threaded through.
+
+Everything else from passes two to four survives unchanged. The lesson worth keeping: four passes
+of reading confirmed a storage design that was basically right, and one pass of trying to break it
+found the thing that would actually have shipped a bug.
 
 ## Constraints on doing this at all
 
