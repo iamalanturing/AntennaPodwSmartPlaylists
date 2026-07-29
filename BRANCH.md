@@ -53,7 +53,14 @@ There is no local Gradle build — the container's proxy blocks `dl.google.com` 
 scaffolding and **must be dropped before any upstream PR**. They are kept in commits labelled as
 such so `git rebase --onto` can remove them without touching the real work.
 
-Upstream's own gate, wider than the fork CI, before any PR:
+`fork-checks.yml` is a faithful mirror of upstream's `checks.yml` — same five jobs, same steps,
+same three-variant unit-test matrix, same emulator tests on API 23/30/36. A failure here is a
+failure upstream would also have seen. It diverges only in its triggers (a fork branch matches
+neither of upstream's), in writing the Gradle speed flags to `gradle.properties` where they
+actually take effect rather than to `local.properties` where upstream's have no effect, and in two
+additive `if: failure()` debugging aids.
+
+Upstream's documented gate before any PR, which `checks.yml` itself does not run in full:
 `./gradlew checkstyle lint spotbugsPlayDebug spotbugsDebug`
 
 ## Where this stands (29 Jul 2026)
@@ -63,14 +70,23 @@ Schema only. `Queues` table, `Queue.queue` column, migration `3110000` → `3120
 still clears every row across all queues and `getQueueCursor` still ignores the column. Multi-queue
 is not functional until the read/write scoping and the remove-path split land.
 
-**CI is red and the cause is not yet known.** Runs
+**The red CI was a phantom, and it is resolved.** On runs
 [30466315328](https://github.com/iamalanturing/AntennaPodwSmartPlaylists/actions/runs/30466315328)
 and
 [30466643609](https://github.com/iamalanturing/AntennaPodwSmartPlaylists/actions/runs/30466643609)
-both failed. The first is the **baseline** — unmodified upstream `develop` plus this workflow — so
-the failure is **not** caused by the schema change. Its `Build` step passed (4m13s); the failure is
-in `Test` or `Static Code Analysis`. Find out which before writing more code: if upstream `develop`
-is simply red right now, that is worth knowing before chasing a phantom.
+`Build`, `Test` and `Static Code Analysis` all **passed**. The only failing step was `Verify APK
+signer`, which was fork-only scaffolding, not code. Its signing config never existed on this
+branch — it lives on the Smart Playlists branch, so the properties were written and never read, the
+APK was signed with the runner's throwaway debug key, and the assertion compared it against a stale
+fingerprint. Both that step and the key-install step have been removed.
+
+It was not merely cosmetic: `actions/cache` declares `post-if: success()`, so a failing job never
+saves its cache. `Post Cache Gradle` was skipped on every `build-and-test` run while the passing
+static-analysis job saved normally, meaning the heaviest job re-downloaded its dependencies and
+reused no task outputs every single time.
+
+Note the old workflow only triggered on `multiple-queues*`, so the current branch had never run CI
+at all. The trigger now covers `claude/**` too.
 
 Next, in order: scope the queue reads/writes by queue id; split remove-from-queue into all-queues
 (system-initiated) versus this-queue (the queue screen swipe) — that split is the biggest
