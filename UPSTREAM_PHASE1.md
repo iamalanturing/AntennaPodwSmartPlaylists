@@ -159,14 +159,49 @@ Provisional answers worth proposing, all chosen to minimise behaviour change for
 playback follows the queue containing the current episode, falling back to the active queue;
 auto-download and cleanup use the union of all queues; Android Auto shows the active queue.
 
+## Third pass: the category B question is cheaper to answer than it looked
+
+**"Next episode" already resolves relative to the current episode's row**, not to any global notion
+of the queue. `PodDBAdapter.getNextInQueue` is:
+
+```sql
+WHERE Queue.ID > (SELECT Queue.ID FROM Queue WHERE Queue.FeedItem = <id>) ORDER BY Queue.ID LIMIT 1
+```
+
+Add the column and the natural extension is one more predicate —
+`AND Queue.queue = (SELECT queue FROM Queue WHERE FeedItem = <id>)` — at which point **playback
+follows the queue containing the episode being played**, with no new concept and no new state. The
+answer that seemed most sensible is also the cheapest, which is the good case.
+
+The one genuine ambiguity: an episode in several queues makes that subquery return several rows.
+Resolve it deterministically — prefer the active queue when the item is in it, otherwise the lowest
+queue id — and say so in the PR rather than letting SQLite pick.
+
+**Correcting a guess from the second pass.** I suggested `UserPreferences.isFollowQueue()` at
+`PlaybackService:1099` might be the hook for this decision. It is not. It is the global
+continuous-playback toggle — whether to advance at all — and is orthogonal to which queue supplies
+the next episode. No help here.
+
+**`QueueFragment` is already shaped for what ByteHamster asked for.** The entire screen loads
+through one `loadItems()` (line 525) that calls `DBReader.getQueue()`, and roughly eight
+`@Subscribe` handlers do nothing but call it again. So "change what is shown in the same fragment
+and remember it for next time" is: set the active-queue preference, call `loadItems()`. No fragment
+stack, no navigation work, no ViewModel. The requirement that sank #8070's UX is close to free.
+
+**Ruled out: `SynchronizationQueue`** in `:net:sync` is the gpodder sync-*event* queue
+(`enqueueEpisodeAction`, `enqueueFeedAdded`, `sync()`). Pure name collision. Ignore it.
+
+**Still a category B consumer: `WearListenerService`** (`app/src/play`, line 105) answers
+`WearDataPaths.QUEUE` with `DBReader.getQueue()` and ships it to the watch. Active queue is the
+obvious answer. Note it is play-flavour only, so a free-flavour build will not catch a break here.
+
 ## Still to study
 
-- `QueueFragment` and `QueueRecyclerAdapter` — how the list loads and what a queue switch redraws.
-- `PlaybackService.getNextInQueue:1069` in full, including the "follow queue" preference at line
-  1099, which may already provide the hook for the category B decision.
-- Whether `SynchronizationQueue*` in `:net:sync` is the episode queue or the sync-event queue —
-  the name collides and it appeared in the first grep. Almost certainly unrelated; confirm.
-- `WearListenerService` (play flavour) — appeared in the queue grep and is easy to forget.
+- `QueueRecyclerAdapter` and `queue.xml` menu — where a queue switcher control would live.
+- `APQueueCleanupAlgorithm` in full, to confirm union-of-queues is right for cleanup.
+- `AutomaticDownloadAlgorithm:66` in full, same question for downloads.
+- The `Favorites` table, which has the identical `(ID, FeedItem, Feed)` shape — worth checking
+  whether a shared helper already exists before writing a second one.
 
 ## Constraints on doing this at all
 
