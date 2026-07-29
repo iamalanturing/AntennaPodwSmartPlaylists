@@ -91,18 +91,82 @@ replacing it:
 The attraction is the blast radius: no new membership table, no data migration, no change to the
 ordering mechanism, and one untouched query that would otherwise need rethinking.
 
-**This is a hypothesis, not a verdict.** It has not been compiled or tested, and the UI side is not
-yet studied. Check it against `QueueFragment`, `ItemEnqueuePositionCalculator`, and the swipe
-actions before committing to it.
+**This is a hypothesis, not a verdict.** It has not been compiled or tested. The storage side of it
+survived the second pass below; the semantic side did not come through as cleanly.
+
+## Second pass: what the write path and callers actually look like
+
+**`ItemEnqueuePositionCalculator` needs no changes at all.** It already takes the queue as a
+parameter — `calcPosition(@NonNull List<FeedItem> curQueue, @Nullable Playable currentPlaying)` —
+and its javadoc already says "inserted to the **named** queue". Whoever wrote it left the door
+open.
+
+One behavioural wrinkle: with `AFTER_CURRENTLY_PLAYING`, `getCurrentlyPlayingPosition` returns `-1`
+when the playing episode is not in the target queue, so the insert lands at the front rather than
+after anything. Adding to a queue you are not currently playing therefore silently means "add to
+front". Defensible, but it is a behaviour change and a reviewer will ask.
+
+**The write path is already whole-queue rewrite.** `DBWriter.addQueueItem` (line 378) reads
+`DBReader.getQueue()`, mutates the `List<FeedItem>`, then calls `adapter.setQueue(queue)` to
+rewrite the table. Every other queue mutation follows the same read-mutate-write shape. So scoping
+writes to one queue is a *parameter*, not a redesign — which is the strongest evidence yet for
+extending the existing table rather than replacing it.
+
+**Keep-sorted is global.** `applySortOrder` consults `UserPreferences.isQueueKeepSorted()` and a
+single stored `SortOrder`. With per-queue sort out of scope, every queue shares one keep-sorted
+setting. That is a real user-visible consequence of the agreed scope and should be stated in the PR
+rather than discovered in review.
+
+**`UserPreferences` idiom** for the active queue: a `public static final String PREF_*` constant
+plus static getter/setter over `prefs`, exactly as `PREF_ENQUEUE_LOCATION` does at line 99/380.
+
+### The actual difficulty is `DBReader.getQueue()`, not the schema
+
+21 production call sites, and they do **not** all mean the same thing. They split in two, and the
+split is the whole design problem:
+
+**A — "the queue the user is looking at or editing."** Becomes the active queue, or takes an
+explicit id. Mechanical.
+`QueueFragment:535`, `RemoveFromQueueSwipeAction:44`, `NavDrawerFragment:322` (badge count),
+and seven call sites inside `DBWriter` (add, remove, move, reorder).
+
+**B — "the queue playback follows," and background algorithms.** Genuinely ambiguous once more
+than one queue exists, and no amount of careful coding decides it for you:
+`PlaybackService:371, 480, 1087`, `PlaybackService.getNextInQueue:1069`,
+`Media3PlaybackService:639`, `LocalPSMP:714`, `CastPsmp`,
+`MediaLibrarySessionCallback:441` (the Android Auto "Queue" browse node),
+`AutomaticDownloadAlgorithm:66`.
+
+The questions category B forces, none of which appear in either previous PR's discussion:
+
+- When an episode finishes, which queue supplies the next one? The active queue, or the queue the
+  finished episode belonged to? An episode can be in several.
+- Does auto-download consider the active queue, or the union of all queues? Downloading only the
+  active one silently breaks the "prepare my commute queue overnight" use case that motivates the
+  feature in the first place.
+- Android Auto exposes one `MEDIA_ID_QUEUE` node. Does it show the active queue, or gain a level?
+- `APQueueCleanupAlgorithm` decides what may be deleted based on queue membership. Union is almost
+  certainly right, or episodes in a non-active queue become eligible for cleanup.
+
+**Revising the earlier optimism.** The storage change really is small — smaller than either prior
+attempt. But "small diff" and "small feature" are not the same thing, and the paragraph above is
+where a phase 1 PR would actually get stuck. The honest read is that category B needs an explicit,
+stated decision *in the issue* before code, not a choice quietly baked into an implementation.
+That is also the strongest argument for commenting on #2648 first: these are exactly the questions
+a maintainer should answer, and getting them wrong silently is how a PR earns twenty review rounds.
+
+Provisional answers worth proposing, all chosen to minimise behaviour change for single-queue users:
+playback follows the queue containing the current episode, falling back to the active queue;
+auto-download and cleanup use the union of all queues; Android Auto shows the active queue.
 
 ## Still to study
 
-- `QueueFragment` and `QueueRecyclerAdapter` — how the list loads and what a queue switch must
-  redraw.
-- `ItemEnqueuePositionCalculator` — enqueue position rules, which are preference-driven.
-- `UserPreferences` — the idiom for a new persisted value.
-- Where `getNextInQueue` is consumed by playback, and what "next" means once a queue can be empty.
-- `APQueueCleanupAlgorithm` and the auto-download paths that assume one queue.
+- `QueueFragment` and `QueueRecyclerAdapter` — how the list loads and what a queue switch redraws.
+- `PlaybackService.getNextInQueue:1069` in full, including the "follow queue" preference at line
+  1099, which may already provide the hook for the category B decision.
+- Whether `SynchronizationQueue*` in `:net:sync` is the episode queue or the sync-event queue —
+  the name collides and it appeared in the first grep. Almost certainly unrelated; confirm.
+- `WearListenerService` (play flavour) — appeared in the queue grep and is easy to forget.
 
 ## Constraints on doing this at all
 
