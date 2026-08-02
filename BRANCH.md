@@ -76,9 +76,15 @@ and
 [30466643609](https://github.com/iamalanturing/AntennaPodwSmartPlaylists/actions/runs/30466643609)
 `Build`, `Test` and `Static Code Analysis` all **passed**. The only failing step was `Verify APK
 signer`, which was fork-only scaffolding, not code. Its signing config never existed on this
-branch — it lives on the Smart Playlists branch, so the properties were written and never read, the
-APK was signed with the runner's throwaway debug key, and the assertion compared it against a stale
-fingerprint. Both that step and the key-install step have been removed.
+branch, so the properties were written and never read, the APK was signed with the runner's
+throwaway debug key, and the assertion compared it against a stale fingerprint.
+
+That is now fixed properly rather than by deletion. `app/fork-debug.keystore` is committed and wired
+up as the `forkDebug` signing config, so every build of this branch installs over the last one
+instead of forcing an uninstall that would destroy the database. Its password is
+`sha256("multiple-queues")` — reproducible, not secret, because a debug key grants no trust. The
+keystore, the `signingConfig`, the `.gitignore` exception and the verify step are all fork-only and
+must be dropped with `fork-checks.yml`.
 
 It was not merely cosmetic: `actions/cache` declares `post-if: success()`, so a failing job never
 saves its cache. `Post Cache Gradle` was skipped on every `build-and-test` run while the passing

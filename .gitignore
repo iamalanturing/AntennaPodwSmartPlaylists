@@ -26,6 +26,9 @@ libs
 *.DS_Store
 gradle.properties
 *.keystore
+# Fork-only. NOT FOR UPSTREAM - drop with the rest of the fork scaffolding.
+# A committed debug key so builds of this branch install over one another. Grants no trust.
+!app/fork-debug.keystore
 *.p12
 .vscode
 .cursor

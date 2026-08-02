@@ -26,12 +26,12 @@
 #      it is frozen and task outputs never accumulate. The commit is in the key here and
 #      restore-keys falls back to the closest earlier cache.
 #
-# What is NOT here, deliberately: the fork debug signing key and the APK signer assertion that used
-# to live in this file. Both were inert on this branch and could only ever fail. The signingConfig
-# they depend on lives on the Smart Playlists branch; this branch is clean upstream develop, whose
-# app/build.gradle has no forkDebug* config, so the properties were written and never read, the APK
-# was signed with the runner's throwaway debug key, and the assertion compared it against a stale
-# fingerprint and failed every run. Restore them only alongside the build.gradle change.
+# The APK signer assertion below pairs with the forkDebug signingConfig in app/build.gradle, which
+# is fork-only scaffolding too and must be dropped with this file. Without it every runner invents
+# its own debug key, so consecutive builds of this branch cannot install over one another and
+# testing means uninstalling first, which destroys the database the migration needs to be tested
+# against. An earlier version of this file drove the key from a repository secret; the key is now
+# committed, because a debug key grants no trust and a secret bought nothing but a way to fail.
 name: Fork Checks
 
 on:
@@ -171,6 +171,27 @@ jobs:
       - name: Test
         if: matrix.execute-tests == true
         run: ./gradlew test${{ matrix.variant }}UnitTest test${{ matrix.base-variant }}UnitTest
+      - name: Verify APK signer
+        # Which key signed this APK decides whether it can update an existing install, and a wrong
+        # key is only discovered after an uninstall has already destroyed the database and
+        # downloads. Assert it here instead. The fingerprint is a public certificate digest of a
+        # debug key, not a secret.
+        if: matrix.upload-artifact == true
+        env:
+          EXPECTED: 326da8de774254e67ed68479071d7b095b966c5845e33ca5288dc98cfbe18eae
+        run: |
+          APK=app/build/outputs/apk/play/debug/app-play-debug.apk
+          SIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)
+          ACTUAL=$("$SIGNER" verify --print-certs "$APK" \
+            | grep -ioE "SHA-256 digest: [0-9a-f]+" | head -1 | awk '{print $NF}')
+          echo "APK signer SHA-256: ${ACTUAL:-<none found>}"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::APK is not signed with the fork debug key."
+            echo "  expected $EXPECTED"
+            echo "  actual   ${ACTUAL:-<none found>}"
+            exit 1
+          fi
+          echo "Signed with the fork debug key - installs over a previous fork-signed build."
       - uses: actions/upload-artifact@v4
         if: matrix.upload-artifact == true
         with:

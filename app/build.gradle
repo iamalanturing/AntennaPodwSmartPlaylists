@@ -25,12 +25,26 @@ android {
             keyAlias project.getProperties().getOrDefault("releaseKeyAlias", "alias")
             keyPassword project.getProperties().getOrDefault("releaseKeyPassword", "password")
         }
+        // Fork-only. NOT FOR UPSTREAM - drop with the rest of the fork scaffolding.
+        // A stable debug key so successive builds of this branch install over one another instead
+        // of each runner inventing its own. The password is sha256("multiple-queues"), which is
+        // reproducible rather than secret: a debug key grants no trust, exactly like the stock
+        // Android one whose password is "android".
+        forkDebug {
+            enableV1Signing true
+            enableV2Signing true
+            storeFile file("fork-debug.keystore")
+            storePassword "03cb1126c7ebb473113a434e8a33c109d99c70110e730bb655c6c782a1826487"
+            keyAlias "multiple-queues"
+            keyPassword "03cb1126c7ebb473113a434e8a33c109d99c70110e730bb655c6c782a1826487"
+        }
     }
 
     buildTypes {
         debug {
             applicationIdSuffix ".debug"
             resValue "string", "provider_authority", "de.danoeh.antennapod.debug.provider"
+            signingConfig signingConfigs.forkDebug
         }
         release {
             resValue "string", "provider_authority", "de.danoeh.antennapod.provider"
