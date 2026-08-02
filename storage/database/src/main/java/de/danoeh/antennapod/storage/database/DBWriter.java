@@ -29,6 +29,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -39,6 +40,7 @@ import de.danoeh.antennapod.event.FeedItemEvent;
 import de.danoeh.antennapod.event.FeedListUpdateEvent;
 import de.danoeh.antennapod.event.playback.PlaybackHistoryEvent;
 import de.danoeh.antennapod.event.QueueEvent;
+import de.danoeh.antennapod.event.QueuesChangedEvent;
 import de.danoeh.antennapod.event.FeedEvent;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
@@ -526,6 +528,44 @@ public class DBWriter {
         if (performAutoDownload) {
             AutoDownloadManager.getInstance().autodownloadUndownloadedItems(context);
         }
+    }
+
+    public static Future<Long> createQueue(final String name) {
+        return callOnDbThread(() -> {
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            long queueId = adapter.createQueue(name);
+            adapter.close();
+            EventBus.getDefault().post(new QueuesChangedEvent());
+            return queueId;
+        });
+    }
+
+    public static Future<?> renameQueue(final long queueId, final String name) {
+        return runOnDbThread(() -> {
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            adapter.renameQueue(queueId, name);
+            adapter.close();
+            EventBus.getDefault().post(new QueuesChangedEvent());
+        });
+    }
+
+    public static Future<?> deleteQueue(final long queueId) {
+        return runOnDbThread(() -> {
+            if (queueId == PodDBAdapter.QUEUE_ID_DEFAULT) {
+                Log.w(TAG, "Refusing to delete the default queue");
+                return;
+            }
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            adapter.deleteQueue(queueId);
+            adapter.close();
+            if (DBReader.getActiveQueue() == queueId) {
+                UserPreferences.setActiveQueue(PodDBAdapter.QUEUE_ID_DEFAULT);
+            }
+            EventBus.getDefault().post(new QueuesChangedEvent());
+        });
     }
 
     public static Future<?> removeFromQueue(final Context context, final long queueId,
@@ -1021,6 +1061,18 @@ public class DBWriter {
      * Submit to the DB thread only if caller is not already on the DB thread. Otherwise,
      * just execute synchronously
      */
+    private static <T> Future<T> callOnDbThread(Callable<T> callable) {
+        if ("DatabaseExecutor".equals(Thread.currentThread().getName())) {
+            try {
+                return Futures.immediateFuture(callable.call());
+            } catch (Exception e) {
+                return Futures.immediateFailedFuture(e);
+            }
+        } else {
+            return dbExec.submit(callable);
+        }
+    }
+
     private static Future<?> runOnDbThread(Runnable runnable) {
         if ("DatabaseExecutor".equals(Thread.currentThread().getName())) {
             runnable.run();

@@ -944,6 +944,36 @@ public class PodDBAdapter {
         }
     }
 
+    public Cursor getQueuesCursor() {
+        return db.query(TABLE_NAME_QUEUES, new String[]{KEY_ID, KEY_NAME},
+                null, null, null, null, KEY_ID + " ASC", null);
+    }
+
+    public long createQueue(String name) {
+        ContentValues values = new ContentValues();
+        values.put(KEY_NAME, name);
+        return db.insert(TABLE_NAME_QUEUES, null, values);
+    }
+
+    public void renameQueue(long queueId, String name) {
+        ContentValues values = new ContentValues();
+        values.put(KEY_NAME, name);
+        db.update(TABLE_NAME_QUEUES, values, KEY_ID + "=?", new String[]{String.valueOf(queueId)});
+    }
+
+    public void deleteQueue(long queueId) {
+        try {
+            db.beginTransactionNonExclusive();
+            db.delete(TABLE_NAME_QUEUE, KEY_QUEUE + "=?", new String[]{String.valueOf(queueId)});
+            db.delete(TABLE_NAME_QUEUES, KEY_ID + "=?", new String[]{String.valueOf(queueId)});
+            db.setTransactionSuccessful();
+        } catch (SQLException e) {
+            Log.e(TAG, Log.getStackTraceString(e));
+        } finally {
+            db.endTransaction();
+        }
+    }
+
     public void removeQueueItems(long... itemIds) {
         if (itemIds.length == 0) {
             return;

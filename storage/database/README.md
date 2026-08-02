@@ -36,6 +36,12 @@ queues.
 - `DBWriter.removeFromQueue(context, queueId, ...)` — **user-initiated, edits one queue.** The
   swipe on the queue screen. Keeps the read-mutate-write shape with the queue id threaded through.
 
+Queue CRUD is `DBWriter.createQueue/renameQueue/deleteQueue`, with `DBReader.getQueues()` listing
+them. The default queue has a `NULL` name so the UI can render a translated label, and `deleteQueue`
+refuses to delete it — every episode must have somewhere to go. Deleting a queue drops its
+membership rows, so its episodes end up in no queue at all and become eligible for auto-delete;
+warn before doing it. If the deleted queue was active, the preference falls back to the default.
+
 `DBReader.getAllQueuedItemIds()` is the union across queues, for callers that must treat "queued"
 as "queued anywhere" — deletion, cleanup, auto-download — rather than `getQueueIDList()`, which
 only sees the active queue.
