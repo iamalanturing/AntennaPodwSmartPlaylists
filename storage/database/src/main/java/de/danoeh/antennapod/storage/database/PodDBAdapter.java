@@ -1345,8 +1345,8 @@ public class PodDBAdapter {
     }
 
     public int getQueueSize(long queueId) {
-        final String query = String.format("SELECT COUNT(%s) FROM %s WHERE %s = %d",
-                KEY_ID, TABLE_NAME_QUEUE, KEY_QUEUE, queueId);
+        final String query = "SELECT COUNT(" + KEY_ID + ") FROM " + TABLE_NAME_QUEUE
+                + " WHERE " + KEY_QUEUE + " = " + queueId;
         try (Cursor c = db.rawQuery(query, null)) {
             if (c.moveToFirst()) {
                 return c.getInt(0);
