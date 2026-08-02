@@ -191,7 +191,7 @@ public class UITestUtils {
         PodDBAdapter adapter = PodDBAdapter.getInstance();
         adapter.open();
         adapter.setCompleteFeed(hostedFeeds.toArray(new Feed[0]));
-        adapter.setQueue(queue);
+        adapter.setQueue(PodDBAdapter.QUEUE_ID_DEFAULT, queue);
         adapter.close();
         EventBus.getDefault().post(new FeedListUpdateEvent(hostedFeeds));
         EventBus.getDefault().post(QueueEvent.setQueue(queue));

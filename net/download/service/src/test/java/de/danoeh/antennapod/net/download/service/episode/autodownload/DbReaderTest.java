@@ -187,7 +187,7 @@ public class DbReaderTest {
             }
             PodDBAdapter adapter = PodDBAdapter.getInstance();
             adapter.open();
-            adapter.setQueue(queue);
+            adapter.setQueue(PodDBAdapter.QUEUE_ID_DEFAULT, queue);
             adapter.close();
             return queue;
         }
@@ -368,7 +368,7 @@ public class DbReaderTest {
                 FeedItem item = feeds.get(1).getItems().get(i);
                 queue.add(item);
             }
-            adapter.setQueue(queue);
+            adapter.setQueue(PodDBAdapter.QUEUE_ID_DEFAULT, queue);
 
             adapter.close();
 

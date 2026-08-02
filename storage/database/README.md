@@ -14,6 +14,13 @@ and `QUEUE_ID_DEFAULT` always exists.
 means "in any queue". Auto-delete relies on this to protect episodes sitting in a queue the user is
 not currently viewing, so scoping it would silently make them eligible for deletion.
 
+`DBReader.getQueue()` and friends operate on the **active queue** — `UserPreferences.getActiveQueue()`,
+falling back to `QUEUE_ID_DEFAULT` until the user first switches. Pass an explicit id to the
+`getQueue(long)` overloads when a caller means a specific queue rather than whichever one the user is
+looking at. `setQueue` rewrites one queue's rows and appends them above the current `MAX(Queue.ID)`,
+since that column is the position and is shared across queues; the gaps this leaves are harmless
+because order only ever has to hold within a queue.
+
 An episode belongs to **exactly one queue**. A unique index on `Queue.feeditem` enforces it, so
 adding an episode to another queue moves it rather than copying it. This is what keeps "which queue
 is this episode in" a question with one answer, and it is why looking up the queue of an episode

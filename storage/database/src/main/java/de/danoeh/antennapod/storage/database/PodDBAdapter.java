@@ -913,16 +913,18 @@ public class PodDBAdapter {
                 + " WHERE " + KEY_FEEDITEM + " IN (" + getItemIds(items) + ")");
     }
 
-    public void setQueue(List<FeedItem> queue) {
+    public void setQueue(long queueId, List<FeedItem> queue) {
         ContentValues values = new ContentValues();
         try {
             db.beginTransactionNonExclusive();
-            db.delete(TABLE_NAME_QUEUE, null, null);
+            db.delete(TABLE_NAME_QUEUE, KEY_QUEUE + "=?", new String[]{String.valueOf(queueId)});
+            long position = getHighestQueuePosition() + 1;
             for (int i = 0; i < queue.size(); i++) {
                 FeedItem item = queue.get(i);
-                values.put(KEY_ID, i);
+                values.put(KEY_ID, position + i);
                 values.put(KEY_FEEDITEM, item.getId());
                 values.put(KEY_FEED, item.getFeed().getId());
+                values.put(KEY_QUEUE, queueId);
                 db.insertWithOnConflict(TABLE_NAME_QUEUE, null, values, SQLiteDatabase.CONFLICT_REPLACE);
             }
             db.setTransactionSuccessful();
@@ -933,8 +935,17 @@ public class PodDBAdapter {
         }
     }
 
-    public void clearQueue() {
-        db.delete(TABLE_NAME_QUEUE, null, null);
+    private long getHighestQueuePosition() {
+        try (Cursor cursor = db.rawQuery("SELECT MAX(" + KEY_ID + ") FROM " + TABLE_NAME_QUEUE, null)) {
+            if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                return cursor.getLong(0);
+            }
+            return -1;
+        }
+    }
+
+    public void clearQueue(long queueId) {
+        db.delete(TABLE_NAME_QUEUE, KEY_QUEUE + "=?", new String[]{String.valueOf(queueId)});
     }
 
     /**
@@ -1081,18 +1092,20 @@ public class PodDBAdapter {
      * cursor uses the FEEDITEM_SEL_FI_SMALL selection.
      * cursor uses the FEEDITEM_SEL_FI_SMALL selection.
      */
-    public final Cursor getQueueCursor() {
+    public final Cursor getQueueCursor(long queueId) {
         final String query = "SELECT " + KEYS_FEED_ITEM_WITHOUT_DESCRIPTION + ", " + KEYS_FEED_MEDIA
                 + " FROM " + TABLE_NAME_QUEUE
                 + " INNER JOIN " + TABLE_NAME_FEED_ITEMS
                 + " ON " + SELECT_KEY_ITEM_ID + " = " + TABLE_NAME_QUEUE + "." + KEY_FEEDITEM
                 +  JOIN_FEED_ITEM_AND_MEDIA
+                + " WHERE " + TABLE_NAME_QUEUE + "." + KEY_QUEUE + " = " + queueId
                 + " ORDER BY " + TABLE_NAME_QUEUE + "." + KEY_ID;
         return db.rawQuery(query, null);
     }
 
-    public Cursor getQueueIDCursor() {
-        return db.query(TABLE_NAME_QUEUE, new String[]{KEY_FEEDITEM}, null, null, null, null, KEY_ID + " ASC", null);
+    public Cursor getQueueIDCursor(long queueId) {
+        return db.query(TABLE_NAME_QUEUE, new String[]{KEY_FEEDITEM}, KEY_QUEUE + "=?",
+                new String[]{String.valueOf(queueId)}, null, null, KEY_ID + " ASC", null);
     }
 
     public Cursor getNextInQueue(final FeedItem item) {
@@ -1101,7 +1114,10 @@ public class PodDBAdapter {
                 + " INNER JOIN " + TABLE_NAME_FEED_ITEMS
                 + " ON " + SELECT_KEY_ITEM_ID + " = " + TABLE_NAME_QUEUE + "." + KEY_FEEDITEM
                 +  JOIN_FEED_ITEM_AND_MEDIA
-                + " WHERE Queue.ID > (SELECT Queue.ID FROM Queue WHERE Queue.FeedItem = "
+                + " WHERE Queue.queue = (SELECT Queue.queue FROM Queue WHERE Queue.FeedItem = "
+                +  item.getId()
+                + ")"
+                + " AND Queue.ID > (SELECT Queue.ID FROM Queue WHERE Queue.FeedItem = "
                 +  item.getId()
                 + ")"
                 + " ORDER BY Queue.ID"
@@ -1109,7 +1125,7 @@ public class PodDBAdapter {
         return db.rawQuery(query, null);
     }
 
-    public final Cursor getPausedQueueCursor(int limit) {
+    public final Cursor getPausedQueueCursor(int limit, long queueId) {
         final String hasPositionOrRecentlyPlayed = TABLE_NAME_FEED_MEDIA + "."  + KEY_POSITION + " >= 1000"
                 + " OR " + TABLE_NAME_FEED_MEDIA + "." + KEY_LAST_PLAYED_TIME_STATISTICS
                 + " >= " + (System.currentTimeMillis() - 30000);
@@ -1118,6 +1134,7 @@ public class PodDBAdapter {
                 + " INNER JOIN " + TABLE_NAME_FEED_ITEMS
                 + " ON " + SELECT_KEY_ITEM_ID + " = " + TABLE_NAME_QUEUE + "." + KEY_FEEDITEM
                 +  JOIN_FEED_ITEM_AND_MEDIA
+                + " WHERE " + TABLE_NAME_QUEUE + "." + KEY_QUEUE + " = " + queueId
                 + " ORDER BY (CASE WHEN " + hasPositionOrRecentlyPlayed + " THEN "
                     + TABLE_NAME_FEED_MEDIA + "." + KEY_LAST_PLAYED_TIME_STATISTICS + " ELSE 0 END) DESC , "
                 + TABLE_NAME_QUEUE + "." + KEY_ID
@@ -1327,8 +1344,9 @@ public class PodDBAdapter {
         return db.rawQuery(query, null);
     }
 
-    public int getQueueSize() {
-        final String query = String.format("SELECT COUNT(%s) FROM %s", KEY_ID, TABLE_NAME_QUEUE);
+    public int getQueueSize(long queueId) {
+        final String query = String.format("SELECT COUNT(%s) FROM %s WHERE %s = %d",
+                KEY_ID, TABLE_NAME_QUEUE, KEY_QUEUE, queueId);
         try (Cursor c = db.rawQuery(query, null)) {
             if (c.moveToFirst()) {
                 return c.getInt(0);
