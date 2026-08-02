@@ -944,6 +944,24 @@ public class PodDBAdapter {
         }
     }
 
+    public void removeQueueItems(long... itemIds) {
+        if (itemIds.length == 0) {
+            return;
+        }
+        StringBuilder ids = new StringBuilder();
+        for (long itemId : itemIds) {
+            if (ids.length() != 0) {
+                ids.append(",");
+            }
+            ids.append(itemId);
+        }
+        db.execSQL("DELETE FROM " + TABLE_NAME_QUEUE + " WHERE " + KEY_FEEDITEM + " IN (" + ids + ")");
+    }
+
+    public Cursor getAllQueuedItemIdsCursor() {
+        return db.query(TABLE_NAME_QUEUE, new String[]{KEY_FEEDITEM}, null, null, null, null, null, null);
+    }
+
     public void clearQueue(long queueId) {
         db.delete(TABLE_NAME_QUEUE, KEY_QUEUE + "=?", new String[]{String.valueOf(queueId)});
     }

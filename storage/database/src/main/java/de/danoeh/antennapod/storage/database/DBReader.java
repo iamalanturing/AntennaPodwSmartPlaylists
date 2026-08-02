@@ -165,6 +165,20 @@ public final class DBReader {
         return getQueueIDList(getActiveQueue());
     }
 
+    public static synchronized LongList getAllQueuedItemIds() {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (Cursor cursor = adapter.getAllQueuedItemIdsCursor()) {
+            LongList queueIds = new LongList(cursor.getCount());
+            while (cursor.moveToNext()) {
+                queueIds.add(cursor.getLong(0));
+            }
+            return queueIds;
+        } finally {
+            adapter.close();
+        }
+    }
+
     public static long getActiveQueue() {
         long queueId = UserPreferences.getActiveQueue();
         return queueId == UserPreferences.QUEUE_UNSET ? PodDBAdapter.QUEUE_ID_DEFAULT : queueId;

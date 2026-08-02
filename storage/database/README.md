@@ -26,9 +26,19 @@ adding an episode to another queue moves it rather than copying it. This is what
 is this episode in" a question with one answer, and it is why looking up the queue of an episode
 never needs a tie-break rule.
 
-Removing an episode splits in two. System-initiated removals — the file was deleted, playback
-ended, sync said so — must clear the episode from *every* queue. Only a user acting on the queue
-screen removes it from one.
+Removing an episode splits in two, and picking the wrong one is the easiest way to corrupt a user's
+queues.
+
+- `DBWriter.removeQueueItem(...)` — **system-initiated, clears every queue.** The file was deleted,
+  playback ended, sync said so, a download was cancelled. It deletes rows directly rather than
+  rewriting a queue, so it is correct for any number of queues by construction. Membership is
+  tested with `FeedItem.TAG_QUEUE`, which means "queued anywhere" because `is_in_queue` is unscoped.
+- `DBWriter.removeFromQueue(context, queueId, ...)` — **user-initiated, edits one queue.** The
+  swipe on the queue screen. Keeps the read-mutate-write shape with the queue id threaded through.
+
+`DBReader.getAllQueuedItemIds()` is the union across queues, for callers that must treat "queued"
+as "queued anywhere" — deletion, cleanup, auto-download — rather than `getQueueIDList()`, which
+only sees the active queue.
 
 Migrations are plain `if (oldVersion < N)` blocks in `DBUpgrader`, and `DBUpgraderTest` covers them
 by building the old schema by hand, calling `DBUpgrader.upgrade` and asserting on the result. Add a
