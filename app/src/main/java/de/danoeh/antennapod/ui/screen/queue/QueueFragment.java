@@ -43,12 +43,15 @@ import java.util.Collections;
 import java.util.List;
 
 import de.danoeh.antennapod.R;
+import de.danoeh.antennapod.databinding.EditTextDialogBinding;
+import de.danoeh.antennapod.model.feed.Queue;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.ui.episodeslist.EpisodeItemListAdapter;
 import de.danoeh.antennapod.ui.common.ConfirmationDialog;
 import de.danoeh.antennapod.ui.MenuItemUtils;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
+import de.danoeh.antennapod.storage.database.PodDBAdapter;
 import de.danoeh.antennapod.ui.common.Converter;
 import de.danoeh.antennapod.ui.screen.feed.ItemSortDialog;
 import de.danoeh.antennapod.event.EpisodeDownloadEvent;
@@ -56,6 +59,7 @@ import de.danoeh.antennapod.event.FeedItemEvent;
 import de.danoeh.antennapod.event.FeedUpdateRunningEvent;
 import de.danoeh.antennapod.event.PlayerStatusEvent;
 import de.danoeh.antennapod.event.QueueEvent;
+import de.danoeh.antennapod.event.QueuesChangedEvent;
 import de.danoeh.antennapod.event.playback.PlaybackPositionEvent;
 import de.danoeh.antennapod.ui.episodeslist.EpisodeMultiSelectActionHandler;
 import de.danoeh.antennapod.ui.swipeactions.SwipeActions;
@@ -97,6 +101,8 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
     private static final String PREF_SHOW_LOCK_WARNING = "show_lock_warning";
 
     private Disposable disposable;
+    private Disposable queuesDisposable;
+    private List<Queue> queues = Collections.emptyList();
     private SwipeActions swipeActions;
     private SharedPreferences prefs;
 
@@ -113,6 +119,7 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
     public void onStart() {
         super.onStart();
         loadItems();
+        loadQueues();
         EventBus.getDefault().register(this);
     }
 
@@ -130,6 +137,9 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
         EventBus.getDefault().unregister(this);
         if (disposable != null) {
             disposable.dispose();
+        }
+        if (queuesDisposable != null) {
+            queuesDisposable.dispose();
         }
     }
 
@@ -276,6 +286,125 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
         boolean keepSorted = UserPreferences.isQueueKeepSorted();
         toolbar.getMenu().findItem(R.id.queue_lock).setChecked(UserPreferences.isQueueLocked());
         toolbar.getMenu().findItem(R.id.queue_lock).setVisible(!keepSorted);
+        boolean isDefaultQueue = DBReader.getActiveQueue() == PodDBAdapter.QUEUE_ID_DEFAULT;
+        toolbar.getMenu().findItem(R.id.queue_switch).setVisible(queues.size() > 1);
+        toolbar.getMenu().findItem(R.id.queue_rename).setVisible(!isDefaultQueue);
+        toolbar.getMenu().findItem(R.id.queue_delete).setVisible(!isDefaultQueue);
+    }
+
+    private String queueName(Queue queue) {
+        return queue.getName() == null ? getString(R.string.queue_label) : queue.getName();
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onQueuesChanged(QueuesChangedEvent event) {
+        loadQueues();
+    }
+
+    private void loadQueues() {
+        if (queuesDisposable != null) {
+            queuesDisposable.dispose();
+        }
+        queuesDisposable = Observable.fromCallable(DBReader::getQueues)
+                .subscribeOn(Schedulers.computation())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(loaded -> {
+                    queues = loaded;
+                    refreshToolbarState();
+                    refreshQueueTitle();
+                }, error -> Log.e(TAG, Log.getStackTraceString(error)));
+    }
+
+    private void refreshQueueTitle() {
+        for (Queue queue : queues) {
+            if (queue.getId() == DBReader.getActiveQueue()) {
+                toolbar.setTitle(queueName(queue));
+                return;
+            }
+        }
+        toolbar.setTitle(R.string.queue_label);
+    }
+
+    private void switchToQueue(long queueId) {
+        UserPreferences.setActiveQueue(queueId);
+        refreshToolbarState();
+        refreshQueueTitle();
+        loadItems();
+    }
+
+    private void showSwitchQueueDialog() {
+        String[] names = new String[queues.size()];
+        int checked = 0;
+        for (int i = 0; i < queues.size(); i++) {
+            names[i] = queueName(queues.get(i));
+            if (queues.get(i).getId() == DBReader.getActiveQueue()) {
+                checked = i;
+            }
+        }
+        new MaterialAlertDialogBuilder(getContext())
+                .setTitle(R.string.switch_queue_label)
+                .setSingleChoiceItems(names, checked, (dialog, which) -> {
+                    switchToQueue(queues.get(which).getId());
+                    dialog.dismiss();
+                })
+                .setNegativeButton(R.string.cancel_label, null)
+                .show();
+    }
+
+    private interface NameCallback {
+        void onName(String name);
+    }
+
+    private void showQueueNameDialog(int titleRes, String initialName, NameCallback onConfirm) {
+        final EditTextDialogBinding binding = EditTextDialogBinding.inflate(LayoutInflater.from(getContext()));
+        binding.textInputLayout.setHint(getString(R.string.queue_name_label));
+        binding.textInput.setText(initialName);
+        new MaterialAlertDialogBuilder(getContext())
+                .setView(binding.getRoot())
+                .setTitle(titleRes)
+                .setPositiveButton(android.R.string.ok, (d, which) -> {
+                    String name = binding.textInput.getText().toString().trim();
+                    if (!name.isEmpty()) {
+                        onConfirm.onName(name);
+                    }
+                })
+                .setNegativeButton(R.string.cancel_label, null)
+                .show();
+    }
+
+    private void showNewQueueDialog() {
+        showQueueNameDialog(R.string.new_queue_label, "", name ->
+                Observable.fromCallable(() -> DBWriter.createQueue(name).get())
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(this::switchToQueue, error -> Log.e(TAG, Log.getStackTraceString(error))));
+    }
+
+    private void showRenameQueueDialog() {
+        for (Queue queue : queues) {
+            if (queue.getId() == DBReader.getActiveQueue()) {
+                showQueueNameDialog(R.string.rename_queue_label, queueName(queue),
+                        name -> DBWriter.renameQueue(queue.getId(), name));
+                return;
+            }
+        }
+    }
+
+    private void showDeleteQueueDialog() {
+        for (Queue queue : queues) {
+            if (queue.getId() == DBReader.getActiveQueue()) {
+                new MaterialAlertDialogBuilder(getContext())
+                        .setTitle(R.string.delete_queue_label)
+                        .setMessage(getString(R.string.delete_queue_confirmation_msg, queueName(queue)))
+                        .setPositiveButton(R.string.confirm_label, (dialog, which) -> {
+                            DBWriter.deleteQueue(queue.getId());
+                            switchToQueue(PodDBAdapter.QUEUE_ID_DEFAULT);
+                        })
+                        .setNegativeButton(R.string.cancel_label, null)
+                        .show();
+                return;
+            }
+        }
     }
 
     @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
@@ -296,6 +425,18 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
             return true;
         } else if (itemId == R.id.queue_sort) {
             new QueueSortDialog().show(getChildFragmentManager().beginTransaction(), "SortDialog");
+            return true;
+        } else if (itemId == R.id.queue_switch) {
+            showSwitchQueueDialog();
+            return true;
+        } else if (itemId == R.id.queue_new) {
+            showNewQueueDialog();
+            return true;
+        } else if (itemId == R.id.queue_rename) {
+            showRenameQueueDialog();
+            return true;
+        } else if (itemId == R.id.queue_delete) {
+            showDeleteQueueDialog();
             return true;
         } else if (itemId == R.id.refresh_item) {
             FeedUpdateManager.getInstance().runOnceOrAsk(requireContext());
