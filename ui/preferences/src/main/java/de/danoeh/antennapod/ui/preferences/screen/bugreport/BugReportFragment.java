@@ -87,7 +87,8 @@ public class BugReportFragment extends AnimatedFragment {
         viewBinding.openForumButton.setOnClickListener(v ->
                 IntentUtils.openInBrowser(requireContext(), "https://forum.antennapod.org/search"));
         viewBinding.openGithubButton.setOnClickListener(v ->
-                IntentUtils.openInBrowser(requireContext(), "https://github.com/AntennaPod/AntennaPod/issues"));
+                IntentUtils.openInBrowser(requireContext(),
+                        "https://github.com/iamalanturing/AntennaPodwSmartPlaylists/issues"));
         viewBinding.attribAppVersionLabel.setOnClickListener(v ->
                 ClipboardUtils.copyText((TextView) v, R.string.report_bug_attrib_app_version));
         viewBinding.attribAndroidVersionLabel.setOnClickListener(v ->
