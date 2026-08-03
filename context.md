@@ -34,7 +34,7 @@ not advertise, and they are why the widget counts the way it does.
 
 Read `FORK.md` first if the work touches a screen or an upstream merge.
 
-The APK is the run's `app-play-debug` artifact:
+The APK is the run's `AntennaPodSmartPlaylist-debug` artifact:
 `https://github.com/iamalanturing/AntennaPodwSmartPlaylists/actions/runs/<run id>/artifacts/<artifact id>`
 — list them with the GitHub Actions tooling rather than guessing ids. Always give the user the
 link; they cannot build either.
@@ -267,7 +267,7 @@ CI does everything; no local Android SDK is needed, and this container cannot bu
 
 `.github/workflows/fork-checks.yml` runs on every push to `claude/**`: `assemblePlayDebug`,
 then `testPlayDebugUnitTest testDebugUnitTest`, then `checkstyle lint`. Each green run attaches
-an installable APK as the `app-play-debug` artifact.
+an installable APK as the `AntennaPodSmartPlaylist-debug` artifact.
 
 It is fork-owned and deliberately separate from upstream's `checks.yml` so it never conflicts on
 merge; re-check it against upstream's during each sync.

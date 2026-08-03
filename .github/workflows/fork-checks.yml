@@ -106,7 +106,7 @@ jobs:
         env:
           EXPECTED: d4f2eaa35a361a9f9d26b426992f307e5f3ba975e36ce768201b10b704f5ecc8
         run: |
-          APK=app/build/outputs/apk/play/debug/app-play-debug.apk
+          APK=app/build/outputs/apk/play/debug/AntennaPodSmartPlaylist-debug.apk
           SIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)
           ACTUAL=$("$SIGNER" verify --print-certs "$APK" \
             | grep -ioE "SHA-256 digest: [0-9a-f]+" | head -1 | awk '{print $NF}')
@@ -126,8 +126,8 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-play-debug
-          path: app/build/outputs/apk/play/debug/app-play-debug.apk
+          name: AntennaPodSmartPlaylist-debug
+          path: app/build/outputs/apk/play/debug/AntennaPodSmartPlaylist-debug.apk
           if-no-files-found: error
       - name: Upload test reports
         if: failure()

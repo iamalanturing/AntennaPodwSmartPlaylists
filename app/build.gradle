@@ -70,6 +70,16 @@ android {
     androidResources {
         additionalParameters += ["--no-version-vectors"]
     }
+
+    // FORK: the debug APK filename otherwise matches upstream's (app-play-debug.apk), which is
+    // easy to mix up with another fork's debug build of the same name once both are downloaded.
+    applicationVariants.all { variant ->
+        if (variant.buildType.name == "debug") {
+            variant.outputs.all { output ->
+                outputFileName = "AntennaPodSmartPlaylist-debug.apk"
+            }
+        }
+    }
 }
 
 dependencies {
