@@ -8,8 +8,8 @@ is an earlier attempt kept only for reference; do not build from it. It is still
 v2 screen looks wrong: v2's UI was written fresh rather than ported, so details fqUHX got right
 (window insets, for one) were silently dropped.
 
-**Upstream base:** `b7ee12c` (2026-07-21) from `upstream/develop`, plus `b25adc2` from
-`upstream/master` (3.12.0-beta, 20 commits). 47 commits on top.
+**Upstream base:** `b7ee12c` (2026-07-21) from `upstream/develop`, plus through `980b2f3`
+(3.12.0 stable) from `upstream/master`.
 
 **Tip:** `e35486c` (2026-07-28). The side branches this work passed through
 (`claude/merge-upstream-master`, `claude/status-bar-overlap-fix-dxla5j`) were folded into v2 and
@@ -58,16 +58,22 @@ historically cost this fork work. The fork's **base** stays `develop`; only new 
 **The exception, and the reason to keep checking:** when a bug is actually being experienced, look
 at `develop` for a fix rather than waiting for it to reach `master`.
 
-State as of 2026-07-28:
+State as of 2026-08-03:
 
-- `master` is `b25adc2` — unchanged, and already fully merged into the fork. Nothing to take.
-- `develop` is `07b7475`, three commits past the fork's base `b7ee12c`: a statistics chart
-  animation, a feed playback speed label refresh, and `2c9111e` "invisible crash when episode does
-  not have chapters".
-- None of the three touch a file the fork touches, so they will merge cleanly whenever they arrive.
-- Checked against symptoms currently being seen: **none of them apply.** `2c9111e` is the only one
-  worth remembering — a null check on `media.getChapters()` in `CoverFragment`, which the fork does
-  not modify. If chapterless episodes ever start behaving oddly on the player screen, cherry-pick
+- `master` is `980b2f3` (3.12.0 stable) — fully merged into the fork, including the version bump
+  itself (`app/build.gradle` now matches: `versionCode 3120095`, `versionName "3.12.0"`) and a fix
+  for "smart mark as played from paused" (`87b2eb9`, upstream's own feature, unrelated to this
+  fork's Smart Queues) in `Media3PlaybackService.java` — applied cleanly despite the fork's heavy
+  changes to that file.
+- `develop` is past `07b7475` by several more commits, none pulled: two refactors worth watching
+  for conflicts next sync — moving settings fragments into their own module (`#8637`, touches
+  `MainPreferencesFragment.java`, which this fork also edits) and moving common UI from `:app` to
+  `:ui:common` (`#8638`) — plus a Gradle plugin 9.0 upgrade (`#8302`). None fix a bug this fork is
+  hitting, so per policy they wait for master.
+- `2c9111e` ("invisible crash when episode does not have chapters") is still the one worth
+  remembering if it ever becomes relevant — a null check on `media.getChapters()` in
+  `CoverFragment`, which the fork does not modify. If chapterless episodes ever start behaving
+  oddly on the player screen, cherry-pick
   it instead of waiting.
 
 There is no `upstream` remote configured in the container. Reach it directly:
