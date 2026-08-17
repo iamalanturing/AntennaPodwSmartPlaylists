@@ -99,6 +99,21 @@ Next, in order: scope the queue reads/writes by queue id; split remove-from-queu
 correctness trap in the feature; active-queue preference and queue CRUD; the switcher on the queue
 screen; tests.
 
+## Where this stands (10 Aug 2026)
+
+All of the above landed: reads/writes are scoped by queue id, the remove-path split is in with a
+migration test, `DBReader.getActiveQueue()` / `UserPreferences` carry the active-queue preference,
+queue create/rename/delete exist with tests, and the queue screen has a switcher plus create/rename/
+delete dialogs. CI mirrors upstream job-for-job and is green through the emulator matrix. Still
+open: an A/B test for the removal split now that a second queue can actually exist, and switching
+auto-download to the all-queues union.
+
+The debug build also now carries its own applicationId (`de.danoeh.antennapod.mq.debug`, was plain
+`.debug`) and its own launcher icon badge, both fork-only and both to be dropped with the rest of
+the scaffolding. See `SIDE_BY_SIDE.md` for why: a build sharing upstream's plain debug id collides
+with any other AntennaPod debug build already on a test device, which turned out to include a real,
+data-bearing install from another fork.
+
 ## AI provenance
 
 This branch is AI-assisted. Every commit carries a `Co-Authored-By: Claude Opus 5` trailer, and the

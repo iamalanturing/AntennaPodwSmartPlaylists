@@ -42,8 +42,15 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix ".debug"
-            resValue "string", "provider_authority", "de.danoeh.antennapod.debug.provider"
+            // Fork-only: ".mq.debug" rather than upstream's ".debug", and the two lines below it,
+            // NOT FOR UPSTREAM - drop with the rest of the fork scaffolding. Without its own
+            // applicationId this collides with any other de.danoeh.antennapod.debug build already
+            // on the device -- including, concretely, an installed Smart Playlists build that
+            // predates that fork's own rename and is still sitting on the plain ".debug" id.
+            // A distinct id here means neither fork's data is ever at risk from the other.
+            applicationIdSuffix ".mq.debug"
+            resValue "string", "provider_authority", "de.danoeh.antennapod.mq.debug.provider"
+            resValue "string", "app_name", "AntennaPod MQ Debug"
             signingConfig signingConfigs.forkDebug
         }
         release {
