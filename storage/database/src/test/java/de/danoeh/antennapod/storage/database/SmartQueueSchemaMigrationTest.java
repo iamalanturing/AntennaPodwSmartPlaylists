@@ -55,6 +55,7 @@ public class SmartQueueSchemaMigrationTest {
                 exists("index", PodDBAdapter.TABLE_NAME_SMART_PLAYLIST_RULES + "_playlist"));
         assertTrue("episodes index missing",
                 exists("index", PodDBAdapter.TABLE_NAME_SMART_PLAYLIST_EPISODES + "_playlist"));
+        assertTrue("QueueStash missing", exists("table", PodDBAdapter.TABLE_NAME_QUEUE_STASH));
     }
 
     @Test
@@ -95,6 +96,16 @@ public class SmartQueueSchemaMigrationTest {
         // must complete without touching upstream tables that a real device would already have.
         DBUpgrader.upgrade(db, PodDBAdapter.VERSION, PodDBAdapter.VERSION);
         assertSmartQueueSchemaPresent();
+    }
+
+    @Test
+    public void upgradeFromPreviousVersionAddsQueueStash() {
+        // A device already stamped 3120001 (the fork's previous VERSION, before QueueStash
+        // existed) must pick up the new table on its next open. This is what actually proves the
+        // VERSION bump matters -- createForkSchema()'s IF NOT EXISTS alone would not run again on
+        // a device Android does not consider due for onUpgrade().
+        DBUpgrader.upgrade(db, 3120001, PodDBAdapter.VERSION);
+        assertTrue("QueueStash missing", exists("table", PodDBAdapter.TABLE_NAME_QUEUE_STASH));
     }
 
     @Test

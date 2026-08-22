@@ -62,7 +62,10 @@ public class PodDBAdapter {
     // columns without the sp_ prefix. The bump is what makes the conversion run: a database
     // restored from one of those backups is stamped 3120000, so without a higher VERSION no
     // upgrade fires and the rename never happens.
-    public static final int VERSION = 3120001;
+    // FORK: 3120002 adds QueueStash (createForkSchema() is IF NOT EXISTS and runs on every
+    // upgrade, but onUpgrade() itself only fires when VERSION goes up -- without this bump an
+    // already-3120001-stamped device never re-enters createForkSchema() and never gets the table).
+    public static final int VERSION = 3120002;
 
     /**
      * FORK: how far through upstream's migration chain the code in this fork actually goes.
@@ -104,6 +107,7 @@ public class PodDBAdapter {
     private static final String KEY_FORK_SCHEMA_NAME = "name";
     private static final String KEY_FORK_SCHEMA_VALUE = "value";
     private static final String FORK_SCHEMA_UPSTREAM_LEVEL = "upstream_level";
+    private static final String FORK_SCHEMA_QUEUE_STASH_PRESENT = "queue_stash_present";
 
     private static final String CREATE_TABLE_FORK_SCHEMA = "CREATE TABLE IF NOT EXISTS "
             + TABLE_NAME_FORK_SCHEMA + " (" + KEY_FORK_SCHEMA_NAME + " TEXT PRIMARY KEY,"
@@ -207,6 +211,7 @@ public class PodDBAdapter {
     public static final String TABLE_NAME_FEED_MEDIA = "FeedMedia";
     public static final String TABLE_NAME_DOWNLOAD_LOG = "DownloadLog";
     public static final String TABLE_NAME_QUEUE = "Queue";
+    public static final String TABLE_NAME_QUEUE_STASH = "QueueStash";
     public static final String TABLE_NAME_SIMPLECHAPTERS = "SimpleChapters";
     public static final String TABLE_NAME_FAVORITES = "Favorites";
     // FORK: Smart Playlist tables
@@ -290,6 +295,10 @@ public class PodDBAdapter {
 
     private static final String CREATE_TABLE_QUEUE = "CREATE TABLE "
             + TABLE_NAME_QUEUE + "(" + KEY_ID + " INTEGER PRIMARY KEY,"
+            + KEY_FEEDITEM + " INTEGER," + KEY_FEED + " INTEGER)";
+
+    static final String CREATE_TABLE_QUEUE_STASH = "CREATE TABLE IF NOT EXISTS "
+            + TABLE_NAME_QUEUE_STASH + "(" + KEY_ID + " INTEGER PRIMARY KEY,"
             + KEY_FEEDITEM + " INTEGER," + KEY_FEED + " INTEGER)";
 
     private static final String CREATE_TABLE_SIMPLECHAPTERS = "CREATE TABLE "
@@ -379,6 +388,7 @@ public class PodDBAdapter {
             TABLE_NAME_FEED_MEDIA,
             TABLE_NAME_DOWNLOAD_LOG,
             TABLE_NAME_QUEUE,
+            TABLE_NAME_QUEUE_STASH,
             TABLE_NAME_SIMPLECHAPTERS,
             TABLE_NAME_FAVORITES,
             // FORK: Smart Playlist tables
@@ -563,6 +573,11 @@ public class PodDBAdapter {
             for (String tableName : ALL_TABLES) {
                 adapter.db.delete(tableName, "1", null);
             }
+            // FORK: QueueStash is wiped above like any other user-content table, but the
+            // presence flag lives in ForkSchema, which deleteDatabase() deliberately never
+            // touches -- clear it too, or it would wrongly claim a stash exists.
+            adapter.db.delete(TABLE_NAME_FORK_SCHEMA, KEY_FORK_SCHEMA_NAME + "=?",
+                    new String[]{FORK_SCHEMA_QUEUE_STASH_PRESENT});
             return true;
         } finally {
             adapter.close();
@@ -1036,6 +1051,67 @@ public class PodDBAdapter {
     }
 
     /**
+     * FORK: copies the current Queue into QueueStash (replacing whatever was stashed before),
+     * records that a stash now exists, then replaces Queue with newQueue. One transaction: the
+     * flag write and the queue swap must never be observable apart from each other, so a process
+     * death mid-activation cannot leave a stash on disk with no pointer back to it.
+     */
+    public void stashQueueThenSet(List<FeedItem> newQueue) {
+        try {
+            db.beginTransactionNonExclusive();
+            db.delete(TABLE_NAME_QUEUE_STASH, null, null);
+            db.execSQL("INSERT INTO " + TABLE_NAME_QUEUE_STASH
+                    + " (" + KEY_ID + "," + KEY_FEEDITEM + "," + KEY_FEED + ")"
+                    + " SELECT " + KEY_ID + "," + KEY_FEEDITEM + "," + KEY_FEED
+                    + " FROM " + TABLE_NAME_QUEUE);
+
+            ContentValues flagValues = new ContentValues();
+            flagValues.put(KEY_FORK_SCHEMA_NAME, FORK_SCHEMA_QUEUE_STASH_PRESENT);
+            flagValues.put(KEY_FORK_SCHEMA_VALUE, 1);
+            db.insertWithOnConflict(TABLE_NAME_FORK_SCHEMA, null, flagValues,
+                    SQLiteDatabase.CONFLICT_REPLACE);
+
+            db.delete(TABLE_NAME_QUEUE, null, null);
+            ContentValues values = new ContentValues();
+            for (int i = 0; i < newQueue.size(); i++) {
+                FeedItem item = newQueue.get(i);
+                values.put(KEY_ID, i);
+                values.put(KEY_FEEDITEM, item.getId());
+                values.put(KEY_FEED, item.getFeed().getId());
+                db.insertWithOnConflict(TABLE_NAME_QUEUE, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+            }
+            db.setTransactionSuccessful();
+        } catch (SQLException e) {
+            Log.e(TAG, Log.getStackTraceString(e));
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    /**
+     * FORK: restores Queue from QueueStash and clears the stash, including the presence flag.
+     * Same one-transaction reasoning as {@link #stashQueueThenSet}.
+     */
+    public void restoreQueueFromStash() {
+        try {
+            db.beginTransactionNonExclusive();
+            db.delete(TABLE_NAME_QUEUE, null, null);
+            db.execSQL("INSERT INTO " + TABLE_NAME_QUEUE
+                    + " (" + KEY_ID + "," + KEY_FEEDITEM + "," + KEY_FEED + ")"
+                    + " SELECT " + KEY_ID + "," + KEY_FEEDITEM + "," + KEY_FEED
+                    + " FROM " + TABLE_NAME_QUEUE_STASH);
+            db.delete(TABLE_NAME_QUEUE_STASH, null, null);
+            db.delete(TABLE_NAME_FORK_SCHEMA, KEY_FORK_SCHEMA_NAME + "=?",
+                    new String[]{FORK_SCHEMA_QUEUE_STASH_PRESENT});
+            db.setTransactionSuccessful();
+        } catch (SQLException e) {
+            Log.e(TAG, Log.getStackTraceString(e));
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    /**
      * Remove the listed items and their FeedMedia entries.
      */
     public void removeFeedItems(@NonNull List<FeedItem> items) {
@@ -1197,6 +1273,11 @@ public class PodDBAdapter {
 
     public Cursor getQueueIDCursor() {
         return db.query(TABLE_NAME_QUEUE, new String[]{KEY_FEEDITEM}, null, null, null, null, KEY_ID + " ASC", null);
+    }
+
+    public Cursor getQueueStashIDCursor() {
+        return db.query(TABLE_NAME_QUEUE_STASH, new String[]{KEY_FEEDITEM}, null, null, null, null,
+                KEY_ID + " ASC", null);
     }
 
     public Cursor getNextInQueue(final FeedItem item) {
@@ -1690,25 +1771,6 @@ public class PodDBAdapter {
         return 0;
     }
 
-    public Cursor getNextInSmartQueueCursor(long queueId, long currentItemId) {
-        final String query = "SELECT " + KEYS_FEED_ITEM_WITHOUT_DESCRIPTION + ", " + KEYS_FEED_MEDIA
-                + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
-                + " INNER JOIN " + TABLE_NAME_FEED_ITEMS
-                + " ON " + TABLE_NAME_FEED_ITEMS + "." + KEY_ID + " = "
-                + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_EPISODE_ID
-                + JOIN_FEED_ITEM_AND_MEDIA
-                + " WHERE " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_ID
-                + " = ?"
-                + " AND " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_POSITION
-                + " > (SELECT " + KEY_SMART_PLAYLIST_POSITION + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
-                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = ?"
-                + " AND " + KEY_SMART_PLAYLIST_EPISODE_ID + " = ?)"
-                + " ORDER BY " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "." + KEY_SMART_PLAYLIST_POSITION + " ASC"
-                + " LIMIT 1";
-        String queueIdStr = String.valueOf(queueId);
-        return db.rawQuery(query, new String[]{queueIdStr, queueIdStr, String.valueOf(currentItemId)});
-    }
-
     public Cursor getSmartPlaylistEpisodesCursor(long playlistId) {
         final String query = "SELECT " + KEYS_FEED_ITEM_WITHOUT_DESCRIPTION + ", " + KEYS_FEED_MEDIA
                 + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
@@ -1893,6 +1955,7 @@ public class PodDBAdapter {
      */
     static void createForkSchema(final SQLiteDatabase db) {
         db.execSQL(CREATE_TABLE_FORK_SCHEMA);
+        db.execSQL(CREATE_TABLE_QUEUE_STASH);
         db.execSQL(CREATE_TABLE_SMART_PLAYLISTS);
         db.execSQL(CREATE_TABLE_SMART_PLAYLIST_RULES);
         db.execSQL(CREATE_TABLE_SMART_PLAYLIST_EPISODES);
@@ -2002,6 +2065,15 @@ public class PodDBAdapter {
         values.put(KEY_FORK_SCHEMA_VALUE, level);
         db.insertWithOnConflict(TABLE_NAME_FORK_SCHEMA, null, values,
                 SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    /** FORK: whether a manual queue is currently stashed in {@link #TABLE_NAME_QUEUE_STASH}. */
+    boolean isQueueStashed() {
+        try (Cursor cursor = db.rawQuery("SELECT " + KEY_FORK_SCHEMA_VALUE + " FROM "
+                        + TABLE_NAME_FORK_SCHEMA + " WHERE " + KEY_FORK_SCHEMA_NAME + "=?",
+                new String[]{FORK_SCHEMA_QUEUE_STASH_PRESENT})) {
+            return cursor.moveToFirst() && cursor.getInt(0) != 0;
+        }
     }
 
     private static class PodDBHelper extends SQLiteOpenHelper {
