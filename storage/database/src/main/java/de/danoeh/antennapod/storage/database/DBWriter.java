@@ -1063,16 +1063,25 @@ public class DBWriter {
      */
     public static Future<List<FeedItem>> activateSmartQueue(Context context, SmartPlaylist playlist) {
         return runOnDbThread(() -> {
-            if (PlaybackPreferences.getActiveSmartQueueId() == playlist.getId()) {
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            boolean stashed = adapter.isQueueStashed();
+            if (PlaybackPreferences.getActiveSmartQueueId() == playlist.getId() && stashed) {
+                // The active-id preference alone is not proof the real queue reflects this
+                // playlist -- it can be stale (e.g. carried over from a build that predates
+                // routing smart queues through the real queue at all). A stash only exists if
+                // this method's own stash-then-set path actually ran, so require both.
+                adapter.close();
                 return DBReader.getQueue();
             }
+            adapter.close();
+
             generateSmartPlaylistInternal(playlist);
             List<FeedItem> matches = DBReader.getSmartPlaylistEpisodes(playlist.getId());
 
-            PodDBAdapter adapter = PodDBAdapter.getInstance();
             adapter.open();
             List<FeedItem> outgoing = DBReader.getQueue();
-            if (adapter.isQueueStashed()) {
+            if (stashed) {
                 // Switching directly from one active smart queue to another: the manual queue is
                 // already stashed underneath the outgoing one, so stashing again here would
                 // overwrite it with the outgoing smart queue's episodes instead.

@@ -177,6 +177,25 @@ public class ActiveSmartQueueTest {
                 idsOf(DBReader.getQueue()).contains(other.getItems().get(0).getId()));
     }
 
+    @Test
+    public void staleActiveIdWithoutAStashStillActivates() throws Exception {
+        // Reproduces upgrading from a build that used the old parallel smart-queue mechanism:
+        // PREF_ACTIVE_SMART_QUEUE_ID is the same preference key that mechanism used, and it
+        // survives an app update. If activateSmartQueue trusted that preference alone, it would
+        // wrongly treat this as "already active" and hand back the pre-existing manual queue
+        // untouched instead of ever loading the playlist's matches.
+        Feed manual = storeFeed("manual", 2, true);
+        DBWriter.addQueueItem(context, manual.getItems().toArray(new FeedItem[0])).get();
+        Feed smart = storeFeed("smart", 2, true);
+        SmartPlaylist playlist = createPlaylist("Queue", smart);
+        PlaybackPreferences.writeActiveSmartQueueId(playlist.getId());
+
+        List<FeedItem> result = DBWriter.activateSmartQueue(context, playlist).get();
+
+        assertSameIds(idsOf(smart.getItems()), idsOf(result));
+        assertSameIds(idsOf(smart.getItems()), idsOf(DBReader.getQueue()));
+    }
+
     private SmartPlaylist createPlaylist(String name, Feed... matchedFeeds) throws Exception {
         StringBuilder feedIds = new StringBuilder();
         for (Feed feed : matchedFeeds) {
