@@ -57,6 +57,7 @@ import de.danoeh.antennapod.playback.service.internal.ClockSleepTimer;
 import de.danoeh.antennapod.playback.service.internal.EpisodeSleepTimer;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
+import de.danoeh.antennapod.storage.database.SmartPlaylistPlaybackUtils;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.storage.preferences.SleepTimerPreferences;
 import de.danoeh.antennapod.storage.preferences.SleepTimerType;
@@ -93,9 +94,6 @@ public class Media3PlaybackService extends MediaLibraryService {
     private FeedMedia currentPlayable;
     private String pendingStreamMediaId;
     private boolean allowStreamingThisTime = false;
-    // FORK: Smart Queue — set in startNextInQueue's loader so the main-thread subscriber knows the
-    // next item came from an active smart queue and should advance regardless of the follow-queue setting
-    private boolean nextItemFromSmartQueue = false;
     private Disposable mediaLoaderDisposable;
     private Disposable positionObserverDisposable;
     private Disposable queueLoaderDisposable;
@@ -397,21 +395,19 @@ public class Media3PlaybackService extends MediaLibraryService {
 
     /** Everything needed to start a queue, all of it assembled off the main thread. */
     private static class SmartQueueStart {
-        private final long mediaId;
         private final MediaItem mediaItem;
         private final long startPosition;
 
-        SmartQueueStart(long mediaId, MediaItem mediaItem, long startPosition) {
-            this.mediaId = mediaId;
+        SmartQueueStart(MediaItem mediaItem, long startPosition) {
             this.mediaItem = mediaItem;
             this.startPosition = startPosition;
         }
     }
 
     /**
-     * Picks what the queue's own detail screen would pick: the episode already in progress, else
-     * the first unplayed one, else the top of the queue. Recording the queue as active is what
-     * makes playback carry on through it afterwards.
+     * Activates the queue -- loading its matches into the real queue, so playback (and Android
+     * Auto) carries on through it afterwards -- then picks the episode already in progress, else
+     * the first unplayed one, else the top of the queue.
      */
     private void startSmartQueue(long playlistId) {
         if (playlistId == 0) {
@@ -428,23 +424,12 @@ public class Media3PlaybackService extends MediaLibraryService {
             return;
         }
         Maybe.fromCallable(() -> {
-            FeedItem startItem = null;
-            for (FeedItem episode : DBReader.getSmartPlaylistEpisodes(playlistId)) {
-                if (episode.getMedia() == null || episode.isPlayed()) {
-                    continue;
-                }
-                if (episode.getMedia().getPosition() > 0) {
-                    startItem = episode;
-                    break;
-                }
-                if (startItem == null) {
-                    startItem = episode;
-                }
+            SmartPlaylist playlist = DBReader.getSmartPlaylist(playlistId);
+            if (playlist == null) {
+                return null;
             }
-            if (startItem == null) {
-                List<FeedItem> episodes = DBReader.getSmartPlaylistEpisodes(playlistId);
-                startItem = episodes.isEmpty() ? null : episodes.get(0);
-            }
+            List<FeedItem> queue = DBWriter.activateSmartQueue(this, playlist).get();
+            FeedItem startItem = SmartPlaylistPlaybackUtils.pickStartEpisode(queue);
             if (startItem == null || startItem.getMedia() == null) {
                 return null;
             }
@@ -456,13 +441,11 @@ public class Media3PlaybackService extends MediaLibraryService {
             long startPosition = RewindAfterPauseUtils.calculatePositionWithRewind(
                     (int) SkipUtils.skipIntroIfNecessary(this, media),
                     media.getLastPlayedTimeStatistics());
-            return new SmartQueueStart(media.getId(),
-                    MediaItemAdapter.fromPlayable(this, media, false), startPosition);
+            return new SmartQueueStart(MediaItemAdapter.fromPlayable(this, media, false), startPosition);
         })
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(start -> {
-                    PlaybackPreferences.writeActiveSmartQueue(playlistId, start.mediaId);
                     player.setMediaItem(start.mediaItem, start.startPosition);
                     player.prepare();
                     player.play();
@@ -570,16 +553,6 @@ public class Media3PlaybackService extends MediaLibraryService {
         pendingStreamMediaId = null;
         try {
             long mediaId = Long.parseLong(player.getCurrentMediaItem().mediaId);
-            // FORK: Smart Queue — an episode the active queue does not own means the user started
-            // playback elsewhere, so the queue stops driving
-            if (PlaybackPreferences.getActiveSmartQueueId() != 0
-                    && PlaybackPreferences.getActiveSmartQueueMediaId() != mediaId) {
-                if (DEBUG_SMART_QUEUE) {
-                    Log.d(TAG, "Playing an episode the active smart queue does not own, "
-                            + "clearing smart queue mode");
-                }
-                PlaybackPreferences.clearActiveSmartQueueId();
-            }
             if (currentPlayable == null || currentPlayable.getId() != mediaId) {
                 if (mediaLoaderDisposable != null) {
                     mediaLoaderDisposable.dispose();
@@ -845,50 +818,22 @@ public class Media3PlaybackService extends MediaLibraryService {
             return;
         }
         queueLoaderDisposable = Maybe.fromCallable(() -> {
-            // FORK: Smart Queue — check if a smart queue is active before falling back to normal queue
-            FeedItem nextItem = null;
-            nextItemFromSmartQueue = false;
+            // The item's own Queue row is still present here -- updateDatabaseAfterPlayback,
+            // which removes it, runs after this lookup -- so an appended row still sorts after it.
+            FeedItem nextItem = DBReader.getNextInQueue(item);
+            // FORK: Smart Queue — the real queue ran out while a regenerating smart queue was
+            // driving it; refill it with newly-matching episodes and look again.
             long activeSmartQueueId = PlaybackPreferences.getActiveSmartQueueId();
-            if (activeSmartQueueId != 0) {
-                if (media.getId() == PlaybackPreferences.getActiveSmartQueueMediaId()) {
-                    nextItem = DBReader.getNextInSmartQueue(activeSmartQueueId, item.getId());
-                    if (nextItem == null) {
-                        // End of smart queue — auto-regenerate or stop smart queue mode
-                        SmartPlaylist queue = DBReader.getSmartPlaylist(activeSmartQueueId);
-                        if (queue != null && queue.isAutoRegenerate()) {
-                            if (DEBUG_SMART_QUEUE) {
-                                Log.d(TAG, "Auto-regenerating smart queue " + activeSmartQueueId);
-                            }
-                            DBWriter.generateSmartPlaylistSync(queue);
-                            for (FeedItem candidate : DBReader.getSmartPlaylistEpisodes(activeSmartQueueId)) {
-                                if (candidate.getId() != item.getId() && !candidate.isPlayed()
-                                        && candidate.getMedia() != null) {
-                                    nextItem = candidate;
-                                    break;
-                                }
-                            }
-                        }
-                        if (nextItem == null) {
-                            if (DEBUG_SMART_QUEUE) {
-                                Log.d(TAG, "Reached end of smart queue " + activeSmartQueueId
-                                        + ", clearing smart queue mode");
-                            }
-                            PlaybackPreferences.clearActiveSmartQueueId();
-                        }
+            if (nextItem == null && activeSmartQueueId != 0) {
+                SmartPlaylist activeQueue = DBReader.getSmartPlaylist(activeSmartQueueId);
+                if (activeQueue != null && activeQueue.isAutoRegenerate()) {
+                    if (DEBUG_SMART_QUEUE) {
+                        Log.d(TAG, "Auto-regenerating smart queue " + activeSmartQueueId);
                     }
-                    nextItemFromSmartQueue = nextItem != null;
-                    if (nextItemFromSmartQueue && nextItem.getMedia() != null) {
-                        PlaybackPreferences.writeActiveSmartQueue(
-                                activeSmartQueueId, nextItem.getMedia().getId());
-                    }
+                    DBWriter.appendRegeneratedSmartQueueEpisodesSync(activeQueue);
+                    nextItem = DBReader.getNextInQueue(item);
                 }
             }
-
-            if (nextItem == null) {
-                // Fall back to normal AntennaPod queue
-                nextItem = DBReader.getNextInQueue(item);
-            }
-            // FORK end
 
             boolean hasNext = nextItem != null && nextItem.getMedia() != null;
             updateDatabaseAfterPlayback(media, ended, wasSkipped, hasNext);
@@ -908,8 +853,7 @@ public class Media3PlaybackService extends MediaLibraryService {
                                 return;
                             }
                             switchToPlayable(nextMedia);
-                            // FORK: Smart Queue advances regardless of the follow-queue preference
-                            player.setPlayWhenReady(nextItemFromSmartQueue || UserPreferences.isFollowQueue());
+                            player.setPlayWhenReady(UserPreferences.isFollowQueue());
                             player.setMediaItem(nextMediaItem, SkipUtils.skipIntroIfNecessary(this, nextMedia));
                             player.prepare();
                         },
