@@ -1,5 +1,6 @@
 package de.danoeh.antennapod.ui.screen.smartplaylist;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -38,7 +39,7 @@ import de.danoeh.antennapod.playback.service.PlaybackStatus;
 import de.danoeh.antennapod.ui.appstartintent.MediaButtonStarter;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
-import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
+import de.danoeh.antennapod.storage.database.SmartPlaylistPlaybackUtils;
 import de.danoeh.antennapod.ui.episodeslist.EpisodeItemListAdapter;
 import de.danoeh.antennapod.ui.episodeslist.EpisodeItemViewHolder;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
@@ -62,6 +63,7 @@ public class SmartPlaylistDetailFragment extends Fragment {
     private List<FeedItem> episodes = new ArrayList<>();
     private EpisodeItemListAdapter episodeAdapter;
     private Disposable disposable;
+    private Disposable activationDisposable;
     private TextView emptyView;
     private Button playButton;
 
@@ -120,10 +122,8 @@ public class SmartPlaylistDetailFragment extends Fragment {
                 ItemActionButton action = ItemActionButton.forItem(episode);
                 if (action instanceof PlayActionButton || action instanceof PlayLocalActionButton
                         || action instanceof StreamActionButton) {
-                    holder.secondaryActionButton.setOnClickListener(v -> {
-                        PlaybackPreferences.writeActiveSmartQueue(playlistId, episode.getMedia().getId());
-                        action.onClick(requireContext());
-                    });
+                    holder.secondaryActionButton.setOnClickListener(v ->
+                            activateThenRun(() -> action.onClick(requireContext())));
                 }
             }
         };
@@ -269,29 +269,9 @@ public class SmartPlaylistDetailFragment extends Fragment {
     }
 
     private void startPlayback() {
-        if (episodes.isEmpty()) {
+        FeedItem startItem = SmartPlaylistPlaybackUtils.pickStartEpisode(episodes);
+        if (startItem == null || startItem.getMedia() == null) {
             return;
-        }
-        // Find first in-progress episode, otherwise the first one that has not been played yet
-        FeedItem startItem = null;
-        for (FeedItem ep : episodes) {
-            if (ep.getMedia() == null || ep.isPlayed()) {
-                continue;
-            }
-            if (ep.getMedia().getPosition() > 0) {
-                startItem = ep;
-                break;
-            }
-            if (startItem == null) {
-                startItem = ep;
-            }
-        }
-        if (startItem == null) {
-            // Everything has been played already: start over at the top of the queue
-            startItem = episodes.get(0);
-            if (startItem.getMedia() == null) {
-                return;
-            }
         }
         FeedMedia media = startItem.getMedia();
         if (media.localFileAvailable() && !media.fileExists()) {
@@ -302,12 +282,29 @@ public class SmartPlaylistDetailFragment extends Fragment {
             EventBus.getDefault().post(new MessageEvent(getString(R.string.error_file_not_found)));
             return;
         }
-        // FORK: Hand the queue ownership of this episode so the playback service keeps advancing
-        // within it for as long as it is the one playing
-        PlaybackPreferences.writeActiveSmartQueue(playlistId, media.getId());
-        new PlaybackServiceStarter(requireContext(), media)
+        activateThenRun(() -> new PlaybackServiceStarter(requireContext(), media)
                 .callEvenIfRunning(true)
-                .start();
+                .start());
+    }
+
+    /**
+     * Loads this playlist's matches into the real queue before running action -- awaited, rather
+     * than fired alongside it, because starting playback before the queue write lands makes the
+     * played episode fall through to the untagged-item fallback and land in the queue this is
+     * about to replace.
+     */
+    private void activateThenRun(Runnable action) {
+        if (playlist == null) {
+            return;
+        }
+        Context context = requireContext();
+        if (activationDisposable != null) {
+            activationDisposable.dispose();
+        }
+        activationDisposable = Observable.fromCallable(() -> DBWriter.activateSmartQueue(context, playlist).get())
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(queue -> action.run(), error -> { });
     }
 
     @Override
@@ -315,6 +312,9 @@ public class SmartPlaylistDetailFragment extends Fragment {
         super.onDestroyView();
         if (disposable != null) {
             disposable.dispose();
+        }
+        if (activationDisposable != null) {
+            activationDisposable.dispose();
         }
     }
 }
