@@ -16,6 +16,7 @@ import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.model.feed.SortOrder;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
+import de.danoeh.antennapod.storage.database.LongList;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
 
 /**
@@ -81,11 +82,16 @@ public class APQueueCleanupAlgorithm extends EpisodeCleanupAlgorithm {
         List<FeedItem> candidates = new ArrayList<>();
         List<FeedItem> downloadedItems = DBReader.getEpisodes(0, Integer.MAX_VALUE,
                 new FeedItemFilter(FeedItemFilter.DOWNLOADED), SortOrder.DATE_NEW_OLD);
+        // FORK: a queue stashed under an active smart queue is not tagged TAG_QUEUE -- it isn't
+        // the real queue right now -- but it still needs auto-delete protection, or restoring it
+        // could hand back rows whose files were deleted out from under them while stashed.
+        LongList stashedIds = DBReader.getQueueStashIDList();
         for (FeedItem item : downloadedItems) {
             if (item.hasMedia()
                     && item.getMedia().isDownloaded()
                     && (!item.getFeed().isLocalFeed() || UserPreferences.isAutoDeleteLocal())
                     && !item.isTagged(FeedItem.TAG_QUEUE)
+                    && !stashedIds.contains(item.getId())
                     && !item.isTagged(FeedItem.TAG_FAVORITE)) {
                 candidates.add(item);
             }
