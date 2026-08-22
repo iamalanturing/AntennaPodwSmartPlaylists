@@ -47,8 +47,10 @@ import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.ui.episodeslist.EpisodeItemListAdapter;
 import de.danoeh.antennapod.ui.common.ConfirmationDialog;
 import de.danoeh.antennapod.ui.MenuItemUtils;
+import de.danoeh.antennapod.playback.service.PlaybackController;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
+import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.ui.common.Converter;
 import de.danoeh.antennapod.ui.screen.feed.ItemSortDialog;
 import de.danoeh.antennapod.event.EpisodeDownloadEvent;
@@ -84,6 +86,8 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
     private static final String SCROLL_OFFSET_KEY = "scroll_offset";
 
     private TextView infoBar;
+    private View smartQueueBanner;
+    private TextView smartQueueBannerText;
     private EpisodeItemListRecyclerView recyclerView;
     private QueueRecyclerAdapter recyclerAdapter;
     private EmptyViewHandler emptyView;
@@ -97,6 +101,7 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
     private static final String PREF_SHOW_LOCK_WARNING = "show_lock_warning";
 
     private Disposable disposable;
+    private Disposable smartQueueBannerDisposable;
     private SwipeActions swipeActions;
     private SharedPreferences prefs;
 
@@ -113,6 +118,7 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
     public void onStart() {
         super.onStart();
         loadItems();
+        updateSmartQueueBanner();
         EventBus.getDefault().register(this);
     }
 
@@ -130,6 +136,9 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
         EventBus.getDefault().unregister(this);
         if (disposable != null) {
             disposable.dispose();
+        }
+        if (smartQueueBannerDisposable != null) {
+            smartQueueBannerDisposable.dispose();
         }
     }
 
@@ -178,6 +187,7 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
         recyclerAdapter.updateDragDropEnabled();
         refreshToolbarState();
         refreshInfoBar();
+        updateSmartQueueBanner();
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -302,15 +312,22 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
             return true;
         } else if (itemId == R.id.clear_queue) {
             // make sure the user really wants to clear the queue
+            boolean smartQueueActive = PlaybackPreferences.getActiveSmartQueueId() != 0;
             ConfirmationDialog conDialog = new ConfirmationDialog(getActivity(),
                     R.string.clear_queue_label,
-                    R.string.clear_queue_confirmation_msg) {
+                    smartQueueActive
+                            ? R.string.smart_queue_stop_confirmation_msg
+                            : R.string.clear_queue_confirmation_msg) {
 
                 @Override
                 public void onConfirmButtonPressed(
                         DialogInterface dialog) {
                     dialog.dismiss();
-                    DBWriter.clearQueue();
+                    if (smartQueueActive) {
+                        stopSmartQueueAndPlayback();
+                    } else {
+                        DBWriter.clearQueue();
+                    }
                 }
             };
             conDialog.createNewDialog().show();
@@ -430,6 +447,10 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
         int paddingHorizontal = (int) (getResources().getDisplayMetrics().density * (largePadding ? 60 : 16));
         infoBar.setPadding(paddingHorizontal, 0, paddingHorizontal, 0);
 
+        smartQueueBanner = root.findViewById(R.id.smart_queue_banner);
+        smartQueueBannerText = root.findViewById(R.id.smart_queue_banner_text);
+        root.<View>findViewById(R.id.smart_queue_stop_button).setOnClickListener(v -> stopSmartQueueAndPlayback());
+
         recyclerView = root.findViewById(R.id.recyclerView);
         RecyclerView.ItemAnimator animator = recyclerView.getItemAnimator();
         if (animator instanceof SimpleItemAnimator) {
@@ -497,6 +518,42 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
     public void onSaveInstanceState(@NonNull Bundle outState) {
         outState.putBoolean(KEY_UP_ARROW, displayUpArrow);
         super.onSaveInstanceState(outState);
+    }
+
+    private void updateSmartQueueBanner() {
+        long activeId = PlaybackPreferences.getActiveSmartQueueId();
+        if (activeId == 0) {
+            smartQueueBanner.setVisibility(View.GONE);
+            return;
+        }
+        if (smartQueueBannerDisposable != null) {
+            smartQueueBannerDisposable.dispose();
+        }
+        smartQueueBannerDisposable = Observable.fromCallable(() -> DBReader.getSmartPlaylist(activeId))
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(playlist -> {
+                    if (playlist == null) {
+                        smartQueueBanner.setVisibility(View.GONE);
+                        return;
+                    }
+                    smartQueueBannerText.setText(getString(R.string.smart_queue_active_banner, playlist.getName()));
+                    smartQueueBanner.setVisibility(View.VISIBLE);
+                }, error -> { });
+    }
+
+    /**
+     * Stops playback before restoring the queue, so nothing can advance into a half-restored
+     * queue. player.stop() moves to STATE_IDLE, not STATE_ENDED, so it does not itself trigger
+     * the auto-advance path this is trying to avoid racing.
+     */
+    private void stopSmartQueueAndPlayback() {
+        PlaybackController.bindToMedia3Service(requireContext(), controller -> {
+            controller.clearMediaItems();
+            controller.stop();
+        });
+        PlaybackPreferences.writeNoMediaPlaying();
+        DBWriter.stopActiveSmartQueue();
     }
 
     private void refreshInfoBar() {

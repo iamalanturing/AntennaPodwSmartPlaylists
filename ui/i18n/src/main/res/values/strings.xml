@@ -1113,6 +1113,9 @@
     <string name="smart_queue_widget_missing">Queue deleted</string>
     <string name="smart_queue_list_empty_title">No Smart Queues yet</string>
     <string name="smart_queue_list_empty_message">A Smart Queue fills itself from rules you set, such as unplayed episodes of a few podcasts. Tap the plus button to create one.</string>
+    <string name="smart_queue_active_banner">Playing smart queue: %s</string>
+    <string name="smart_queue_stop_label">Stop</string>
+    <string name="smart_queue_stop_confirmation_msg">This will stop the Smart Queue, restore your previous queue, and stop playback.</string>
     <string name="save_label">Save</string>
 </resources>
 

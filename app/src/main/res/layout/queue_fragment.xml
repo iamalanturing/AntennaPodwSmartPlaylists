@@ -32,6 +32,33 @@
             android:layout_marginBottom="8dp"
             tools:text="12 Episodes - Time remaining: 12 hours" />
 
+        <LinearLayout
+            android:id="@+id/smart_queue_banner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="8dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <TextView
+                android:id="@+id/smart_queue_banner_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                tools:text="Playing smart queue: Weekend Listens" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/smart_queue_stop_button"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/smart_queue_stop_label" />
+
+        </LinearLayout>
+
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
