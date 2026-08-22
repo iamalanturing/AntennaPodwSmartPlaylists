@@ -1120,6 +1120,9 @@ public class DBWriter {
             adapter.open();
             if (!adapter.isQueueStashed()) {
                 adapter.close();
+                // A preference pointing at a playlist with nothing stashed is stale (see
+                // activateSmartQueue) -- clear it so a stuck banner can't survive a Stop tap too.
+                PlaybackPreferences.clearActiveSmartQueueId();
                 return;
             }
             List<FeedItem> outgoing = DBReader.getQueue();

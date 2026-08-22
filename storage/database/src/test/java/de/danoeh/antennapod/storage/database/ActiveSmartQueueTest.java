@@ -196,6 +196,20 @@ public class ActiveSmartQueueTest {
         assertSameIds(idsOf(smart.getItems()), idsOf(DBReader.getQueue()));
     }
 
+    @Test
+    public void stoppingWithAStalePreferenceButNoStashClearsIt() throws Exception {
+        // The Stop-side counterpart to staleActiveIdWithoutAStashStillActivates: nothing to
+        // restore, but the stale preference must not survive the tap either, or the banner it
+        // drives is stuck forever.
+        Feed smart = storeFeed("smart", 1, true);
+        SmartPlaylist playlist = createPlaylist("Queue", smart);
+        PlaybackPreferences.writeActiveSmartQueueId(playlist.getId());
+
+        DBWriter.stopActiveSmartQueue().get();
+
+        assertEquals(0, PlaybackPreferences.getActiveSmartQueueId());
+    }
+
     private SmartPlaylist createPlaylist(String name, Feed... matchedFeeds) throws Exception {
         StringBuilder feedIds = new StringBuilder();
         for (Feed feed : matchedFeeds) {
