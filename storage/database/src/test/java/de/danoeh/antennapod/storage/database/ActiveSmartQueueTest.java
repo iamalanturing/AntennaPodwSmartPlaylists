@@ -1,6 +1,7 @@
 package de.danoeh.antennapod.storage.database;
 
 import android.content.Context;
+import com.google.common.util.concurrent.Futures;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
@@ -8,6 +9,7 @@ import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 import de.danoeh.antennapod.model.feed.SortOrder;
+import de.danoeh.antennapod.net.download.serviceinterface.AutoDownloadManager;
 import de.danoeh.antennapod.net.sync.serviceinterface.SynchronizationQueue;
 import de.danoeh.antennapod.net.sync.serviceinterface.SynchronizationQueueStub;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
@@ -23,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.Future;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -50,6 +53,16 @@ public class ActiveSmartQueueTest {
         adapter.open();
         adapter.close();
         SynchronizationQueue.setInstance(new SynchronizationQueueStub());
+        AutoDownloadManager.setInstance(new AutoDownloadManager() {
+            @Override
+            public Future<?> autodownloadUndownloadedItems(Context context) {
+                return Futures.immediateFuture(null);
+            }
+
+            @Override
+            public void performAutoCleanup(Context context) {
+            }
+        });
     }
 
     @After

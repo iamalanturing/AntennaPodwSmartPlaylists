@@ -1222,7 +1222,9 @@ public class DBWriter {
         }
     }
 
-    /** Same as {@link #runOnDbThread(Runnable)}, for callers that need a result back. */
+    /**
+     * Same as {@link #runOnDbThread(Runnable)}, for callers that need a result back.
+     */
     private static <T> Future<T> runOnDbThread(Callable<T> callable) {
         if ("DatabaseExecutor".equals(Thread.currentThread().getName())) {
             try {

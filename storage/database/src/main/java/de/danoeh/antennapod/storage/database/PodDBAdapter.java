@@ -2067,7 +2067,9 @@ public class PodDBAdapter {
                 SQLiteDatabase.CONFLICT_REPLACE);
     }
 
-    /** FORK: whether a manual queue is currently stashed in {@link #TABLE_NAME_QUEUE_STASH}. */
+    /**
+     * FORK: whether a manual queue is currently stashed in {@link #TABLE_NAME_QUEUE_STASH}.
+     */
     boolean isQueueStashed() {
         try (Cursor cursor = db.rawQuery("SELECT " + KEY_FORK_SCHEMA_VALUE + " FROM "
                         + TABLE_NAME_FORK_SCHEMA + " WHERE " + KEY_FORK_SCHEMA_NAME + "=?",
