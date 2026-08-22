@@ -180,6 +180,25 @@ public final class DBReader {
     }
 
     /**
+     * FORK: loads the IDs of the FeedItems currently stashed while a smart queue is active. Used
+     * to keep those episodes protected from auto-deletion even though they are not in the real
+     * queue right now — see {@code APQueueCleanupAlgorithm}/{@code APCleanupAlgorithm}.
+     */
+    public static synchronized LongList getQueueStashIDList() {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (Cursor cursor = adapter.getQueueStashIDCursor()) {
+            LongList stashIds = new LongList(cursor.getCount());
+            while (cursor.moveToNext()) {
+                stashIds.add(cursor.getLong(0));
+            }
+            return stashIds;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    /**
      * Gets the remaining queue size, given a current item, including the current item.
      * If the current item is not found it will return 0.
      */
@@ -920,23 +939,5 @@ public final class DBReader {
         }
     }
 
-    @Nullable
-    public static synchronized FeedItem getNextInSmartQueue(long queueId, long currentItemId) {
-        PodDBAdapter adapter = PodDBAdapter.getInstance();
-        adapter.open();
-        try (FeedItemCursor cursor = new FeedItemCursor(
-                adapter.getNextInSmartQueueCursor(queueId, currentItemId))) {
-            List<FeedItem> list = extractItemlistFromCursor(cursor);
-            if (!list.isEmpty()) {
-                loadFeedDataOfFeedItemList(list);
-                return list.get(0);
-            }
-            return null;
-        } catch (Exception e) {
-            return null;
-        } finally {
-            adapter.close();
-        }
-    }
 
 }

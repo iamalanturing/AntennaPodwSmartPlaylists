@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -1037,6 +1038,11 @@ public class DBWriter {
 
     public static Future<?> deleteSmartPlaylist(long playlistId) {
         return runOnDbThread(() -> {
+            // Deleting the active playlist would otherwise strand its episodes in the real queue
+            // with no route back to the manual queue stashed underneath them.
+            if (PlaybackPreferences.getActiveSmartQueueId() == playlistId) {
+                stopActiveSmartQueue();
+            }
             PodDBAdapter adapter = PodDBAdapter.getInstance();
             adapter.open();
             try {
@@ -1044,14 +1050,123 @@ public class DBWriter {
             } finally {
                 adapter.close();
             }
-            // Drop the playback-side pointer too. The service recovers on its own once the
-            // membership rows are gone, but only at the next track transition; clearing it here
-            // means the deleted playlist stops being the active queue immediately.
-            if (PlaybackPreferences.getActiveSmartQueueId() == playlistId) {
-                PlaybackPreferences.clearActiveSmartQueueId();
-            }
             EventBus.getDefault().post(new SmartPlaylistEvent(playlistId));
         });
+    }
+
+    /**
+     * FORK: activates a smart queue for playback -- loads its current matches into the real
+     * queue (stashing whatever was there first, so it can be restored later) and hands playback
+     * advancement to the ordinary queue mechanism. Re-activating the playlist that is already
+     * active is a no-op: the queue is left exactly as it is, including any manual reordering,
+     * so the caller resumes wherever it left off instead of rebuilding.
+     */
+    public static Future<List<FeedItem>> activateSmartQueue(Context context, SmartPlaylist playlist) {
+        return runOnDbThread(() -> {
+            if (PlaybackPreferences.getActiveSmartQueueId() == playlist.getId()) {
+                return DBReader.getQueue();
+            }
+            generateSmartPlaylistInternal(playlist);
+            List<FeedItem> matches = DBReader.getSmartPlaylistEpisodes(playlist.getId());
+
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            List<FeedItem> outgoing = DBReader.getQueue();
+            if (adapter.isQueueStashed()) {
+                // Switching directly from one active smart queue to another: the manual queue is
+                // already stashed underneath the outgoing one, so stashing again here would
+                // overwrite it with the outgoing smart queue's episodes instead.
+                adapter.setQueue(matches);
+            } else {
+                adapter.stashQueueThenSet(matches);
+            }
+            adapter.close();
+
+            for (FeedItem item : outgoing) {
+                item.removeTag(FeedItem.TAG_QUEUE);
+            }
+            for (FeedItem item : matches) {
+                item.addTag(FeedItem.TAG_QUEUE);
+            }
+            PlaybackPreferences.writeActiveSmartQueueId(playlist.getId());
+
+            EventBus.getDefault().post(QueueEvent.setQueue(matches));
+            List<FeedItem> changed = new ArrayList<>(outgoing);
+            changed.addAll(matches);
+            EventBus.getDefault().post(new FeedItemEvent(changed, false));
+
+            AutoDownloadManager.getInstance().autodownloadUndownloadedItems(context);
+            return matches;
+        });
+    }
+
+    /**
+     * FORK: the only path that restores the manual queue stashed under an active smart queue --
+     * exists to be called from an explicit user action ("Stop Smart Queue"), never automatically.
+     * A no-op if nothing is currently stashed.
+     */
+    public static Future<?> stopActiveSmartQueue() {
+        return runOnDbThread(() -> {
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            if (!adapter.isQueueStashed()) {
+                adapter.close();
+                return;
+            }
+            List<FeedItem> outgoing = DBReader.getQueue();
+            adapter.restoreQueueFromStash();
+            List<FeedItem> restored = DBReader.getQueue();
+            adapter.close();
+
+            for (FeedItem item : outgoing) {
+                item.removeTag(FeedItem.TAG_QUEUE);
+            }
+            for (FeedItem item : restored) {
+                item.addTag(FeedItem.TAG_QUEUE);
+            }
+            PlaybackPreferences.clearActiveSmartQueueId();
+
+            EventBus.getDefault().post(QueueEvent.setQueue(restored));
+            List<FeedItem> changed = new ArrayList<>(outgoing);
+            changed.addAll(restored);
+            EventBus.getDefault().post(new FeedItemEvent(changed, false));
+        });
+    }
+
+    /**
+     * FORK: called when the real queue runs out during playback while this playlist is the
+     * active, auto-regenerating smart queue. Regenerates its matches and appends whatever is not
+     * already in the real queue to its end -- an append, not a replace, so playback position and
+     * anything else already queued are left untouched.
+     */
+    public static void appendRegeneratedSmartQueueEpisodesSync(SmartPlaylist playlist) {
+        generateSmartPlaylistInternal(playlist);
+        List<FeedItem> matches = DBReader.getSmartPlaylistEpisodes(playlist.getId());
+
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        List<FeedItem> queue = DBReader.getQueue();
+        List<FeedItem> added = new ArrayList<>();
+        for (FeedItem candidate : matches) {
+            if (candidate.getMedia() == null || itemListContains(queue, candidate.getId())) {
+                continue;
+            }
+            queue.add(candidate);
+            added.add(candidate);
+        }
+        if (!added.isEmpty()) {
+            adapter.setQueue(queue);
+        }
+        adapter.close();
+
+        if (added.isEmpty()) {
+            return;
+        }
+        for (FeedItem item : added) {
+            item.addTag(FeedItem.TAG_QUEUE);
+        }
+        EventBus.getDefault().post(QueueEvent.setQueue(queue));
+        EventBus.getDefault().post(new FeedItemEvent(added, false));
     }
 
     public static Future<?> generateSmartPlaylist(SmartPlaylist playlist) {
@@ -1104,6 +1219,19 @@ public class DBWriter {
             return Futures.immediateFuture(null);
         } else {
             return dbExec.submit(runnable);
+        }
+    }
+
+    /** Same as {@link #runOnDbThread(Runnable)}, for callers that need a result back. */
+    private static <T> Future<T> runOnDbThread(Callable<T> callable) {
+        if ("DatabaseExecutor".equals(Thread.currentThread().getName())) {
+            try {
+                return Futures.immediateFuture(callable.call());
+            } catch (Exception e) {
+                return Futures.immediateFailedFuture(e);
+            }
+        } else {
+            return dbExec.submit(callable);
         }
     }
 }
