@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 public class MediaItemAdapter {
     private static final String TAG = "MediaItemAdapter";
     public static final String MEDIA_ID_FEED_PREFIX = "FeedId:";
+    public static final String MEDIA_ID_SMART_QUEUE_PREFIX = "SmartQueueId:";
     public static final String MEDIA_ID_CONFIRM_STREAMING = "confirm_streaming";
     public static final String KEY_STREAM_URL = "stream_url";
     public static final String KEY_AUTHORIZATION_HEADER = "authorization_header";
@@ -197,6 +198,31 @@ public class MediaItemAdapter {
         metadataBuilder.setIsPlayable(false);
         return new MediaItem.Builder()
                 .setMediaId(id)
+                .setMediaMetadata(metadataBuilder.build())
+                .build();
+    }
+
+    /**
+     * FORK: a smart queue as a playable entry, so choosing it in Android Auto activates it.
+     */
+    public static MediaItem fromSmartQueue(Context context, long playlistId, String title,
+                                           @DrawableRes int iconResId, @Nullable String subtitle) {
+        Uri iconUri = new Uri.Builder()
+                .scheme(ContentResolver.SCHEME_ANDROID_RESOURCE)
+                .authority(context.getResources().getResourcePackageName(iconResId))
+                .appendPath(context.getResources().getResourceTypeName(iconResId))
+                .appendPath(context.getResources().getResourceEntryName(iconResId))
+                .build();
+        MediaMetadata.Builder metadataBuilder = new MediaMetadata.Builder();
+        metadataBuilder.setTitle(title);
+        metadataBuilder.setArtworkUri(iconUri);
+        if (subtitle != null) {
+            metadataBuilder.setSubtitle(subtitle);
+        }
+        metadataBuilder.setIsBrowsable(false);
+        metadataBuilder.setIsPlayable(true);
+        return new MediaItem.Builder()
+                .setMediaId(MEDIA_ID_SMART_QUEUE_PREFIX + playlistId)
                 .setMediaMetadata(metadataBuilder.build())
                 .build();
     }

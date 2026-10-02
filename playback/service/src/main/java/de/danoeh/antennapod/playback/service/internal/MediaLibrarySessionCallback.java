@@ -30,12 +30,15 @@ import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.model.feed.FeedMedia;
+import de.danoeh.antennapod.model.feed.SmartPlaylist;
 import de.danoeh.antennapod.model.feed.SortOrder;
 import de.danoeh.antennapod.playback.base.MediaItemAdapter;
 import de.danoeh.antennapod.playback.base.RewindAfterPauseUtils;
 import de.danoeh.antennapod.ui.appstartintent.MediaButtonStarter;
 import de.danoeh.antennapod.playback.service.R;
 import de.danoeh.antennapod.storage.database.DBReader;
+import de.danoeh.antennapod.storage.database.DBWriter;
+import de.danoeh.antennapod.storage.database.SmartPlaylistPlaybackUtils;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import de.danoeh.antennapod.event.playback.SleepTimerUpdatedEvent;
@@ -55,10 +58,11 @@ public class MediaLibrarySessionCallback implements MediaLibraryService.MediaLib
     private static final String MEDIA_ID_EPISODES = "episodes";
     private static final String MEDIA_ID_SUBSCRIPTIONS = "subscriptions";
     private static final String MEDIA_ID_CONTINUE_LISTENING = "continue_listening";
+    private static final String MEDIA_ID_SMART_QUEUES = "smart_queues";
     private static final int CONTINUE_LISTENING_NUM_EPISODES = 8;
     private static final ImmutableList<String> BROWSABLE_MEDIA_IDS = ImmutableList.of(
             MEDIA_ID_ROOT, MEDIA_ID_QUEUE, MEDIA_ID_DOWNLOADS, MEDIA_ID_EPISODES,
-            MEDIA_ID_SUBSCRIPTIONS, MEDIA_ID_CONTINUE_LISTENING);
+            MEDIA_ID_SUBSCRIPTIONS, MEDIA_ID_CONTINUE_LISTENING, MEDIA_ID_SMART_QUEUES);
 
     protected static final SessionCommand SESSION_COMMAND_REWIND
             = new SessionCommand("rewind", Bundle.EMPTY);
@@ -260,6 +264,11 @@ public class MediaLibrarySessionCallback implements MediaLibraryService.MediaLib
             return Futures.immediateFuture(new MediaSession.MediaItemsWithStartPosition(
                     mediaItems, index, startPositionMs));
         }
+        String selectedId = mediaItems.get(index).mediaId;
+        if (selectedId.startsWith(MediaItemAdapter.MEDIA_ID_SMART_QUEUE_PREFIX)) {
+            return activateSmartQueueItem(Long.parseLong(
+                    selectedId.substring(MediaItemAdapter.MEDIA_ID_SMART_QUEUE_PREFIX.length())), startPositionMs);
+        }
         String searchQuery = mediaItems.get(index).requestMetadata.searchQuery;
         if (searchQuery != null) {
             if ("".equals(searchQuery)) {
@@ -311,6 +320,39 @@ public class MediaLibrarySessionCallback implements MediaLibraryService.MediaLib
                     future.set(new MediaSession.MediaItemsWithStartPosition(
                             Collections.emptyList(), index, startPositionMs));
                 });
+        return future;
+    }
+
+    /**
+     * FORK: choosing a smart queue in the browse tree loads it into the real queue and starts the
+     * episode already in progress, else the first unplayed one -- the same as tapping Play in the app.
+     */
+    private ListenableFuture<MediaSession.MediaItemsWithStartPosition> activateSmartQueueItem(
+            long playlistId, long startPositionMs) {
+        SettableFuture<MediaSession.MediaItemsWithStartPosition> future = SettableFuture.create();
+        Maybe.fromCallable(() -> {
+            SmartPlaylist playlist = DBReader.getSmartPlaylist(playlistId);
+            if (playlist == null) {
+                return null;
+            }
+            FeedItem start = SmartPlaylistPlaybackUtils.pickStartEpisode(
+                    DBWriter.activateSmartQueue(context, playlist).get());
+            return start == null ? null : start.getMedia();
+        })
+                .subscribeOn(Schedulers.io())
+                .subscribe(media -> {
+                    long startPosition = RewindAfterPauseUtils.calculatePositionWithRewind(
+                            (int) SkipUtils.skipIntroIfNecessary(context, media),
+                            media.getLastPlayedTimeStatistics());
+                    future.set(new MediaSession.MediaItemsWithStartPosition(
+                            Collections.singletonList(MediaItemAdapter.fromPlayable(context, media, false)),
+                            0, startPosition));
+                }, error -> {
+                    Log.e(TAG, "Failed to activate smart queue " + playlistId, error);
+                    future.set(new MediaSession.MediaItemsWithStartPosition(
+                            Collections.emptyList(), 0, startPositionMs));
+                }, () -> future.set(new MediaSession.MediaItemsWithStartPosition(
+                        Collections.emptyList(), 0, startPositionMs)));
         return future;
     }
 
@@ -423,12 +465,18 @@ public class MediaLibrarySessionCallback implements MediaLibraryService.MediaLib
 
         switch (parentId) {
             case MEDIA_ID_ROOT:
-                Single.fromCallable(() -> ImmutableList.of(
-                                createBrowsableMediaItem(MEDIA_ID_CONTINUE_LISTENING),
-                                createBrowsableMediaItem(MEDIA_ID_QUEUE),
-                                createBrowsableMediaItem(MEDIA_ID_DOWNLOADS),
-                                createBrowsableMediaItem(MEDIA_ID_EPISODES),
-                                createBrowsableMediaItem(MEDIA_ID_SUBSCRIPTIONS)))
+                Single.fromCallable(() -> {
+                    ImmutableList.Builder<MediaItem> rootItems = ImmutableList.builder();
+                    rootItems.add(createBrowsableMediaItem(MEDIA_ID_CONTINUE_LISTENING),
+                            createBrowsableMediaItem(MEDIA_ID_QUEUE));
+                    if (!DBReader.getSmartPlaylists().isEmpty()) {
+                        rootItems.add(createBrowsableMediaItem(MEDIA_ID_SMART_QUEUES));
+                    }
+                    rootItems.add(createBrowsableMediaItem(MEDIA_ID_DOWNLOADS),
+                            createBrowsableMediaItem(MEDIA_ID_EPISODES),
+                            createBrowsableMediaItem(MEDIA_ID_SUBSCRIPTIONS));
+                    return rootItems.build();
+                })
                         .subscribeOn(Schedulers.io())
                         .subscribe(items -> future.set(LibraryResult.ofItemList(items, params)),
                                 future::setException);
@@ -446,6 +494,21 @@ public class MediaLibrarySessionCallback implements MediaLibraryService.MediaLib
                                     }
                                     future.set(LibraryResult.ofItemList(builder.build(), params));
                                 },
+                                future::setException);
+                return future;
+            case MEDIA_ID_SMART_QUEUES:
+                Single.fromCallable(() -> {
+                    ImmutableList.Builder<MediaItem> builder = ImmutableList.builder();
+                    for (SmartPlaylist playlist : DBReader.getSmartPlaylists()) {
+                        builder.add(MediaItemAdapter.fromSmartQueue(context, playlist.getId(), playlist.getName(),
+                                R.drawable.ic_playlist_play_black, context.getResources().getQuantityString(
+                                        R.plurals.num_episodes, playlist.getEpisodeCount(),
+                                        playlist.getEpisodeCount())));
+                    }
+                    return builder.build();
+                })
+                        .subscribeOn(Schedulers.io())
+                        .subscribe(items -> future.set(LibraryResult.ofItemList(items, params)),
                                 future::setException);
                 return future;
             case MEDIA_ID_CONTINUE_LISTENING:
@@ -572,6 +635,10 @@ public class MediaLibrarySessionCallback implements MediaLibraryService.MediaLib
             case MEDIA_ID_SUBSCRIPTIONS:
                 return MediaItemAdapter.from(context, MEDIA_ID_SUBSCRIPTIONS,
                         context.getString(R.string.subscriptions_label), R.drawable.ic_subscriptions_black, null);
+            case MEDIA_ID_SMART_QUEUES:
+                return MediaItemAdapter.from(context, MEDIA_ID_SMART_QUEUES,
+                        context.getString(R.string.smart_queue_home_section_title),
+                        R.drawable.ic_playlist_play_black, null);
             case MEDIA_ID_CONTINUE_LISTENING:
                 return MediaItemAdapter.from(context, MEDIA_ID_CONTINUE_LISTENING,
                         context.getString(R.string.current_playing_episode), R.drawable.ic_play_48dp_black, null);
