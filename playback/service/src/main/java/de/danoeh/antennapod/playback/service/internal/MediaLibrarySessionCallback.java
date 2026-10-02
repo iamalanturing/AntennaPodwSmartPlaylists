@@ -327,6 +327,7 @@ public class MediaLibrarySessionCallback implements MediaLibraryService.MediaLib
      * FORK: choosing a smart queue in the browse tree loads it into the real queue and starts the
      * episode already in progress, else the first unplayed one -- the same as tapping Play in the app.
      */
+    @UnstableApi
     private ListenableFuture<MediaSession.MediaItemsWithStartPosition> activateSmartQueueItem(
             long playlistId, long startPositionMs) {
         SettableFuture<MediaSession.MediaItemsWithStartPosition> future = SettableFuture.create();
