@@ -6,7 +6,11 @@ from filters (feeds, tags, age, duration, media type) instead of being filled by
 - **Branch:** `claude/add-smart-playlists-v2`
 - **Upstream base:** `b7ee12c` (2026-07-21) from `upstream/develop`, plus `b25adc2` from
   `upstream/master` (the 3.12.0-beta line, 20 commits)
-- **Modified upstream files:** 11 — the rest of the fork is new files
+- **Upstream fixes through 3.12.3** are not merged here. Thirteen conflict-free cherry-picks are
+  on `claude/v2-upstream-sync-3.12.3`; the widget play button (#8672) and own media button
+  receiver (#8816) conflict with the fork's build files and are still to port.
+- **Modified upstream files:** listed under "Upstream files modified" below — the rest of the
+  fork is new files
 
 An earlier attempt lives on `claude/add-smart-playlists-fqUHX`. It touched 137 files and
 modified 40+ upstream ones, including breaking API changes. This branch is a cleaner
@@ -18,9 +22,14 @@ reimplementation and is the one to work from; treat the old branch as reference 
 
 ### The database version number is the sharp edge
 
-The fork sets `PodDBAdapter.VERSION = 3120000` to carry its tables. **Upstream had not reached
-that number** — as of this writing its `VERSION` is still `3110000` and its highest migration
-block is `3080000`. The fork took a number out of upstream's future.
+The fork sets `PodDBAdapter.VERSION` to carry its tables: `3120000` originally, `3120001` for
+the rewritten smart queue tables, `3120002` for `QueueStash`. **Upstream had not reached that
+number** — as of this writing its `VERSION` is still `3110000` and its highest migration block is
+`3080000`. The fork took a number out of upstream's future.
+
+Adding a fork table also means bumping `VERSION`: `createForkSchema` is idempotent, but
+`DBUpgrader.upgrade` only runs when Android sees a higher number, so without the bump devices
+already on the old stamp never get the table (`SmartQueueSchemaMigrationTest` covers this).
 
 Upstream's migration chain is a series of `if (oldVersion < N)` blocks. If a database is already
 stamped `3120000` and upstream later adds a migration numbered at or below that, the block never
@@ -70,18 +79,39 @@ current databases and safe on every upgrade.
 3120000, and without a higher version no upgrade fires and the conversion never happens.
 `LegacySmartQueueMigrationTest` covers it, using DDL copied verbatim from the older branch.
 
-### A smart queue drives playback by ownership, not by membership
+### A smart queue is the real queue
 
-`PlaybackPreferences` stores the active queue id together with the id of the one episode that queue
-owns. The queue keeps overriding continuous playback only while that episode is the one playing:
-the service hands ownership to the next episode as it advances, and
-`Media3PlaybackService.ensureCurrentMediaLoaded` releases the queue as soon as an episode it does
-not own reaches the player.
+Activating a smart queue loads its matches into the real `Queue` table, so everything that reads
+the queue — the Queue screen, auto-advance, Android Auto's `queue` node — works on it unchanged.
+The previous manual queue is copied into `QueueStash` and restored only by an explicit Stop (or by
+deleting the active smart queue). Nothing restores it implicitly.
 
-Do not go back to asking whether the finished episode is *in* the queue. Membership is not
-exclusive — an episode can sit in the regular queue and match a smart queue's rules at the same
-time — so that test silently kept smart queue mode alive and overrode the user's continuous
-playback setting during ordinary queue playback.
+- **"A stash exists" lives in `ForkSchema`** (`queue_stash_present`), written in the same
+  transaction as the copy (`PodDBAdapter.stashQueueThenSet` / `restoreQueueFromStash`). Do not
+  infer it from a preference: process death between the two writes would lose the manual queue.
+- **Switching** from one active smart queue to another replaces `Queue` without re-stashing,
+  otherwise the stash would hold the outgoing smart queue instead of the manual queue.
+- **Re-activating the active queue resumes, it does not rebuild** — but the fast path in
+  `DBWriter.activateSmartQueue` requires the stash as well as the preference.
+  `PREF_ACTIVE_SMART_QUEUE_ID` is the key the old parallel mechanism used and survives an app
+  update, so trusting it alone showed the "Playing smart queue" banner over an untouched manual
+  queue. Stop clears a stale preference for the same reason.
+- **`TAG_QUEUE` is derived from the `Queue` table at read time**, so stashed episodes read as
+  not queued and the queue-based cleanup algorithms would have deleted their downloads.
+  `APCleanupAlgorithm` and `APQueueCleanupAlgorithm` therefore also check
+  `DBReader.getQueueStashIDList()` (marked `// FORK:`). Re-check them on every sync.
+- **Auto-regenerate appends** (`DBWriter.appendRegeneratedSmartQueueEpisodesSync`) and never
+  replaces, so manual reordering inside the queue survives.
+- **Clear queue** while a smart queue is active performs Stop instead.
+
+Do not reintroduce a parallel "next episode in the smart queue" lookup; the queue is the single
+source of truth.
+
+**Android Auto** gets a `Smart Queues` folder (`MediaLibrarySessionCallback`, shown only when one
+exists). Entries are playable `SmartQueueId:<id>` items; choosing one activates it through the
+same path as Play in the app. Known limit, not specific to smart queues: the Now Playing "Queue"
+button lists only the current episode, because `Media3PlaybackService` loads one item into the
+player at a time. The full list is under the library's `Queue` folder.
 
 ### The home section is the part that breaks
 
@@ -211,27 +241,36 @@ WHERE/ORDER BY clause), plus tests `SmartQueueSchemaMigrationTest`,
 the rule edit dialog, and `ui/screen/home/sections/SmartPlaylistsSection` for the home card.
 Layouts and menus under `app/src/main/res/`.
 
-**Three tables**, created by `PodDBAdapter.createForkSchema`: `SmartPlaylists`,
-`SmartPlaylistRules`, `SmartPlaylistEpisodes` (generated membership cache), plus the
-`ForkSchema` bookkeeping table.
+**Playback** — `storage/database/.../SmartPlaylistPlaybackUtils` (shared start-episode choice) and
+`MediaItemAdapter.fromSmartQueue` for the Android Auto folder entries.
+
+**Tests** — `ActiveSmartQueueTest` (stash, restore, switch, resume, stale preference),
+`DbCleanupTests.testPerformAutoCleanupShouldNotDeleteBecauseStashed`, and the smart queue cases in
+`MediaLibrarySessionCallbackTest`.
+
+**Four tables**, created by `PodDBAdapter.createForkSchema`: `SmartPlaylists`,
+`SmartPlaylistRules`, `SmartPlaylistEpisodes` (generated membership cache), `QueueStash` (the
+manual queue while a smart queue is active), plus the `ForkSchema` bookkeeping table.
 
 ## Upstream files modified
 
 | File | Change |
 |---|---|
-| `storage/database/.../PodDBAdapter.java` | `VERSION` bump, fork constants, table/index DDL, Smart Queue CRUD, `createForkSchema` / `readUpstreamSchemaLevel` / `writeUpstreamSchemaLevel`, `SmartPlaylistEpisodes` cleanup in `removeFeedItems` |
+| `storage/database/.../PodDBAdapter.java` | `VERSION` bump, fork constants, table/index DDL, Smart Queue CRUD, `QueueStash` and the stash/restore primitives, `createForkSchema` / `readUpstreamSchemaLevel` / `writeUpstreamSchemaLevel`, `SmartPlaylistEpisodes` cleanup in `removeFeedItems` |
 | `storage/database/.../DBUpgrader.java` | Drives the upstream chain off the recorded level; applies fork DDL unconditionally |
-| `storage/database/.../DBReader.java` | Smart Queue read methods |
-| `storage/database/.../DBWriter.java` | Smart Queue CRUD, transactional regeneration, clears the active queue id on delete |
-| `storage/preferences/.../PlaybackPreferences.java` | Active smart queue id, and the episode that queue owns |
-| `playback/service/.../Media3PlaybackService.java` | Advances within a smart queue; auto-regenerates at end of queue; releases the queue when an episode it does not own starts |
+| `storage/database/.../DBReader.java` | Smart Queue read methods, `getQueueStashIDList` |
+| `storage/database/.../DBWriter.java` | Smart Queue CRUD, transactional regeneration, `activateSmartQueue` / `stopActiveSmartQueue` / append-on-regenerate, deleting the active queue restores the stash |
+| `net/download/service/.../APCleanupAlgorithm.java`, `APQueueCleanupAlgorithm.java` | Protect stashed episodes from auto-delete |
+| `storage/preferences/.../PlaybackPreferences.java` | Active smart queue id |
+| `playback/service/.../Media3PlaybackService.java` | Advances through the real queue; auto-regenerates by appending at end of queue; widget entry point activates the queue |
+| `playback/service/.../MediaLibrarySessionCallback.java`, `playback/base/.../MediaItemAdapter.java` | Android Auto `Smart Queues` folder and activate-on-select |
+| `app/.../ui/screen/queue/QueueFragment.java`, `queue_fragment.xml` | Active-queue banner with Stop; Clear queue performs Stop while one is active |
 | `app/.../PodcastApp.java` | Registers the media browser service at startup for Bluetooth/AVRCP |
 | `app/.../MainActivity.java`, `.../home/HomeFragment.java` | Fragment and home-section wiring |
 | `ui/i18n/.../values/strings.xml`, `ui/preferences/.../values/arrays.xml` | Strings and home-section registration |
 
-Note this branch does **not** touch `PlaybackService.java` (the legacy service),
-`MediaItemAdapter`, or the launcher icons — all of which the older fqUHX branch did. Rebasing
-is correspondingly less painful.
+Note this branch does **not** touch `PlaybackService.java` (the legacy service) or the launcher
+icons, both of which the older fqUHX branch did. Rebasing is correspondingly less painful.
 
 Fork insertions in upstream files are marked `// FORK:`. Treat that as a hint, not an
 inventory — the markers do not cover every touched line.
@@ -253,5 +292,7 @@ run and no artifact. If someone is waiting on a build, make sure the push actual
 
 After a merge, beyond a green CI run, check on a device with a **backed-up** database:
 upgrading over an existing install keeps both playlists and their episode counts; a fresh
-install creates the tables; deleting a smart queue mid-playback falls back to the normal queue;
-and the home screen still renders.
+install creates the tables; deleting a smart queue mid-playback restores the manual queue; and
+the home screen still renders. Also: activate a smart queue with a manual queue in place and
+check Stop brings it back intact; and in Android Auto check the `Smart Queues` folder lists the
+queues, marks the active one, and starts one when chosen.

@@ -500,11 +500,14 @@ public class MediaLibrarySessionCallback implements MediaLibraryService.MediaLib
             case MEDIA_ID_SMART_QUEUES:
                 Single.fromCallable(() -> {
                     ImmutableList.Builder<MediaItem> builder = ImmutableList.builder();
+                    long activeId = PlaybackPreferences.getActiveSmartQueueId();
                     for (SmartPlaylist playlist : DBReader.getSmartPlaylists()) {
+                        String count = context.getResources().getQuantityString(
+                                R.plurals.num_episodes, playlist.getEpisodeCount(), playlist.getEpisodeCount());
+                        String subtitle = playlist.getId() == activeId
+                                ? context.getString(R.string.smart_queue_active_subtitle, count) : count;
                         builder.add(MediaItemAdapter.fromSmartQueue(context, playlist.getId(), playlist.getName(),
-                                R.drawable.ic_playlist_play_black, context.getResources().getQuantityString(
-                                        R.plurals.num_episodes, playlist.getEpisodeCount(),
-                                        playlist.getEpisodeCount())));
+                                R.drawable.ic_playlist_play_black, subtitle));
                     }
                     return builder.build();
                 })
