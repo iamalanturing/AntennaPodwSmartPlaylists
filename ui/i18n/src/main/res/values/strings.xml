@@ -1065,7 +1065,6 @@
     <string name="smart_queue_edit">Edit</string>
     <string name="smart_queue_delete">Delete</string>
     <string name="smart_queue_regenerate">Regenerate</string>
-    <string name="smart_queue_auto_rebuild">Auto-rebuild when exhausted</string>
     <string name="smart_queue_name_hint">Queue name</string>
     <string name="smart_queue_add_rule">Add rule</string>
     <string name="smart_queue_no_limit">0 = no limit</string>
