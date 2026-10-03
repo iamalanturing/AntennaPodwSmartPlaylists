@@ -826,7 +826,10 @@ public class Media3PlaybackService extends MediaLibraryService {
             long activeSmartQueueId = PlaybackPreferences.getActiveSmartQueueId();
             if (nextItem == null && activeSmartQueueId != 0) {
                 SmartPlaylist activeQueue = DBReader.getSmartPlaylist(activeSmartQueueId);
-                if (activeQueue != null && activeQueue.isAutoRegenerate()) {
+                if (activeQueue != null && activeQueue.getNextPlaylistId() != 0) {
+                    nextItem = SmartPlaylistPlaybackUtils.pickStartEpisode(
+                            DBWriter.handOverToNextSmartQueue(this, activeQueue, item.getId()).get());
+                } else if (activeQueue != null && activeQueue.isAutoRegenerate()) {
                     if (DEBUG_SMART_QUEUE) {
                         Log.d(TAG, "Auto-regenerating smart queue " + activeSmartQueueId);
                     }

@@ -28,6 +28,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -1078,35 +1079,99 @@ public class DBWriter {
 
             generateSmartPlaylistInternal(playlist);
             List<FeedItem> matches = DBReader.getSmartPlaylistEpisodes(playlist.getId());
-
-            adapter.open();
-            List<FeedItem> outgoing = DBReader.getQueue();
-            if (stashed) {
-                // Switching directly from one active smart queue to another: the manual queue is
-                // already stashed underneath the outgoing one, so stashing again here would
-                // overwrite it with the outgoing smart queue's episodes instead.
-                adapter.setQueue(matches);
-            } else {
-                adapter.stashQueueThenSet(matches);
+            if (matches.isEmpty() && playlist.getNextPlaylistId() != 0) {
+                Set<Long> visited = new HashSet<>();
+                visited.add(playlist.getId());
+                List<FeedItem> handedOver = handOverToSmartQueue(context, playlist.getNextPlaylistId(), 0, visited);
+                if (!handedOver.isEmpty()) {
+                    return handedOver;
+                }
             }
-            adapter.close();
-
-            for (FeedItem item : outgoing) {
-                item.removeTag(FeedItem.TAG_QUEUE);
-            }
-            for (FeedItem item : matches) {
-                item.addTag(FeedItem.TAG_QUEUE);
-            }
-            PlaybackPreferences.writeActiveSmartQueueId(playlist.getId());
-
-            EventBus.getDefault().post(QueueEvent.setQueue(matches));
-            List<FeedItem> changed = new ArrayList<>(outgoing);
-            changed.addAll(matches);
-            EventBus.getDefault().post(new FeedItemEvent(changed, false));
-
-            AutoDownloadManager.getInstance().autodownloadUndownloadedItems(context);
-            return matches;
+            return installSmartQueue(context, playlist, matches);
         });
+    }
+
+    /**
+     * FORK: a smart queue has run out and is set to hand over to another one. Resumes the target
+     * from what it has left rather than rebuilding it; rebuilds it only when nothing is left, and
+     * if even that finds nothing, follows the target's own setting in turn. Returns what was
+     * loaded into the queue, empty if no queue in the chain had anything to play.
+     *
+     * @param finishedItemId the episode that just ended. Its played state is not written yet, so
+     *                       it must be kept out of the new queue or it would start again.
+     */
+    public static Future<List<FeedItem>> handOverToNextSmartQueue(Context context, SmartPlaylist exhausted,
+                                                                  long finishedItemId) {
+        return runOnDbThread(() -> handOverToSmartQueue(
+                context, exhausted.getNextPlaylistId(), finishedItemId, new HashSet<>()));
+    }
+
+    private static List<FeedItem> handOverToSmartQueue(Context context, long targetId, long finishedItemId,
+                                                       Set<Long> visited) {
+        long nextId = targetId;
+        // A queue seen twice in one hand-over is a loop of queues that are all empty
+        while (nextId != 0 && visited.add(nextId)) {
+            SmartPlaylist target = DBReader.getSmartPlaylist(nextId);
+            if (target == null) {
+                break;
+            }
+            List<FeedItem> episodes = playableEpisodes(
+                    DBReader.getSmartPlaylistEpisodes(nextId), finishedItemId, true);
+            if (episodes.isEmpty()) {
+                generateSmartPlaylistInternal(target);
+                episodes = playableEpisodes(DBReader.getSmartPlaylistEpisodes(nextId), finishedItemId, false);
+            }
+            if (!episodes.isEmpty()) {
+                return installSmartQueue(context, target, episodes);
+            }
+            nextId = target.getNextPlaylistId();
+        }
+        return Collections.emptyList();
+    }
+
+    private static List<FeedItem> playableEpisodes(List<FeedItem> episodes, long excludedItemId,
+                                                   boolean dropPlayed) {
+        List<FeedItem> playable = new ArrayList<>();
+        for (FeedItem episode : episodes) {
+            if (episode.getMedia() != null && episode.getId() != excludedItemId
+                    && !(dropPlayed && episode.isPlayed())) {
+                playable.add(episode);
+            }
+        }
+        return playable;
+    }
+
+    private static List<FeedItem> installSmartQueue(Context context, SmartPlaylist playlist,
+                                                    List<FeedItem> matches) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        boolean stashed = adapter.isQueueStashed();
+        List<FeedItem> outgoing = DBReader.getQueue();
+        if (stashed) {
+            // Switching directly from one active smart queue to another: the manual queue is
+            // already stashed underneath the outgoing one, so stashing again here would
+            // overwrite it with the outgoing smart queue's episodes instead.
+            adapter.setQueue(matches);
+        } else {
+            adapter.stashQueueThenSet(matches);
+        }
+        adapter.close();
+
+        for (FeedItem item : outgoing) {
+            item.removeTag(FeedItem.TAG_QUEUE);
+        }
+        for (FeedItem item : matches) {
+            item.addTag(FeedItem.TAG_QUEUE);
+        }
+        PlaybackPreferences.writeActiveSmartQueueId(playlist.getId());
+
+        EventBus.getDefault().post(QueueEvent.setQueue(matches));
+        List<FeedItem> changed = new ArrayList<>(outgoing);
+        changed.addAll(matches);
+        EventBus.getDefault().post(new FeedItemEvent(changed, false));
+
+        AutoDownloadManager.getInstance().autodownloadUndownloadedItems(context);
+        return matches;
     }
 
     /**

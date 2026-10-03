@@ -8,6 +8,8 @@ public class SmartPlaylist implements Serializable {
     private long id;
     private String name;
     private boolean autoRegenerate;
+    private long nextPlaylistId;
+    private String nextPlaylistName;
     private long generatedAt;
     private long createdAt;
     private long updatedAt;
@@ -43,6 +45,22 @@ public class SmartPlaylist implements Serializable {
 
     public void setAutoRegenerate(boolean autoRegenerate) {
         this.autoRegenerate = autoRegenerate;
+    }
+
+    public long getNextPlaylistId() {
+        return nextPlaylistId;
+    }
+
+    public void setNextPlaylistId(long nextPlaylistId) {
+        this.nextPlaylistId = nextPlaylistId;
+    }
+
+    public String getNextPlaylistName() {
+        return nextPlaylistName;
+    }
+
+    public void setNextPlaylistName(String nextPlaylistName) {
+        this.nextPlaylistName = nextPlaylistName;
     }
 
     public long getGeneratedAt() {

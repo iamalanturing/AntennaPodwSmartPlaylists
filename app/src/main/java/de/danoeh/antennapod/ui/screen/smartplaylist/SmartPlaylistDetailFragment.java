@@ -8,11 +8,9 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.CompoundButton;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.widget.SwitchCompat;
 import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -93,11 +91,13 @@ public class SmartPlaylistDetailFragment extends Fragment {
         toolbar.setNavigationOnClickListener(v -> requireActivity().onBackPressed());
         toolbar.setOnMenuItemClickListener(this::onMenuItemClick);
 
-        SwitchCompat autoRebuildSwitch = view.findViewById(R.id.auto_rebuild_switch);
-        autoRebuildSwitch.setOnCheckedChangeListener((CompoundButton btn, boolean checked) -> {
+        TextView runOutSetting = view.findViewById(R.id.run_out_setting);
+        runOutSetting.setOnClickListener(v -> {
             if (playlist != null) {
-                playlist.setAutoRegenerate(checked);
-                DBWriter.updateSmartPlaylist(playlist, requireContext());
+                SmartQueueRunOutDialog.show(requireContext(), playlist, () -> {
+                    DBWriter.updateSmartPlaylist(playlist, requireContext());
+                    runOutSetting.setText(SmartQueueRunOutDialog.describe(requireContext(), playlist));
+                });
             }
         });
 
@@ -224,8 +224,8 @@ public class SmartPlaylistDetailFragment extends Fragment {
                         return;
                     }
                     view.<Toolbar>findViewById(R.id.toolbar).setTitle(playlist.getName());
-                    SwitchCompat sw = view.findViewById(R.id.auto_rebuild_switch);
-                    sw.setChecked(playlist.isAutoRegenerate());
+                    view.<TextView>findViewById(R.id.run_out_setting).setText(
+                            SmartQueueRunOutDialog.describe(requireContext(), playlist));
 
                     @SuppressWarnings("unchecked")
                     List<FeedItem> eps = (List<FeedItem>) result[1];

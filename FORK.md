@@ -23,7 +23,7 @@ reimplementation and is the one to work from; treat the old branch as reference 
 ### The database version number is the sharp edge
 
 The fork sets `PodDBAdapter.VERSION` to carry its tables: `3120000` originally, `3120001` for
-the rewritten smart queue tables, `3120002` for `QueueStash`. **Upstream had not reached that
+the rewritten smart queue tables, `3120002` for `QueueStash`, `3120003` for `SmartPlaylists.sp_next_playlist_id`. **Upstream had not reached that
 number** — as of this writing its `VERSION` is still `3110000` and its highest migration block is
 `3080000`. The fork took a number out of upstream's future.
 
@@ -103,6 +103,14 @@ deleting the active smart queue). Nothing restores it implicitly.
 - **Auto-regenerate appends** (`DBWriter.appendRegeneratedSmartQueueEpisodesSync`) and never
   replaces, so manual reordering inside the queue survives.
 - **Clear queue** while a smart queue is active performs Stop instead.
+- **"When this queue runs out"** is one of stop, rebuild (`sp_auto_regenerate`) or hand over to
+  another smart queue (`sp_next_playlist_id`); the edit screen keeps them mutually exclusive.
+  `DBWriter.handOverToNextSmartQueue` resumes the target from its cached membership minus played
+  episodes and does **not** rebuild it unless nothing is left; if the rebuild is empty too it
+  follows the target's own setting. Queues may hand over to each other in a ring; a queue seen
+  twice within one hand-over ends it. The episode that just finished is passed in and excluded,
+  because its played state is written after the lookup. Starting an empty queue that has a target
+  goes straight to the target. Deleting a queue clears every reference to it.
 
 Do not reintroduce a parallel "next episode in the smart queue" lookup; the queue is the single
 source of truth.

@@ -45,6 +45,18 @@ public class SmartQueueSchemaMigrationTest {
         }
     }
 
+    private boolean hasColumn(String table, String column) {
+        try (Cursor cursor = db.rawQuery("PRAGMA table_info(" + table + ")", null)) {
+            int nameColumn = cursor.getColumnIndex("name");
+            while (cursor.moveToNext()) {
+                if (column.equals(cursor.getString(nameColumn))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private void assertSmartQueueSchemaPresent() {
         assertTrue("SmartPlaylists missing", exists("table", PodDBAdapter.TABLE_NAME_SMART_PLAYLISTS));
         assertTrue("SmartPlaylistRules missing",
@@ -56,6 +68,8 @@ public class SmartQueueSchemaMigrationTest {
         assertTrue("episodes index missing",
                 exists("index", PodDBAdapter.TABLE_NAME_SMART_PLAYLIST_EPISODES + "_playlist"));
         assertTrue("QueueStash missing", exists("table", PodDBAdapter.TABLE_NAME_QUEUE_STASH));
+        assertTrue("hand-over column missing", hasColumn(PodDBAdapter.TABLE_NAME_SMART_PLAYLISTS,
+                PodDBAdapter.KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID));
     }
 
     @Test
@@ -106,6 +120,33 @@ public class SmartQueueSchemaMigrationTest {
         // a device Android does not consider due for onUpgrade().
         DBUpgrader.upgrade(db, 3120001, PodDBAdapter.VERSION);
         assertTrue("QueueStash missing", exists("table", PodDBAdapter.TABLE_NAME_QUEUE_STASH));
+    }
+
+    @Test
+    public void upgradeFromPreviousVersionAddsTheHandOverColumnAndKeepsPlaylists() {
+        // SmartPlaylists as it was at 3120002, before sp_next_playlist_id existed. CREATE TABLE
+        // IF NOT EXISTS leaves it alone, so the column has to be added to the existing table.
+        db.execSQL("CREATE TABLE " + PodDBAdapter.TABLE_NAME_SMART_PLAYLISTS + " ("
+                + PodDBAdapter.KEY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + PodDBAdapter.KEY_SMART_PLAYLIST_NAME + " TEXT NOT NULL,"
+                + PodDBAdapter.KEY_SMART_PLAYLIST_AUTO_REGENERATE + " INTEGER DEFAULT 1,"
+                + PodDBAdapter.KEY_SMART_PLAYLIST_GENERATED_AT + " INTEGER DEFAULT 0,"
+                + PodDBAdapter.KEY_SMART_PLAYLIST_CREATED_AT + " INTEGER NOT NULL,"
+                + PodDBAdapter.KEY_SMART_PLAYLIST_UPDATED_AT + " INTEGER NOT NULL)");
+        db.execSQL("INSERT INTO " + PodDBAdapter.TABLE_NAME_SMART_PLAYLISTS + " ("
+                + PodDBAdapter.KEY_SMART_PLAYLIST_NAME + ", " + PodDBAdapter.KEY_SMART_PLAYLIST_CREATED_AT
+                + ", " + PodDBAdapter.KEY_SMART_PLAYLIST_UPDATED_AT + ") VALUES ('Kids', 1, 1)");
+
+        DBUpgrader.upgrade(db, 3120002, PodDBAdapter.VERSION);
+
+        assertTrue(hasColumn(PodDBAdapter.TABLE_NAME_SMART_PLAYLISTS,
+                PodDBAdapter.KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID));
+        assertEquals(1, rowCount(PodDBAdapter.TABLE_NAME_SMART_PLAYLISTS));
+        try (Cursor cursor = db.rawQuery("SELECT " + PodDBAdapter.KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID
+                + " FROM " + PodDBAdapter.TABLE_NAME_SMART_PLAYLISTS, null)) {
+            cursor.moveToFirst();
+            assertEquals("existing playlists must not hand over to anything", 0, cursor.getLong(0));
+        }
     }
 
     @Test

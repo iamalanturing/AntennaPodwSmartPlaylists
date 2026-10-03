@@ -866,6 +866,14 @@ public final class DBReader {
                 playlist.setEpisodeCount(adapter.getSmartPlaylistEpisodeCount(playlistId));
                 List<SmartPlaylistRule> rules = getSmartPlaylistRulesInternal(adapter, playlistId);
                 playlist.setRules(rules);
+                if (playlist.getNextPlaylistId() != 0) {
+                    try (SmartPlaylistCursor next = new SmartPlaylistCursor(
+                            adapter.getSmartPlaylistCursor(playlist.getNextPlaylistId()))) {
+                        if (next.moveToFirst()) {
+                            playlist.setNextPlaylistName(next.extractSmartPlaylist().getName());
+                        }
+                    }
+                }
                 return playlist;
             }
             return null;

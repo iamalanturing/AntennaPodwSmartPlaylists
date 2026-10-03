@@ -9,6 +9,7 @@ public class SmartPlaylistCursor extends CursorWrapper {
     private final int indexId;
     private final int indexName;
     private final int indexAutoRegenerate;
+    private final int indexNextPlaylistId;
     private final int indexGeneratedAt;
     private final int indexCreatedAt;
     private final int indexUpdatedAt;
@@ -18,6 +19,7 @@ public class SmartPlaylistCursor extends CursorWrapper {
         indexId = cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_ID);
         indexName = cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_SMART_PLAYLIST_NAME);
         indexAutoRegenerate = cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_SMART_PLAYLIST_AUTO_REGENERATE);
+        indexNextPlaylistId = cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID);
         indexGeneratedAt = cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_SMART_PLAYLIST_GENERATED_AT);
         indexCreatedAt = cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_SMART_PLAYLIST_CREATED_AT);
         indexUpdatedAt = cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_SMART_PLAYLIST_UPDATED_AT);
@@ -28,6 +30,7 @@ public class SmartPlaylistCursor extends CursorWrapper {
         playlist.setId(getLong(indexId));
         playlist.setName(getString(indexName));
         playlist.setAutoRegenerate(getInt(indexAutoRegenerate) == 1);
+        playlist.setNextPlaylistId(getLong(indexNextPlaylistId));
         playlist.setGeneratedAt(getLong(indexGeneratedAt));
         playlist.setCreatedAt(getLong(indexCreatedAt));
         playlist.setUpdatedAt(getLong(indexUpdatedAt));

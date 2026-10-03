@@ -65,7 +65,10 @@ public class PodDBAdapter {
     // FORK: 3120002 adds QueueStash (createForkSchema() is IF NOT EXISTS and runs on every
     // upgrade, but onUpgrade() itself only fires when VERSION goes up -- without this bump an
     // already-3120001-stamped device never re-enters createForkSchema() and never gets the table).
-    public static final int VERSION = 3120002;
+    // FORK: 3120003 adds SmartPlaylists.sp_next_playlist_id (what a smart queue hands over to when
+    // it runs out). Same reason as above: the column is added from createForkSchema(), which only
+    // runs again on a device if onUpgrade() fires.
+    public static final int VERSION = 3120003;
 
     /**
      * FORK: how far through upstream's migration chain the code in this fork actually goes.
@@ -188,6 +191,7 @@ public class PodDBAdapter {
     // FORK: Smart Playlist column keys
     public static final String KEY_SMART_PLAYLIST_NAME = "sp_name";
     public static final String KEY_SMART_PLAYLIST_AUTO_REGENERATE = "sp_auto_regenerate";
+    public static final String KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID = "sp_next_playlist_id";
     public static final String KEY_SMART_PLAYLIST_GENERATED_AT = "sp_generated_at";
     public static final String KEY_SMART_PLAYLIST_CREATED_AT = "sp_created_at";
     public static final String KEY_SMART_PLAYLIST_UPDATED_AT = "sp_updated_at";
@@ -340,6 +344,7 @@ public class PodDBAdapter {
             + TABLE_NAME_SMART_PLAYLISTS + " (" + KEY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
             + KEY_SMART_PLAYLIST_NAME + " TEXT NOT NULL,"
             + KEY_SMART_PLAYLIST_AUTO_REGENERATE + " INTEGER DEFAULT 1,"
+            + KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID + " INTEGER DEFAULT 0,"
             + KEY_SMART_PLAYLIST_GENERATED_AT + " INTEGER DEFAULT 0,"
             + KEY_SMART_PLAYLIST_CREATED_AT + " INTEGER NOT NULL,"
             + KEY_SMART_PLAYLIST_UPDATED_AT + " INTEGER NOT NULL)";
@@ -1832,6 +1837,7 @@ public class PodDBAdapter {
         ContentValues values = new ContentValues();
         values.put(KEY_SMART_PLAYLIST_NAME, playlist.getName());
         values.put(KEY_SMART_PLAYLIST_AUTO_REGENERATE, playlist.isAutoRegenerate() ? 1 : 0);
+        values.put(KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID, playlist.getNextPlaylistId());
         values.put(KEY_SMART_PLAYLIST_GENERATED_AT, playlist.getGeneratedAt());
         values.put(KEY_SMART_PLAYLIST_UPDATED_AT, System.currentTimeMillis());
 
@@ -1916,6 +1922,10 @@ public class PodDBAdapter {
         deleteSmartPlaylistEpisodes(playlistId);
         db.delete(TABLE_NAME_SMART_PLAYLISTS, KEY_ID + "=?",
                 new String[]{String.valueOf(playlistId)});
+        ContentValues clearedHandOff = new ContentValues();
+        clearedHandOff.put(KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID, 0);
+        db.update(TABLE_NAME_SMART_PLAYLISTS, clearedHandOff, KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID + "=?",
+                new String[]{String.valueOf(playlistId)});
     }
 
     /**
@@ -1957,6 +1967,10 @@ public class PodDBAdapter {
         db.execSQL(CREATE_TABLE_FORK_SCHEMA);
         db.execSQL(CREATE_TABLE_QUEUE_STASH);
         db.execSQL(CREATE_TABLE_SMART_PLAYLISTS);
+        if (!hasColumn(db, TABLE_NAME_SMART_PLAYLISTS, KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID)) {
+            db.execSQL("ALTER TABLE " + TABLE_NAME_SMART_PLAYLISTS + " ADD COLUMN "
+                    + KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID + " INTEGER DEFAULT 0");
+        }
         db.execSQL(CREATE_TABLE_SMART_PLAYLIST_RULES);
         db.execSQL(CREATE_TABLE_SMART_PLAYLIST_EPISODES);
         db.execSQL(CREATE_INDEX_SMART_PLAYLIST_EPISODES_PLAYLIST);

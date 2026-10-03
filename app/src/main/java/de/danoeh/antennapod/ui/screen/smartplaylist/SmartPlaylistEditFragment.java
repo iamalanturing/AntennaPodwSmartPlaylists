@@ -7,10 +7,10 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.widget.SwitchCompat;
 import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.ItemTouchHelper;
@@ -45,7 +45,7 @@ public class SmartPlaylistEditFragment extends Fragment {
     private Disposable feedsDisposable;
     private Disposable countsDisposable;
     private EditText nameEdit;
-    private SwitchCompat autoRebuildSwitch;
+    private TextView runOutSetting;
 
     public static SmartPlaylistEditFragment newInstance(long playlistId) {
         SmartPlaylistEditFragment fragment = new SmartPlaylistEditFragment();
@@ -80,7 +80,9 @@ public class SmartPlaylistEditFragment extends Fragment {
             return false;
         });
 
-        autoRebuildSwitch = view.findViewById(R.id.auto_rebuild_switch);
+        runOutSetting = view.findViewById(R.id.run_out_setting);
+        runOutSetting.setOnClickListener(v -> SmartQueueRunOutDialog.show(requireContext(), playlist,
+                () -> runOutSetting.setText(SmartQueueRunOutDialog.describe(requireContext(), playlist))));
 
         nameEdit = view.findViewById(R.id.smart_playlist_name_edit);
         nameEdit.addTextChangedListener(new TextWatcher() {
@@ -101,6 +103,7 @@ public class SmartPlaylistEditFragment extends Fragment {
         rulesRecycler.setLayoutManager(new LinearLayoutManager(getContext()));
 
         playlist = new SmartPlaylist();
+        runOutSetting.setText(SmartQueueRunOutDialog.describe(requireContext(), playlist));
         playlist.getRules().add(newRule());
         ruleAdapter = new SmartPlaylistRuleAdapter(playlist.getRules(), rule ->
                 SmartPlaylistRuleEditDialog.show(requireContext(), rule, feeds, () -> {
@@ -222,7 +225,7 @@ public class SmartPlaylistEditFragment extends Fragment {
                     if (result != null) {
                         playlist = result;
                         nameEdit.setText(playlist.getName());
-                        autoRebuildSwitch.setChecked(playlist.isAutoRegenerate());
+                        runOutSetting.setText(SmartQueueRunOutDialog.describe(requireContext(), playlist));
                         if (ruleAdapter != null) {
                             ruleAdapter.setRules(playlist.getRules());
                         }
@@ -238,7 +241,6 @@ public class SmartPlaylistEditFragment extends Fragment {
             return;
         }
         playlist.setName(name);
-        playlist.setAutoRegenerate(autoRebuildSwitch.isChecked());
 
         if (playlistId == 0) {
             DBWriter.createSmartPlaylist(playlist, requireContext());

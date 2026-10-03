@@ -1115,6 +1115,13 @@
     <string name="smart_queue_list_empty_message">A Smart Queue fills itself from rules you set, such as unplayed episodes of a few podcasts. Tap the plus button to create one.</string>
     <string name="smart_queue_active_banner">Playing smart queue: %s</string>
     <string name="smart_queue_active_subtitle">Playing now · %1$s</string>
+    <string name="smart_queue_run_out_title">When this queue runs out</string>
+    <string name="smart_queue_run_out_summary">When this queue runs out: %1$s</string>
+    <string name="smart_queue_run_out_stop">Stop</string>
+    <string name="smart_queue_run_out_rebuild">Rebuild</string>
+    <string name="smart_queue_run_out_switch">Switch to another smart queue</string>
+    <string name="smart_queue_run_out_switch_to">Switch to %1$s</string>
+    <string name="smart_queue_run_out_pick_target">Switch to which smart queue?</string>
     <string name="smart_queue_stop_label">Stop</string>
     <string name="smart_queue_stop_confirmation_msg">This will stop the Smart Queue, restore your previous queue, and stop playback.</string>
     <string name="save_label">Save</string>

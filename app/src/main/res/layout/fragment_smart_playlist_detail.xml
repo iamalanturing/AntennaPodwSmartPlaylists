@@ -25,12 +25,14 @@
         android:padding="8dp"
         android:gravity="center_vertical">
 
-        <androidx.appcompat.widget.SwitchCompat
-            android:id="@+id/auto_rebuild_switch"
+        <TextView
+            android:id="@+id/run_out_setting"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/smart_queue_auto_rebuild" />
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackground"
+            android:textAppearance="?attr/textAppearanceBodyLarge" />
 
         <Button
             android:id="@+id/play_button"
