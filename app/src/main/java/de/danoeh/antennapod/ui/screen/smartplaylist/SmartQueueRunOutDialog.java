@@ -16,7 +16,8 @@ import java.util.List;
  * FORK: the "When this queue runs out" choice -- stop, rebuild, or hand over to another smart queue.
  */
 public final class SmartQueueRunOutDialog {
-    private SmartQueueRunOutDialog() { }
+    private SmartQueueRunOutDialog() {
+    }
 
     public static String describe(Context context, SmartPlaylist playlist) {
         String setting;
