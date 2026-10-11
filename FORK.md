@@ -6,9 +6,10 @@ from filters (feeds, tags, age, duration, media type) instead of being filled by
 - **Branch:** `claude/add-smart-playlists-v2`
 - **Upstream base:** `b7ee12c` (2026-07-21) from `upstream/develop`, plus `b25adc2` from
   `upstream/master` (the 3.12.0-beta line, 20 commits)
-- **Upstream fixes through 3.12.3** are not merged here. Thirteen conflict-free cherry-picks are
-  on `claude/v2-upstream-sync-3.12.3`; the widget play button (#8672) and own media button
-  receiver (#8816) conflict with the fork's build files and are still to port.
+- **Upstream fixes through 3.12.3** are merged (13 commits from `upstream/master`, cherry-picked
+  with `-x`). Not taken: the widget play button (#8672) and own media button receiver (#8816),
+  which conflict with the fork's build files and are still to port, plus version bumps,
+  translations and contributor lists.
 - **Modified upstream files:** listed under "Upstream files modified" below — the rest of the
   fork is new files
 
