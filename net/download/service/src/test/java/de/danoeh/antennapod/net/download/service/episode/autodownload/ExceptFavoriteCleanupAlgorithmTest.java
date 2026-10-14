@@ -85,6 +85,10 @@ public class ExceptFavoriteCleanupAlgorithmTest extends DbCleanupTests {
     }
 
     @Override
+    public void testPerformAutoCleanupShouldNotDeleteBecauseInOtherQueue() throws IOException {
+    }
+
+    @Override
     public void testPerformAutoCleanupShouldNotDeleteBecauseInQueue_withFeedsWithNoMedia() throws IOException {
         // Yes it should
     }

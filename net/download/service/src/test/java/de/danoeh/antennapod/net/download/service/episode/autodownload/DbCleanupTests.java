@@ -195,6 +195,26 @@ public class DbCleanupTests {
         }
     }
 
+    @Test
+    public void testPerformAutoCleanupShouldNotDeleteBecauseInOtherQueue() throws IOException {
+        final int numItems = EPISODE_CACHE_SIZE * 2;
+
+        Feed feed = new Feed("url", null, "title");
+        List<FeedItem> items = new ArrayList<>();
+        feed.setItems(items);
+        List<File> files = new ArrayList<>();
+        populateItems(numItems, feed, items, files, FeedItem.PLAYED, false, false);
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        adapter.setQueue(PodDBAdapter.QUEUE_ID_DEFAULT + 1, items);
+        adapter.close();
+
+        AutoDownloadManager.getInstance().performAutoCleanup(context);
+        for (File file : files) {
+            assertTrue(file.exists());
+        }
+    }
+
     /**
      * Reproduces a bug where DBTasks.performAutoCleanup(android.content.Context) would use the ID
      * of the FeedItem in the call to DBWriter.deleteFeedMediaOfItem instead of the ID of the FeedMedia.

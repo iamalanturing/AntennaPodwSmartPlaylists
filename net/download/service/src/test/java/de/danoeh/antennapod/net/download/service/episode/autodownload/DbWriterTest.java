@@ -27,6 +27,7 @@ import org.robolectric.RobolectricTestRunner;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -667,6 +668,41 @@ public class DbWriterTest {
             queue.close();
             adapter.close();
         }
+    }
+
+    @Test
+    public void testRemoveQueueItemRemovesFromAllQueues() throws Exception {
+        final long otherQueue = PodDBAdapter.QUEUE_ID_DEFAULT + 1;
+        Feed feed = createTestFeed(2);
+        final FeedItem inDefault = feed.getItems().get(0);
+        final FeedItem inOther = feed.getItems().get(1);
+        withPodDB(adapter -> {
+            adapter.setQueue(PodDBAdapter.QUEUE_ID_DEFAULT, Collections.singletonList(inDefault));
+            adapter.setQueue(otherQueue, Collections.singletonList(inOther));
+        });
+
+        DBWriter.removeQueueItem(context, false, inOther).get(TIMEOUT, TimeUnit.SECONDS);
+
+        assertEquals(1, DBReader.getQueueIDList(PodDBAdapter.QUEUE_ID_DEFAULT).size());
+        assertEquals(0, DBReader.getQueueIDList(otherQueue).size());
+    }
+
+    @Test
+    public void testRemoveFromQueueOnlyTouchesThatQueue() throws Exception {
+        final long otherQueue = PodDBAdapter.QUEUE_ID_DEFAULT + 1;
+        Feed feed = createTestFeed(2);
+        final FeedItem inDefault = feed.getItems().get(0);
+        final FeedItem inOther = feed.getItems().get(1);
+        withPodDB(adapter -> {
+            adapter.setQueue(PodDBAdapter.QUEUE_ID_DEFAULT, Collections.singletonList(inDefault));
+            adapter.setQueue(otherQueue, Collections.singletonList(inOther));
+        });
+
+        DBWriter.removeFromQueue(context, PodDBAdapter.QUEUE_ID_DEFAULT, false, inDefault)
+                .get(TIMEOUT, TimeUnit.SECONDS);
+
+        assertEquals(0, DBReader.getQueueIDList(PodDBAdapter.QUEUE_ID_DEFAULT).size());
+        assertEquals(1, DBReader.getQueueIDList(otherQueue).size());
     }
 
     @Test
