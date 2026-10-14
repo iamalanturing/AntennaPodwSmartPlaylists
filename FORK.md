@@ -268,6 +268,17 @@ WHERE/ORDER BY clause), plus tests `SmartQueueSchemaMigrationTest`,
 the rule edit dialog, and `ui/screen/home/sections/SmartPlaylistsSection` for the home card.
 Layouts and menus under `app/src/main/res/`.
 
+**Verify downloads** — `storage/database/.../DownloadVerifier` and
+`app/.../ui/screen/download/VerifyDownloadsDialog`. Reached from a smart queue's overflow menu
+(checks that queue's episodes) and Settings > Downloads (checks every episode marked downloaded, then
+runs the auto-download algorithm). It exists for device switches: a restored database keeps the
+"downloaded" flag but not the files, and auto-download never revisits an episode flagged downloaded.
+A file counts as present when it exists and is not empty. Size is deliberately not compared with the
+feed's, which is often wrong, and a flagged file is normally complete, so a size check would only add
+false re-downloads. Repairs clear the flag without enqueueing a gpodder delete, because nothing was
+deleted on purpose. Downloads go through `DownloadServiceInterface.download`, so the user's network
+settings still decide when they start. Local feeds are skipped.
+
 **Playback** — `storage/database/.../SmartPlaylistPlaybackUtils` (shared start-episode choice) and
 `MediaItemAdapter.fromSmartQueue` for the Android Auto folder entries.
 
@@ -291,6 +302,7 @@ manual queue while a smart queue is active), plus the `ForkSchema` bookkeeping t
 | `storage/preferences/.../PlaybackPreferences.java` | Active smart queue id |
 | `playback/service/.../Media3PlaybackService.java` | Advances through the real queue; auto-regenerates by appending at end of queue; widget entry point activates the queue; puts `QueueTimelinePlayer` under its player and refreshes it on `QueueEvent` |
 | `playback/service/.../MediaLibrarySessionCallback.java`, `playback/base/.../MediaItemAdapter.java` | Android Auto `Smart Queues` folder and activate-on-select |
+| `ui/preferences/.../xml/preferences_downloads.xml`, `app/.../ui/screen/preferences/DownloadsPreferencesFragment.java` | "Verify downloads" preference |
 | `app/.../ui/screen/queue/QueueFragment.java`, `queue_fragment.xml` | Active-queue banner with Stop; Clear queue performs Stop while one is active |
 | `app/.../PodcastApp.java` | Registers the media browser service at startup for Bluetooth/AVRCP |
 | `app/.../MainActivity.java`, `.../home/HomeFragment.java` | Fragment and home-section wiring |

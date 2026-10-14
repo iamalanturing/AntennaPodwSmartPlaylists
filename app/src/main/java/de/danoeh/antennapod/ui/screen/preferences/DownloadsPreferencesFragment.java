@@ -4,8 +4,12 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import androidx.preference.PreferenceManager;
 import de.danoeh.antennapod.R;
+import de.danoeh.antennapod.model.feed.FeedItemFilter;
+import de.danoeh.antennapod.model.feed.SortOrder;
 import de.danoeh.antennapod.net.download.serviceinterface.FeedUpdateManager;
+import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
+import de.danoeh.antennapod.ui.screen.download.VerifyDownloadsDialog;
 import de.danoeh.antennapod.ui.preferences.screen.AnimatedPreferenceFragment;
 import de.danoeh.antennapod.ui.preferences.screen.downloads.ChooseDataFolderDialog;
 
@@ -18,6 +22,7 @@ public class DownloadsPreferencesFragment extends AnimatedPreferenceFragment
     private static final String PREF_SCREEN_AUTO_DELETE = "prefAutoDeleteScreen";
     private static final String PREF_PROXY = "prefProxy";
     private static final String PREF_CHOOSE_DATA_DIR = "prefChooseDataDir";
+    private static final String PREF_VERIFY_DOWNLOADS = "prefVerifyDownloads";
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -57,6 +62,12 @@ public class DownloadsPreferencesFragment extends AnimatedPreferenceFragment
         findPreference(PREF_PROXY).setOnPreferenceClickListener(preference -> {
             ProxyDialog dialog = new ProxyDialog(getActivity());
             dialog.show();
+            return true;
+        });
+        // FORK: check every downloaded episode is on this device, then auto-download what is due
+        findPreference(PREF_VERIFY_DOWNLOADS).setOnPreferenceClickListener(preference -> {
+            VerifyDownloadsDialog.show(requireContext(), () -> DBReader.getEpisodes(0, Integer.MAX_VALUE,
+                    new FeedItemFilter(FeedItemFilter.DOWNLOADED), SortOrder.DATE_NEW_OLD), true);
             return true;
         });
         findPreference(PREF_CHOOSE_DATA_DIR).setOnPreferenceClickListener(preference -> {

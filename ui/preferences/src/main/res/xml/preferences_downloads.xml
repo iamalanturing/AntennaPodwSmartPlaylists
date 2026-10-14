@@ -51,5 +51,10 @@
                 android:key="prefProxy"
                 android:summary="@string/pref_proxy_sum"
                 android:title="@string/pref_proxy_title"/>
+        <!-- FORK: check every downloaded episode is on this device -->
+        <Preference
+                android:key="prefVerifyDownloads"
+                android:summary="@string/verify_downloads_summary"
+                android:title="@string/verify_downloads_title"/>
     </PreferenceCategory>
 </PreferenceScreen>

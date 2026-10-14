@@ -23,6 +23,7 @@ import de.danoeh.antennapod.actionbutton.PlayLocalActionButton;
 import de.danoeh.antennapod.actionbutton.StreamActionButton;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.ui.common.ThemeUtils;
+import de.danoeh.antennapod.ui.screen.download.VerifyDownloadsDialog;
 import de.danoeh.antennapod.event.FeedItemEvent;
 import de.danoeh.antennapod.event.MessageEvent;
 import de.danoeh.antennapod.event.PlayerStatusEvent;
@@ -245,6 +246,10 @@ public class SmartPlaylistDetailFragment extends Fragment {
             return true;
         } else if (item.getItemId() == R.id.action_regenerate_smart_playlist) {
             regenerate();
+            return true;
+        } else if (item.getItemId() == R.id.action_verify_downloads) {
+            VerifyDownloadsDialog.show(requireContext(),
+                    () -> DBReader.getSmartPlaylistEpisodes(playlistId), false);
             return true;
         } else if (item.getItemId() == R.id.action_delete_smart_playlist) {
             new MaterialAlertDialogBuilder(requireContext())
