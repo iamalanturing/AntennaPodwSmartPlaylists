@@ -101,6 +101,7 @@ public class Media3PlaybackService extends MediaLibraryService {
     private Disposable positionObserverDisposable;
     private Disposable queueLoaderDisposable;
     // FORK: the real queue, presented to Android Auto as the player timeline
+    @UnstableApi
     private QueueTimelinePlayer queuePlayer;
     private Disposable queueTimelineDisposable;
     private Disposable queueRowDisposable;
@@ -277,6 +278,7 @@ public class Media3PlaybackService extends MediaLibraryService {
     }
 
     // FORK: keeps the queue shown in Android Auto's Now Playing list current
+    @UnstableApi
     private void refreshQueueTimeline() {
         if (queueTimelineDisposable != null) {
             queueTimelineDisposable.dispose();
@@ -315,6 +317,7 @@ public class Media3PlaybackService extends MediaLibraryService {
                 }, error -> Log.e(TAG, "Failed to play queue item " + mediaId, error));
     }
 
+    @UnstableApi
     @Subscribe(threadMode = ThreadMode.MAIN)
     @SuppressWarnings("unused")
     public void queueChanged(QueueEvent event) {
