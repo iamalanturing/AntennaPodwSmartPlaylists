@@ -19,10 +19,13 @@ import java.util.concurrent.Future;
  *
  * <p>After a database is restored onto another device the "downloaded" flag survives but the files
  * do not, and nothing else repairs that until the episode is played. A file counts as present when
- * it exists and is not empty. Its size is deliberately not compared with the feed's, which is
- * often wrong.
+ * it exists, is not empty, and is not smaller than half the size recorded for the episode. Half
+ * rather than the full size because feeds often report wrong sizes, and a false alarm only costs a
+ * needless download.
  */
 public final class DownloadVerifier {
+    private static final int MIN_SIZE_FRACTION_DENOMINATOR = 2;
+
     private DownloadVerifier() {
     }
 
@@ -128,7 +131,10 @@ public final class DownloadVerifier {
             return false;
         }
         File file = new File(url);
-        return file.isFile() && file.length() > 0;
+        if (!file.isFile() || file.length() == 0) {
+            return false;
+        }
+        return media.getSize() <= 0 || file.length() * MIN_SIZE_FRACTION_DENOMINATOR >= media.getSize();
     }
 
     private static boolean isDownloading(FeedMedia media) {

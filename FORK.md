@@ -273,9 +273,11 @@ Layouts and menus under `app/src/main/res/`.
 (checks that queue's episodes) and Settings > Downloads (checks every episode marked downloaded, then
 runs the auto-download algorithm). It exists for device switches: a restored database keeps the
 "downloaded" flag but not the files, and auto-download never revisits an episode flagged downloaded.
-A file counts as present when it exists and is not empty. Size is deliberately not compared with the
-feed's, which is often wrong, and a flagged file is normally complete, so a size check would only add
-false re-downloads. Repairs clear the flag without enqueueing a gpodder delete, because nothing was
+A file counts as present when it exists, is not empty, and is at least half the size recorded for the
+episode. Half rather than the full size because feeds often report wrong sizes and a false alarm costs
+a needless re-download; an unknown size never triggers the check. `MediaDownloadedHandler` stores the
+real file size when this app finishes a download, so the threshold could be raised if truncated files
+still slip through. Repairs clear the flag without enqueueing a gpodder delete, because nothing was
 deleted on purpose. Downloads go through `DownloadServiceInterface.download`, so the user's network
 settings still decide when they start. Local feeds are skipped.
 

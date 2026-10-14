@@ -103,7 +103,7 @@ public class DownloadVerifierTest {
 
     @Test
     public void aPresentFileIsLeftAlone() throws Exception {
-        FeedItem item = storeEpisode("present", true, writeFile("present.mp3", "audio"), 1234);
+        FeedItem item = storeEpisode("present", true, writeFile("present.mp3", "audio"), 6);
 
         DownloadVerifier.Result result = DownloadVerifier.verify(Collections.singletonList(item));
 
@@ -133,6 +133,37 @@ public class DownloadVerifierTest {
 
         assertEquals(1, result.getRepaired().size());
         assertEquals(1, result.getToDownload().size());
+    }
+
+    @Test
+    public void aFileUnderHalfTheReportedSizeCountsAsMissing() throws Exception {
+        FeedItem item = storeEpisode("truncated", true, writeFile("truncated.mp3", "audio"), 1000);
+
+        DownloadVerifier.Result result = DownloadVerifier.verify(Collections.singletonList(item));
+
+        assertEquals(1, result.getRepaired().size());
+        assertEquals(1, result.getToDownload().size());
+        assertFalse(DBReader.getFeedMedia(item.getMedia().getId()).isDownloaded());
+    }
+
+    @Test
+    public void aFileAtExactlyHalfTheReportedSizeIsKept() throws Exception {
+        FeedItem item = storeEpisode("half", true, writeFile("half.mp3", "audio"), 10);
+
+        DownloadVerifier.Result result = DownloadVerifier.verify(Collections.singletonList(item));
+
+        assertTrue(result.getRepaired().isEmpty());
+        assertTrue(result.getToDownload().isEmpty());
+    }
+
+    @Test
+    public void anUnknownSizeNeverTriggersTheSizeCheck() throws Exception {
+        FeedItem item = storeEpisode("unknownsize", true, writeFile("unknownsize.mp3", "audio"), 0);
+
+        DownloadVerifier.Result result = DownloadVerifier.verify(Collections.singletonList(item));
+
+        assertTrue(result.getRepaired().isEmpty());
+        assertTrue(result.getToDownload().isEmpty());
     }
 
     @Test
