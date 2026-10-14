@@ -68,7 +68,7 @@ public class PlaybackServiceTaskManagerTest {
         PodDBAdapter adapter = PodDBAdapter.getInstance();
         adapter.open();
         adapter.setCompleteFeed(f);
-        adapter.setQueue(f.getItems());
+        adapter.setQueue(PodDBAdapter.QUEUE_ID_DEFAULT, f.getItems());
         adapter.close();
 
         for (FeedItem item : f.getItems()) {

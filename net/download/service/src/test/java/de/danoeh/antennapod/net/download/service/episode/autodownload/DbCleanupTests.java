@@ -148,7 +148,7 @@ public class DbCleanupTests {
         adapter.open();
         adapter.setCompleteFeed(feed);
         if (addToQueue) {
-            adapter.setQueue(items);
+            adapter.setQueue(PodDBAdapter.QUEUE_ID_DEFAULT, items);
         }
         if (addToFavorites) {
             adapter.setFavorites(items);

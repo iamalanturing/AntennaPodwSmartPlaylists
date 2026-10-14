@@ -189,7 +189,7 @@ public class DbReaderTest {
             }
             PodDBAdapter adapter = PodDBAdapter.getInstance();
             adapter.open();
-            adapter.setQueue(queue);
+            adapter.setQueue(PodDBAdapter.QUEUE_ID_DEFAULT, queue);
             adapter.close();
             return queue;
         }
@@ -345,8 +345,8 @@ public class DbReaderTest {
                 feed.getItems().get(0).setNew();
                 adapter.setCompleteFeed(feed);
             }
-            adapter.setQueue(Arrays.asList(feeds.get(0).getItems().get(0), feeds.get(2).getItems().get(0),
-                    feeds.get(3).getItems().get(0), feeds.get(4).getItems().get(0),
+            adapter.setQueue(PodDBAdapter.QUEUE_ID_DEFAULT, Arrays.asList(feeds.get(0).getItems().get(0),
+                    feeds.get(2).getItems().get(0), feeds.get(3).getItems().get(0), feeds.get(4).getItems().get(0),
                     feeds.get(5).getItems().get(0), noMediaFeed.getItems().get(0)));
             adapter.close();
 
@@ -428,7 +428,7 @@ public class DbReaderTest {
                 FeedItem item = feeds.get(1).getItems().get(i);
                 queue.add(item);
             }
-            adapter.setQueue(queue);
+            adapter.setQueue(PodDBAdapter.QUEUE_ID_DEFAULT, queue);
 
             adapter.close();
 
