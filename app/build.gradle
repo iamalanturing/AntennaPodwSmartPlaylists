@@ -25,10 +25,17 @@ android {
             keyAlias project.getProperties().getOrDefault("releaseKeyAlias", "alias")
             keyPassword project.getProperties().getOrDefault("releaseKeyPassword", "password")
         }
+        forkDebug {
+            storeFile file("fork-debug.keystore")
+            storePassword "2b085a779720233ed501dc55e7df91c78cbf7e41873379ba635d66966bf0544e"
+            keyAlias "multiple-queues-v2"
+            keyPassword "2b085a779720233ed501dc55e7df91c78cbf7e41873379ba635d66966bf0544e"
+        }
     }
 
     buildTypes {
         debug {
+            signingConfig signingConfigs.forkDebug
             applicationIdSuffix ".debug"
             resValue "string", "provider_authority", "de.danoeh.antennapod.debug.provider"
         }

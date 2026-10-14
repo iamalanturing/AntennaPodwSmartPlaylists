@@ -26,6 +26,7 @@ libs
 *.DS_Store
 gradle.properties
 *.keystore
+!app/fork-debug.keystore
 *.p12
 .vscode
 .cursor
