@@ -142,11 +142,22 @@ them:
 After merging anything that touches home sections, open the home screen and confirm the Smart
 Queue card is there.
 
-### Follow `master`; the base stays `develop`
+### Follow `master`; move the base to `master` at the next release cut
 
-These are two different things and the distinction matters. The fork is **based** on `develop` and
-stays there — rebasing the fork's commits onto `master` would mean undoing the build conversions
-below for no gain. But **new upstream work is taken from `master`**, not from `develop`.
+These are two different things and the distinction matters. The fork is currently **based** on a
+`develop` snapshot (`b7ee12c`), but **new upstream work is taken from `master`**, not from
+`develop`.
+
+**Decision (2026-10-13): this is a personal build, and it should run released upstream code, so
+the base moves to `master` at the next upstream release cut** — the point where `develop` is
+merged into `master` for 3.13. Until then it stays on `b7ee12c` and keeps taking `master` fixes.
+
+Not done earlier because it is expensive now and nearly free then. A dry run against 3.12.3,
+`git merge-tree --write-tree --name-only --merge-base b7ee12cc <upstream master> <fork tip>`,
+conflicted in 16 files. `develop` carries 34 commits that `master` does not, including the Gradle
+version catalog (#8443) and fixed home-section ids (#8611), so moving now would mean backporting
+the fork's code and build files to `master`'s older conventions. Once those commits reach `master`,
+rerun the same dry run: it should come back close to conflict-free, and then the move is a merge.
 
 Upstream accumulates on `develop` through the early betas, pushes that to `master`, and then runs
 the later betas on `master`, which is ahead of `develop` until the next sync. `master` is therefore
