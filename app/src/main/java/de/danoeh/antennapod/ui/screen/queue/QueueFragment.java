@@ -310,6 +310,7 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(loaded -> {
                     queues = loaded;
+                    UserPreferences.setQueueCount(loaded.size());
                     refreshToolbarState();
                     refreshQueueTitle();
                 }, error -> Log.e(TAG, Log.getStackTraceString(error)));

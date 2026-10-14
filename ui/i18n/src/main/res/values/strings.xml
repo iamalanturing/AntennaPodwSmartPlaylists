@@ -399,6 +399,7 @@
     <string name="delete_queue_label">Delete queue</string>
     <string name="delete_queue_confirmation_msg">Delete \"%1$s\"? Its episodes will no longer be in any queue, so they can be deleted automatically.</string>
     <string name="queue_name_label">Queue name</string>
+    <string name="move_to_queue_label">Move to queue</string>
     <string name="undo">Undo</string>
     <string name="move_to_top_label">Move to top</string>
     <plurals name="move_to_top_message">

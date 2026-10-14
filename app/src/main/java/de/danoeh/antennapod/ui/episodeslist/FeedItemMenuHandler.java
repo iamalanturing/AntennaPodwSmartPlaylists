@@ -23,6 +23,7 @@ import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterface;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.playback.service.PlaybackController;
+import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
 import de.danoeh.antennapod.ui.common.IntentUtils;
 import de.danoeh.antennapod.playback.service.PlaybackStatus;
@@ -30,9 +31,13 @@ import de.danoeh.antennapod.ui.share.ShareUtils;
 import de.danoeh.antennapod.ui.share.ShareDialog;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
+import de.danoeh.antennapod.model.feed.Queue;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import de.danoeh.antennapod.ui.appstartintent.MediaButtonStarter;
 import de.danoeh.antennapod.ui.view.LocalDeleteModal;
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import org.greenrobot.eventbus.EventBus;
 
 /**
@@ -108,6 +113,7 @@ public class FeedItemMenuHandler {
         setItemVisibility(menu, R.id.skip_episode_item, canSkip);
         setItemVisibility(menu, R.id.remove_from_queue_item, canRemoveFromQueue);
         setItemVisibility(menu, R.id.add_to_queue_item, canAddToQueue);
+        setItemVisibility(menu, R.id.move_to_queue_item, canRemoveFromQueue && UserPreferences.getQueueCount() > 1);
         setItemVisibility(menu, R.id.visit_website_item, canVisitWebsite);
         setItemVisibility(menu, R.id.share_item, canShare);
         setItemVisibility(menu, R.id.remove_inbox_item, canRemoveFromInbox);
@@ -174,6 +180,25 @@ public class FeedItemMenuHandler {
         }
     }
 
+    private static void showMoveToQueueDialog(Context context, FeedItem item) {
+        Observable.fromCallable(DBReader::getQueues)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(queues -> {
+                    String[] names = new String[queues.size()];
+                    for (int i = 0; i < queues.size(); i++) {
+                        Queue queue = queues.get(i);
+                        names[i] = queue.getName() == null ? context.getString(R.string.queue_label) : queue.getName();
+                    }
+                    new MaterialAlertDialogBuilder(context)
+                            .setTitle(R.string.move_to_queue_label)
+                            .setItems(names, (dialog, which) ->
+                                    DBWriter.moveToQueue(Collections.singletonList(item), queues.get(which).getId()))
+                            .setNegativeButton(R.string.cancel_label, null)
+                            .show();
+                }, error -> Log.e(TAG, Log.getStackTraceString(error)));
+    }
+
     /**
      * Default menu handling for the given FeedItem.
      * A Fragment instance, (rather than the more generic Context), is needed as a parameter
@@ -200,6 +225,8 @@ public class FeedItemMenuHandler {
             DBWriter.addQueueItem(context, selectedItem);
         } else if (menuItemId == R.id.remove_from_queue_item) {
             DBWriter.removeQueueItem(context, true, selectedItem);
+        } else if (menuItemId == R.id.move_to_queue_item) {
+            showMoveToQueueDialog(context, selectedItem);
         } else if (menuItemId == R.id.add_to_favorites_item) {
             DBWriter.addFavoriteItems(Collections.singletonList(selectedItem));
         } else if (menuItemId == R.id.remove_from_favorites_item) {

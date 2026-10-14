@@ -27,6 +27,7 @@ import org.robolectric.RobolectricTestRunner;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -703,6 +704,27 @@ public class DbWriterTest {
 
         assertEquals(0, DBReader.getQueueIDList(PodDBAdapter.QUEUE_ID_DEFAULT).size());
         assertEquals(1, DBReader.getQueueIDList(otherQueue).size());
+    }
+
+    @Test
+    public void testMoveToQueueKeepsEpisodeInExactlyOneQueue() throws Exception {
+        final long otherQueue = PodDBAdapter.QUEUE_ID_DEFAULT + 1;
+        Feed feed = createTestFeed(3);
+        final FeedItem moved = feed.getItems().get(0);
+        final FeedItem stays = feed.getItems().get(1);
+        final FeedItem alreadyThere = feed.getItems().get(2);
+        withPodDB(adapter -> {
+            adapter.setQueue(PodDBAdapter.QUEUE_ID_DEFAULT, Arrays.asList(moved, stays));
+            adapter.setQueue(otherQueue, Collections.singletonList(alreadyThere));
+        });
+
+        DBWriter.moveToQueue(Collections.singletonList(moved), otherQueue).get(TIMEOUT, TimeUnit.SECONDS);
+
+        assertEquals(Collections.singletonList(stays.getId()),
+                toItemIds(DBReader.getQueue(PodDBAdapter.QUEUE_ID_DEFAULT)));
+        assertEquals(Arrays.asList(alreadyThere.getId(), moved.getId()),
+                toItemIds(DBReader.getQueue(otherQueue)));
+        assertEquals(3, DBReader.getAllQueuedItemIds().size());
     }
 
     @Test

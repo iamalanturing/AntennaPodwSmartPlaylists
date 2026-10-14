@@ -99,6 +99,7 @@ public abstract class UserPreferences {
     public static final String PREF_ENQUEUE_LOCATION = "prefEnqueueLocation";
     public static final String PREF_ACTIVE_QUEUE = "prefActiveQueue";
     public static final long QUEUE_UNSET = 0;
+    private static final String PREF_QUEUE_COUNT = "prefQueueCount";
     public static final String PREF_UPDATE_INTERVAL_MINUTES = "prefAutoUpdateIntervall";
     public static final String PREF_MOBILE_UPDATE = "prefMobileUpdateTypes";
     public static final String PREF_EPISODE_CLEANUP = "prefEpisodeCleanup";
@@ -403,6 +404,16 @@ public abstract class UserPreferences {
     public static void setActiveQueue(long queueId) {
         prefs.edit()
                 .putLong(PREF_ACTIVE_QUEUE, queueId)
+                .apply();
+    }
+
+    public static int getQueueCount() {
+        return prefs.getInt(PREF_QUEUE_COUNT, 1);
+    }
+
+    public static void setQueueCount(int count) {
+        prefs.edit()
+                .putInt(PREF_QUEUE_COUNT, count)
                 .apply();
     }
 

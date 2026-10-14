@@ -536,6 +536,7 @@ public class DBWriter {
             adapter.open();
             final long queueId = adapter.createQueue(name);
             adapter.close();
+            UserPreferences.setQueueCount(DBReader.getQueues().size());
             EventBus.getDefault().post(new QueuesChangedEvent());
             return queueId;
         });
@@ -561,10 +562,38 @@ public class DBWriter {
             adapter.open();
             adapter.deleteQueue(queueId);
             adapter.close();
+            UserPreferences.setQueueCount(DBReader.getQueues().size());
             if (DBReader.getActiveQueue() == queueId) {
                 UserPreferences.setActiveQueue(PodDBAdapter.QUEUE_ID_DEFAULT);
             }
             EventBus.getDefault().post(new QueuesChangedEvent());
+        });
+    }
+
+    public static Future<?> moveToQueue(final List<FeedItem> items, final long targetQueueId) {
+        return runOnDbThread(() -> {
+            final PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            final List<FeedItem> target = DBReader.getQueue(targetQueueId);
+            ItemEnqueuePositionCalculator positionCalculator =
+                    new ItemEnqueuePositionCalculator(UserPreferences.getEnqueueLocation());
+            Playable currentlyPlaying = DBReader.getFeedMedia(PlaybackPreferences.getCurrentlyPlayingFeedMediaId());
+            int insertPosition = positionCalculator.calcPosition(target, currentlyPlaying);
+            boolean queueModified = false;
+            for (FeedItem item : items) {
+                if (itemListContains(target, item.getId())) {
+                    continue;
+                }
+                target.add(insertPosition, item);
+                insertPosition++;
+                queueModified = true;
+            }
+            if (queueModified) {
+                applySortOrder(target, new ArrayList<>());
+                adapter.setQueue(targetQueueId, target);
+                EventBus.getDefault().post(QueueEvent.setQueue(DBReader.getQueue()));
+            }
+            adapter.close();
         });
     }
 
