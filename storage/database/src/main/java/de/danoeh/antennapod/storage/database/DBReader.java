@@ -22,6 +22,7 @@ import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.FeedOrder;
 import de.danoeh.antennapod.model.feed.FeedPreferences;
+import de.danoeh.antennapod.model.feed.Queue;
 import de.danoeh.antennapod.model.feed.SortOrder;
 import de.danoeh.antennapod.model.feed.SubscriptionsFilter;
 import de.danoeh.antennapod.model.download.DownloadResult;
@@ -163,6 +164,21 @@ public final class DBReader {
      */
     public static synchronized LongList getQueueIDList() {
         return getQueueIDList(getActiveQueue());
+    }
+
+    @NonNull
+    public static synchronized List<Queue> getQueues() {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (Cursor cursor = adapter.getQueuesCursor()) {
+            List<Queue> queues = new ArrayList<>(cursor.getCount());
+            while (cursor.moveToNext()) {
+                queues.add(new Queue(cursor.getLong(0), cursor.isNull(1) ? null : cursor.getString(1)));
+            }
+            return queues;
+        } finally {
+            adapter.close();
+        }
     }
 
     public static synchronized LongList getAllQueuedItemIds() {
