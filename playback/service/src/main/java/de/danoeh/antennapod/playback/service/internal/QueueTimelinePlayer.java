@@ -4,11 +4,11 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.core.util.Consumer;
 import androidx.media3.common.C;
+import androidx.media3.common.FlagSet;
 import androidx.media3.common.ForwardingPlayer;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.Player;
 import androidx.media3.common.Timeline;
-import androidx.media3.common.util.FlagSet;
 import androidx.media3.common.util.UnstableApi;
 
 import java.lang.reflect.InvocationHandler;
