@@ -118,9 +118,16 @@ source of truth.
 
 **Android Auto** gets a `Smart Queues` folder (`MediaLibrarySessionCallback`, shown only when one
 exists). Entries are playable `SmartQueueId:<id>` items; choosing one activates it through the
-same path as Play in the app. Known limit, not specific to smart queues: the Now Playing "Queue"
-button lists only the current episode, because `Media3PlaybackService` loads one item into the
-player at a time. The full list is under the library's `Queue` folder.
+same path as Play in the app.
+
+**The Now Playing "Queue" list** shows the real queue. `Media3PlaybackService` still loads one item
+into the player at a time, but `QueueTimelinePlayer` sits under the service's player and reports
+the current episode followed by up to 49 upcoming queue episodes as the timeline, which is what the
+session turns into Android Auto's list. Choosing a later row plays that episode through the normal
+start path (`playQueueItem`). The list refreshes on every `QueueEvent`, so activation, Stop,
+hand-over and rebuilds all update it. When what is playing is not in the queue, the player reports
+its ordinary one-item timeline. Listeners get the queue timeline through a proxy, so a callback
+added in a future Media3 release is still forwarded.
 
 ### The home section is the part that breaks
 
@@ -282,7 +289,7 @@ manual queue while a smart queue is active), plus the `ForkSchema` bookkeeping t
 | `storage/database/.../DBWriter.java` | Smart Queue CRUD, transactional regeneration, `activateSmartQueue` / `stopActiveSmartQueue` / append-on-regenerate, deleting the active queue restores the stash |
 | `net/download/service/.../APCleanupAlgorithm.java`, `APQueueCleanupAlgorithm.java` | Protect stashed episodes from auto-delete |
 | `storage/preferences/.../PlaybackPreferences.java` | Active smart queue id |
-| `playback/service/.../Media3PlaybackService.java` | Advances through the real queue; auto-regenerates by appending at end of queue; widget entry point activates the queue |
+| `playback/service/.../Media3PlaybackService.java` | Advances through the real queue; auto-regenerates by appending at end of queue; widget entry point activates the queue; puts `QueueTimelinePlayer` under its player and refreshes it on `QueueEvent` |
 | `playback/service/.../MediaLibrarySessionCallback.java`, `playback/base/.../MediaItemAdapter.java` | Android Auto `Smart Queues` folder and activate-on-select |
 | `app/.../ui/screen/queue/QueueFragment.java`, `queue_fragment.xml` | Active-queue banner with Stop; Clear queue performs Stop while one is active |
 | `app/.../PodcastApp.java` | Registers the media browser service at startup for Bluetooth/AVRCP |

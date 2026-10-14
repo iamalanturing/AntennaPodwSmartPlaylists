@@ -28,6 +28,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import de.danoeh.antennapod.event.MessageEvent;
 import de.danoeh.antennapod.event.FeedItemEvent;
+import de.danoeh.antennapod.event.QueueEvent;
 import de.danoeh.antennapod.event.PlayerErrorEvent;
 import de.danoeh.antennapod.event.StreamingConfirmationEvent;
 import de.danoeh.antennapod.event.settings.VolumeAdaptionChangedEvent;
@@ -52,6 +53,7 @@ import de.danoeh.antennapod.playback.cast.CastPlayerWrapper;
 import de.danoeh.antennapod.playback.service.internal.ExoPlayerUtils;
 import de.danoeh.antennapod.playback.service.internal.MediaLibrarySessionCallback;
 import de.danoeh.antennapod.playback.service.internal.PlayableUtils;
+import de.danoeh.antennapod.playback.service.internal.QueueTimelinePlayer;
 import de.danoeh.antennapod.playback.service.internal.SkipUtils;
 import de.danoeh.antennapod.playback.service.internal.SleepTimer;
 import de.danoeh.antennapod.playback.service.internal.ClockSleepTimer;
@@ -98,6 +100,10 @@ public class Media3PlaybackService extends MediaLibraryService {
     private Disposable mediaLoaderDisposable;
     private Disposable positionObserverDisposable;
     private Disposable queueLoaderDisposable;
+    // FORK: the real queue, presented to Android Auto as the player timeline
+    private QueueTimelinePlayer queuePlayer;
+    private Disposable queueTimelineDisposable;
+    private Disposable queueRowDisposable;
     private long lastPositionSaveTime = 0;
     private String playedMediaId = null;
     private int playbackStartPosition = -1;
@@ -127,7 +133,8 @@ public class Media3PlaybackService extends MediaLibraryService {
         });
         initLoudnessEnhancer(exoPlayer.getAudioSessionId());
         Player maybeCastPlayer = CastPlayerWrapper.wrap(exoPlayer, this);
-        player = new ForwardingPlayer(maybeCastPlayer) {
+        queuePlayer = new QueueTimelinePlayer(maybeCastPlayer, this::playQueueItem);
+        player = new ForwardingPlayer(queuePlayer) {
             @Override
             @NonNull
             public Player.Commands getAvailableCommands() {
@@ -262,10 +269,56 @@ public class Media3PlaybackService extends MediaLibraryService {
         mediaSession = new MediaLibraryService.MediaLibrarySession.Builder(this, player, sessionCallback)
                 .setSessionActivity(new MainActivityStarter(this).withOpenPlayer().getPendingIntent())
                 .build();
+        refreshQueueTimeline();
         if (isCasting()) {
             keepServiceRunningWhileCasting();
             loadCurrentMediaWhileCasting();
         }
+    }
+
+    // FORK: keeps the queue shown in Android Auto's Now Playing list current
+    private void refreshQueueTimeline() {
+        if (queueTimelineDisposable != null) {
+            queueTimelineDisposable.dispose();
+        }
+        queueTimelineDisposable = Single.fromCallable(
+                () -> MediaItemAdapter.fromItemList(this, DBReader.getQueue()))
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(items -> queuePlayer.setQueue(items),
+                        error -> Log.e(TAG, "Failed to load queue for the player timeline", error));
+    }
+
+    // FORK: a row of the queue list was chosen in Android Auto; play that episode
+    private void playQueueItem(String mediaId) {
+        if (queueRowDisposable != null) {
+            queueRowDisposable.dispose();
+        }
+        queueRowDisposable = Maybe.fromCallable(() -> {
+            FeedMedia media = DBReader.getFeedMedia(Long.parseLong(mediaId));
+            if (media == null) {
+                return null;
+            }
+            long startPosition = RewindAfterPauseUtils.calculatePositionWithRewind(
+                    (int) SkipUtils.skipIntroIfNecessary(this, media), media.getLastPlayedTimeStatistics());
+            return new SmartQueueStart(MediaItemAdapter.fromPlayable(this, media, false), startPosition);
+        })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(start -> {
+                    if (player == null) {
+                        return;
+                    }
+                    player.setMediaItem(start.mediaItem, start.startPosition);
+                    player.prepare();
+                    player.play();
+                }, error -> Log.e(TAG, "Failed to play queue item " + mediaId, error));
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    @SuppressWarnings("unused")
+    public void queueChanged(QueueEvent event) {
+        refreshQueueTimeline();
     }
 
     @UnstableApi
@@ -578,6 +631,14 @@ public class Media3PlaybackService extends MediaLibraryService {
         if (queueLoaderDisposable != null) {
             queueLoaderDisposable.dispose();
             queueLoaderDisposable = null;
+        }
+        if (queueTimelineDisposable != null) {
+            queueTimelineDisposable.dispose();
+            queueTimelineDisposable = null;
+        }
+        if (queueRowDisposable != null) {
+            queueRowDisposable.dispose();
+            queueRowDisposable = null;
         }
         saveCurrentPosition();
         if (loudnessEnhancer != null) {
