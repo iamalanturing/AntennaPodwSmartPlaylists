@@ -68,6 +68,22 @@
         <item>4320</item>
     </string-array>
 
+    <string-array name="keep_free_space_entries">
+        <item>@string/keep_free_space_500_mb</item>
+        <item>@string/keep_free_space_1_gb</item>
+        <item>@string/keep_free_space_2_gb</item>
+        <item>@string/keep_free_space_5_gb</item>
+        <item>@string/keep_free_space_10_gb</item>
+    </string-array>
+
+    <string-array name="keep_free_space_values">
+        <item>500</item>
+        <item>1024</item>
+        <item>2048</item>
+        <item>5120</item>
+        <item>10240</item>
+    </string-array>
+
     <string-array name="globalNewEpisodesActionItems">
         <item>@string/feed_new_episodes_action_add_to_inbox</item>
         <item>@string/feed_new_episodes_action_add_to_queue</item>

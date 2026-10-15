@@ -487,11 +487,12 @@ only fires at zero.
    on-device check. The user decided **not** to report it upstream for now — do not open an issue
    without asking. Keep it here in case it becomes worth doing.
 
-**Do not propose auto-download awareness of Smart Queues.** The user was asked directly and does
-not want it — "I may never want it". The mechanism, for reference only: auto-download selects from
-episodes marked NEW plus the regular queue, so a queue filtered on `downloaded` only fills as new
-episodes arrive. Watch the episode cache instead — see above. This is a settled decision, not a
-backlog item.
+**Auto-download awareness of Smart Queues: reversed on 2026-10-15.** The user first declined it
+("I may never want it"), then asked for it after global auto-download proved too blunt (a 999+
+inbox, one global cap, the silent `subList` crash). It is now opt-in per queue: rules drive
+downloads and stale prefetches are cleaned under pressure. FORK.md, "Rule-driven downloads", has
+the design; the decisions on targets, cleanup protection, declined episodes and RANDOM rules were
+the user's and should not be relitigated.
 
 ## Decisions worth not relitigating
 

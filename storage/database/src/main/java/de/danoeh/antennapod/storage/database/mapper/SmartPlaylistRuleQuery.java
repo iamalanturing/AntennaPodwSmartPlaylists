@@ -129,6 +129,37 @@ public class SmartPlaylistRuleQuery {
         return query.toString();
     }
 
+    /**
+     * FORK: a copy of the rule with only the "downloaded" filter property removed, so it matches
+     * what the rule would pick if every episode were already on the device.
+     */
+    public static SmartPlaylistRule withoutDownloadedFilter(SmartPlaylistRule rule) {
+        List<String> kept = new ArrayList<>();
+        String filterProps = rule.getFilterProperties();
+        if (!TextUtils.isEmpty(filterProps)) {
+            for (String property : filterProps.split(",")) {
+                String trimmed = property.trim();
+                if (!trimmed.isEmpty() && !FeedItemFilter.DOWNLOADED.equals(trimmed)) {
+                    kept.add(trimmed);
+                }
+            }
+        }
+        SmartPlaylistRule copy = new SmartPlaylistRule();
+        copy.setId(rule.getId());
+        copy.setPlaylistId(rule.getPlaylistId());
+        copy.setPosition(rule.getPosition());
+        copy.setFilterProperties(TextUtils.join(",", kept));
+        copy.setFeedIds(rule.getFeedIds());
+        copy.setFeedTags(rule.getFeedTags());
+        copy.setMaxAgeDays(rule.getMaxAgeDays());
+        copy.setMinDurationMs(rule.getMinDurationMs());
+        copy.setMaxDurationMs(rule.getMaxDurationMs());
+        copy.setMediaType(rule.getMediaType());
+        copy.setEpisodeLimit(rule.getEpisodeLimit());
+        copy.setSortOrder(rule.getSortOrder());
+        return copy;
+    }
+
     public static String generateOrderClause(SmartPlaylistRule rule) {
         String sortOrder = rule.getSortOrder();
         if (sortOrder == null) {

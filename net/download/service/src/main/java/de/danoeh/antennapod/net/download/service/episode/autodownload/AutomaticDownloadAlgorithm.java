@@ -50,6 +50,13 @@ public class AutomaticDownloadAlgorithm {
 
                 Log.d(TAG, "Performing auto-dl of undownloaded episodes");
 
+                // FORK: smart queue rules drive their own downloads, apart from the inbox and the cache limit
+                try {
+                    SmartQueueDownloads.run(context);
+                } catch (RuntimeException e) {
+                    Log.e(TAG, "Smart queue downloads failed", e);
+                }
+
                 final List<FeedItem> newItems = DBReader.getEpisodes(0, Integer.MAX_VALUE,
                         new FeedItemFilter(FeedItemFilter.NEW), SortOrder.DATE_NEW_OLD);
                 final List<FeedItem> candidates = new ArrayList<>();
@@ -96,7 +103,7 @@ public class AutomaticDownloadAlgorithm {
                 if (cacheIsUnlimited || episodeCacheSize >= downloadedEpisodes + autoDownloadableEpisodes) {
                     episodeSpaceLeft = autoDownloadableEpisodes;
                 } else {
-                    episodeSpaceLeft = episodeCacheSize - (downloadedEpisodes - deletedEpisodes);
+                    episodeSpaceLeft = Math.max(0, episodeCacheSize - (downloadedEpisodes - deletedEpisodes));
                 }
 
                 List<FeedItem> itemsToDownload = candidates.subList(0, episodeSpaceLeft);

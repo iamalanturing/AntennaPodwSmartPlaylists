@@ -113,6 +113,13 @@ public class DBWriter {
                 return;
             }
             deleteFeedMediaSynchronous(context, media);
+            // FORK: an unplayed episode deleted by hand must not be fetched again by smart queue rules
+            if (media.getItem() != null && !media.getItem().isPlayed()) {
+                PodDBAdapter adapter = PodDBAdapter.getInstance();
+                adapter.open();
+                adapter.markDeclined(media.getItemId());
+                adapter.close();
+            }
             EventBus.getDefault().post(new FeedItemEvent(media.getItem() != null
                     ? Collections.singletonList(media.getItem()) : Collections.emptyList(), false));
             if (UserPreferences.shouldDeleteRemoveFromQueue()) {
@@ -1169,9 +1176,54 @@ public class DBWriter {
         List<FeedItem> changed = new ArrayList<>(outgoing);
         changed.addAll(matches);
         EventBus.getDefault().post(new FeedItemEvent(changed, false));
-
-        AutoDownloadManager.getInstance().autodownloadUndownloadedItems(context);
         return matches;
+    }
+
+    /**
+     * FORK: records episodes that smart queue rules asked to download ahead, so the stale-prefetch
+     * cleanup knows which downloads it owns.
+     */
+    public static Future<?> markPrefetched(List<Long> episodeIds) {
+        return runOnDbThread(() -> {
+            long now = System.currentTimeMillis();
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            try {
+                for (long episodeId : episodeIds) {
+                    adapter.markPrefetched(episodeId, now);
+                }
+            } finally {
+                adapter.close();
+            }
+        });
+    }
+
+    /**
+     * FORK: the user turned this episode down (cancelled or deleted it), so smart queue rules
+     * skip it from now on.
+     */
+    public static Future<?> markDeclined(long episodeId) {
+        return runOnDbThread(() -> {
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            try {
+                adapter.markDeclined(episodeId);
+            } finally {
+                adapter.close();
+            }
+        });
+    }
+
+    public static Future<?> removePrefetchMarker(long episodeId) {
+        return runOnDbThread(() -> {
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            try {
+                adapter.removePrefetchMarker(episodeId);
+            } finally {
+                adapter.close();
+            }
+        });
     }
 
     /**

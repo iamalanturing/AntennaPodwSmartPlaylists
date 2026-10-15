@@ -31,6 +31,14 @@
             android:key="prefAutoDeleteScreen"
             android:summary="@string/pref_auto_delete_sum"
             android:title="@string/pref_auto_delete_title"/>
+        <!-- FORK: free space smart queue downloads keep on the device -->
+        <de.danoeh.antennapod.ui.preferences.preference.MaterialListPreference
+            android:entryValues="@array/keep_free_space_values"
+            android:entries="@array/keep_free_space_entries"
+            android:key="prefSmartQueueKeepFreeSpace"
+            android:title="@string/pref_keep_free_space_title"
+            android:summary="@string/pref_keep_free_space_sum"
+            android:defaultValue="1024"/>
         <SwitchPreferenceCompat
             android:defaultValue="false"
             android:enabled="true"

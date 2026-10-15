@@ -16,6 +16,7 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.materialswitch.MaterialSwitch;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.ui.common.ThemeUtils;
 import de.danoeh.antennapod.model.feed.Feed;
@@ -46,6 +47,7 @@ public class SmartPlaylistEditFragment extends Fragment {
     private Disposable countsDisposable;
     private EditText nameEdit;
     private TextView runOutSetting;
+    private MaterialSwitch downloadRulesSwitch;
 
     public static SmartPlaylistEditFragment newInstance(long playlistId) {
         SmartPlaylistEditFragment fragment = new SmartPlaylistEditFragment();
@@ -83,6 +85,13 @@ public class SmartPlaylistEditFragment extends Fragment {
         runOutSetting = view.findViewById(R.id.run_out_setting);
         runOutSetting.setOnClickListener(v -> SmartQueueRunOutDialog.show(requireContext(), playlist,
                 () -> runOutSetting.setText(SmartQueueRunOutDialog.describe(requireContext(), playlist))));
+
+        downloadRulesSwitch = view.findViewById(R.id.download_rules_switch);
+        downloadRulesSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (playlist != null) {
+                playlist.setDownloadRules(isChecked);
+            }
+        });
 
         nameEdit = view.findViewById(R.id.smart_playlist_name_edit);
         nameEdit.addTextChangedListener(new TextWatcher() {
@@ -226,6 +235,7 @@ public class SmartPlaylistEditFragment extends Fragment {
                         playlist = result;
                         nameEdit.setText(playlist.getName());
                         runOutSetting.setText(SmartQueueRunOutDialog.describe(requireContext(), playlist));
+                        downloadRulesSwitch.setChecked(playlist.isDownloadRules());
                         if (ruleAdapter != null) {
                             ruleAdapter.setRules(playlist.getRules());
                         }

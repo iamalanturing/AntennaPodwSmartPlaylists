@@ -1134,5 +1134,14 @@
     <string name="smart_queue_stop_label">Stop</string>
     <string name="smart_queue_stop_confirmation_msg">This will stop the Smart Queue, restore your previous queue, and stop playback.</string>
     <string name="save_label">Save</string>
+    <string name="smart_queue_download_rules_title">Download episodes for this queue</string>
+    <string name="smart_queue_download_rules_summary">After each refresh, download what each rule would pick next, even when automatic download is off</string>
+    <string name="pref_keep_free_space_title">Keep free space</string>
+    <string name="pref_keep_free_space_sum">Smart queue downloads stop below this amount, and episodes they fetched ahead that are no longer needed are removed</string>
+    <string name="keep_free_space_500_mb">500 MB</string>
+    <string name="keep_free_space_1_gb">1 GB</string>
+    <string name="keep_free_space_2_gb">2 GB</string>
+    <string name="keep_free_space_5_gb">5 GB</string>
+    <string name="keep_free_space_10_gb">10 GB</string>
 </resources>
 

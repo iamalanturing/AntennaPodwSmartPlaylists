@@ -11,8 +11,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import de.danoeh.antennapod.model.feed.Chapter;
 import de.danoeh.antennapod.model.feed.Feed;
@@ -27,6 +29,7 @@ import de.danoeh.antennapod.model.feed.SmartPlaylistRule;
 import de.danoeh.antennapod.model.feed.SortOrder;
 import de.danoeh.antennapod.model.feed.SubscriptionsFilter;
 import de.danoeh.antennapod.model.download.DownloadResult;
+import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.storage.database.mapper.SmartPlaylistCursor;
 import de.danoeh.antennapod.storage.database.mapper.SmartPlaylistRuleCursor;
 import de.danoeh.antennapod.storage.database.mapper.ChapterCursor;
@@ -47,6 +50,11 @@ public final class DBReader {
      * Maximum size of the list returned by {@link #getDownloadLog()}.
      */
     private static final int DOWNLOAD_LOG_SIZE = 200;
+
+    /**
+     * FORK: how many episodes a smart queue rule without a limit downloads ahead.
+     */
+    public static final int DEFAULT_DOWNLOAD_RULE_LIMIT = 3;
 
 
     private DBReader() {
@@ -944,6 +952,141 @@ public final class DBReader {
             return cursor.getCount();
         } finally {
             adapter.close();
+        }
+    }
+
+    /**
+     * FORK: what each rule of a smart queue would pick at its next rebuild if every episode were
+     * on the device, assuming the episodes now in the queue will be played.
+     *
+     * <p>Per rule, in the rule's order: the first {@code limit} episodes with media that are not
+     * in the queue, not claimed by an earlier rule and not declined. A rule without a limit counts
+     * as {@link #DEFAULT_DOWNLOAD_RULE_LIMIT}. A RANDOM rule keeps the downloaded episodes it
+     * already has and only tops up the shortfall, so its random order does not swap them out on
+     * every pass. The result includes targets that are already downloaded.
+     */
+    @NonNull
+    public static synchronized List<FeedItem> getSmartPlaylistDownloadTargets(long playlistId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try {
+            Set<Long> skipped = new HashSet<>();
+            addIds(adapter.getSmartPlaylistEpisodeIdsCursor(playlistId), skipped);
+            if (PlaybackPreferences.getActiveSmartQueueId() == playlistId) {
+                addIds(adapter.getQueueIDCursor(), skipped);
+            }
+            addIds(adapter.getDeclinedIdsCursor(), skipped);
+
+            List<FeedItem> targets = new ArrayList<>();
+            for (SmartPlaylistRule rule : getSmartPlaylistRulesInternal(adapter, playlistId)) {
+                int limit = rule.getEpisodeLimit() > 0 ? rule.getEpisodeLimit() : DEFAULT_DOWNLOAD_RULE_LIMIT;
+                boolean random = "RANDOM".equals(rule.getSortOrder());
+                List<FeedItem> picked = new ArrayList<>();
+                List<FeedItem> notDownloaded = new ArrayList<>();
+                try (FeedItemCursor cursor = new FeedItemCursor(
+                        adapter.getSmartPlaylistRuleDownloadCandidatesCursor(rule))) {
+                    while (picked.size() < limit && cursor.moveToNext()) {
+                        FeedItem item = cursor.getFeedItem();
+                        if (!item.hasMedia() || skipped.contains(item.getId())) {
+                            continue;
+                        }
+                        if (random && !item.isDownloaded()) {
+                            if (notDownloaded.size() < limit) {
+                                notDownloaded.add(item);
+                            }
+                            continue;
+                        }
+                        picked.add(item);
+                    }
+                }
+                for (int i = 0; picked.size() < limit && i < notDownloaded.size(); i++) {
+                    picked.add(notDownloaded.get(i));
+                }
+                for (FeedItem item : picked) {
+                    skipped.add(item.getId());
+                }
+                targets.addAll(picked);
+            }
+            loadFeedDataOfFeedItemList(targets);
+            return targets;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    /**
+     * FORK: the episodes a rebuild of the smart queue would pick right now, as its rules run
+     * during a rebuild (download state and limits included).
+     */
+    @NonNull
+    public static synchronized Set<Long> getSmartPlaylistRebuildPicks(long playlistId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try {
+            Set<Long> picks = new HashSet<>();
+            for (SmartPlaylistRule rule : getSmartPlaylistRulesInternal(adapter, playlistId)) {
+                try (Cursor cursor = adapter.getSmartPlaylistRuleMatchesCursor(rule)) {
+                    int idIndex = cursor.getColumnIndexOrThrow(PodDBAdapter.SELECT_KEY_ITEM_ID);
+                    while (cursor.moveToNext()) {
+                        picks.add(cursor.getLong(idIndex));
+                    }
+                }
+            }
+            return picks;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    @NonNull
+    public static synchronized Set<Long> getSmartPlaylistEpisodeIds(long playlistId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try {
+            Set<Long> ids = new HashSet<>();
+            addIds(adapter.getSmartPlaylistEpisodeIdsCursor(playlistId), ids);
+            return ids;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    /**
+     * FORK: episodes rule-driven downloads fetched ahead, oldest fetch first, declined ones left out.
+     */
+    @NonNull
+    public static synchronized List<Long> getPrefetchedIds() {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (Cursor cursor = adapter.getPrefetchedIdsCursor()) {
+            List<Long> ids = new ArrayList<>();
+            while (cursor.moveToNext()) {
+                ids.add(cursor.getLong(0));
+            }
+            return ids;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    @NonNull
+    public static synchronized Set<Long> getDeclinedIds() {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try {
+            Set<Long> ids = new HashSet<>();
+            addIds(adapter.getDeclinedIdsCursor(), ids);
+            return ids;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    private static void addIds(Cursor idCursor, Set<Long> ids) {
+        try (Cursor cursor = idCursor) {
+            while (cursor.moveToNext()) {
+                ids.add(cursor.getLong(0));
+            }
         }
     }
 

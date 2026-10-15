@@ -10,6 +10,7 @@ public class SmartPlaylist implements Serializable {
     private boolean autoRegenerate;
     private long nextPlaylistId;
     private String nextPlaylistName;
+    private boolean downloadRules;
     private long generatedAt;
     private long createdAt;
     private long updatedAt;
@@ -61,6 +62,14 @@ public class SmartPlaylist implements Serializable {
 
     public void setNextPlaylistName(String nextPlaylistName) {
         this.nextPlaylistName = nextPlaylistName;
+    }
+
+    public boolean isDownloadRules() {
+        return downloadRules;
+    }
+
+    public void setDownloadRules(boolean downloadRules) {
+        this.downloadRules = downloadRules;
     }
 
     public long getGeneratedAt() {

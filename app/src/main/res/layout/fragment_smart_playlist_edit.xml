@@ -48,6 +48,23 @@
             android:background="?attr/selectableItemBackground"
             android:textAppearance="?attr/textAppearanceBodyLarge" />
 
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/download_rules_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:padding="8dp"
+            android:text="@string/smart_queue_download_rules_title"
+            android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="@string/smart_queue_download_rules_summary"
+            android:textAppearance="?attr/textAppearanceBodySmall" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

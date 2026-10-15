@@ -196,4 +196,30 @@ public class SmartPlaylistRuleQueryTest {
     public void emptyRuleProducesNoConditions() {
         assertEquals("", SmartPlaylistRuleQuery.generateWhereClause(rule()));
     }
+
+    @Test
+    public void downloadCandidatesDropOnlyTheDownloadedFilter() {
+        SmartPlaylistRule rule = rule();
+        rule.setFilterProperties("unplayed,downloaded,not_downloaded");
+        rule.setFeedIds("7");
+        rule.setSortOrder("OLDEST");
+        rule.setEpisodeLimit(2);
+
+        SmartPlaylistRule copy = SmartPlaylistRuleQuery.withoutDownloadedFilter(rule);
+
+        assertEquals("unplayed,not_downloaded", copy.getFilterProperties());
+        assertEquals("7", copy.getFeedIds());
+        assertEquals("OLDEST", copy.getSortOrder());
+        assertEquals(2, copy.getEpisodeLimit());
+        assertEquals("unplayed,downloaded,not_downloaded", rule.getFilterProperties());
+    }
+
+    @Test
+    public void downloadCandidatesLeaveARuleWithoutTheDownloadedFilterUnchanged() {
+        SmartPlaylistRule rule = rule();
+        rule.setFilterProperties("unplayed");
+
+        assertEquals(SmartPlaylistRuleQuery.generateWhereClause(rule),
+                SmartPlaylistRuleQuery.generateWhereClause(SmartPlaylistRuleQuery.withoutDownloadedFilter(rule)));
+    }
 }

@@ -281,6 +281,37 @@ still slip through. Repairs clear the flag without enqueueing a gpodder delete, 
 deleted on purpose. Downloads go through `DownloadServiceInterface.download`, so the user's network
 settings still decide when they start. Local feeds are skipped.
 
+**Rule-driven downloads** — `net/download/service/.../autodownload/SmartQueueDownloads`, run from
+`AutomaticDownloadAlgorithm` once its network and power checks pass, before and apart from the inbox
+logic, so after every feed refresh (and on the connectivity, power and queue-edit triggers that run the
+algorithm). A smart queue opts in with "Download episodes for this queue" (`sp_download_rules`).
+- *Targets* (`DBReader.getSmartPlaylistDownloadTargets`): what each rule would pick at the next
+  rebuild if every episode were on the device, treating the episodes now in the queue (its generated
+  list, plus the real queue when it is the active one) as about to be played. Per rule, in rule order,
+  the first `limit` matches with the `downloaded` filter stripped, skipping queued, declined and
+  earlier-rule episodes; a rule without a limit takes `DEFAULT_DOWNLOAD_RULE_LIMIT` (3). Newest-first
+  with the newest queued therefore fetches the second newest; oldest-first fetches the episode after
+  the queued one, however many new episodes arrive. RANDOM keeps what it has downloaded and only tops
+  up the shortfall, or every pass would fetch a different random episode.
+- *`isAutoDownloadEnabled` is ignored on purpose*: `MediaDownloadedHandler` clears it on every
+  finished download, so honouring it would block re-fetching a cleaned-up target and every episode
+  restored on a new device. Its other use, remembering a cancel, is replaced by the *declined* flag in
+  the fork table `SmartPrefetched`: a cancel (`CancelDownloadActionButton`) or a manual delete of an
+  unplayed episode (`DBWriter.deleteFeedMediaOfItem`) marks it, and rules skip it from then on.
+- *Stale prefetches*: every requested target gets a `SmartPrefetched` row. When free space is below
+  Settings > Downloads > "Keep free space" or the downloaded count is over the episode limit, rows that
+  are no longer targets are deleted oldest-fetch first until the pressure clears, independent of the
+  "Episode cleanup" setting. Never deleted: the real queue, the stash, any smart queue's generated list,
+  current targets, what a rebuild would pick right now (so the downloaded fallback survives while its
+  replacement is still downloading), favorites, started episodes and the playing one. Played
+  prefetches are left to the normal cleanup. Rule downloads skip a pass while free space stays below
+  the threshold, and do not count against the episode limit; past it the upstream inbox path gets no
+  slots (`episodeSpaceLeft` is clamped at 0, which also fixes the upstream `subList` crash).
+- *Not done*: a finished download does not rebuild the queue; new downloads join it at the next
+  rebuild (hand-over, "Rebuild" when it runs out, Regenerate, or saving the edit). Activating or
+  handing over a smart queue no longer runs auto-download itself. Turning the switch off leaves its
+  prefetches, which are removed under pressure like any stale one.
+
 **Playback** — `storage/database/.../SmartPlaylistPlaybackUtils` (shared start-episode choice) and
 `MediaItemAdapter.fromSmartQueue` for the Android Auto folder entries.
 
@@ -301,6 +332,9 @@ manual queue while a smart queue is active), plus the `ForkSchema` bookkeeping t
 | `storage/database/.../DBReader.java` | Smart Queue read methods, `getQueueStashIDList` |
 | `storage/database/.../DBWriter.java` | Smart Queue CRUD, transactional regeneration, `activateSmartQueue` / `stopActiveSmartQueue` / append-on-regenerate, deleting the active queue restores the stash |
 | `net/download/service/.../APCleanupAlgorithm.java`, `APQueueCleanupAlgorithm.java` | Protect stashed episodes from auto-delete |
+| `net/download/service/.../AutomaticDownloadAlgorithm.java` | Runs `SmartQueueDownloads`; clamps `episodeSpaceLeft` at 0 |
+| `storage/database/.../DBWriter.java` (`deleteFeedMediaOfItem`), `app/.../actionbutton/CancelDownloadActionButton.java` | Mark an unplayed manual delete or a cancel as declined for rule-driven downloads |
+| `storage/preferences/.../UserPreferences.java`, `ui/preferences/.../xml/preferences_downloads.xml` | "Keep free space" preference |
 | `storage/preferences/.../PlaybackPreferences.java` | Active smart queue id |
 | `playback/service/.../Media3PlaybackService.java` | Advances through the real queue; auto-regenerates by appending at end of queue; widget entry point activates the queue; puts `QueueTimelinePlayer` under its player and refreshes it on `QueueEvent` |
 | `playback/service/.../MediaLibrarySessionCallback.java`, `playback/base/.../MediaItemAdapter.java` | Android Auto `Smart Queues` folder and activate-on-select |

@@ -68,7 +68,9 @@ public class PodDBAdapter {
     // FORK: 3120003 adds SmartPlaylists.sp_next_playlist_id (what a smart queue hands over to when
     // it runs out). Same reason as above: the column is added from createForkSchema(), which only
     // runs again on a device if onUpgrade() fires.
-    public static final int VERSION = 3120003;
+    // FORK: 3120004 adds SmartPlaylists.sp_download_rules and the SmartPrefetched table (rule-driven
+    // downloads). Same reason as above.
+    public static final int VERSION = 3120004;
 
     /**
      * FORK: how far through upstream's migration chain the code in this fork actually goes.
@@ -192,6 +194,10 @@ public class PodDBAdapter {
     public static final String KEY_SMART_PLAYLIST_NAME = "sp_name";
     public static final String KEY_SMART_PLAYLIST_AUTO_REGENERATE = "sp_auto_regenerate";
     public static final String KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID = "sp_next_playlist_id";
+    public static final String KEY_SMART_PLAYLIST_DOWNLOAD_RULES = "sp_download_rules";
+    public static final String KEY_PREFETCH_EPISODE_ID = "spf_episode_id";
+    public static final String KEY_PREFETCH_FETCHED_AT = "spf_fetched_at";
+    public static final String KEY_PREFETCH_DECLINED = "spf_declined";
     public static final String KEY_SMART_PLAYLIST_GENERATED_AT = "sp_generated_at";
     public static final String KEY_SMART_PLAYLIST_CREATED_AT = "sp_created_at";
     public static final String KEY_SMART_PLAYLIST_UPDATED_AT = "sp_updated_at";
@@ -222,6 +228,7 @@ public class PodDBAdapter {
     public static final String TABLE_NAME_SMART_PLAYLISTS = "SmartPlaylists";
     public static final String TABLE_NAME_SMART_PLAYLIST_RULES = "SmartPlaylistRules";
     public static final String TABLE_NAME_SMART_PLAYLIST_EPISODES = "SmartPlaylistEpisodes";
+    public static final String TABLE_NAME_SMART_PREFETCHED = "SmartPrefetched";
 
     // SQL Statements for creating new tables
     private static final String TABLE_PRIMARY_KEY = KEY_ID
@@ -345,6 +352,7 @@ public class PodDBAdapter {
             + KEY_SMART_PLAYLIST_NAME + " TEXT NOT NULL,"
             + KEY_SMART_PLAYLIST_AUTO_REGENERATE + " INTEGER DEFAULT 1,"
             + KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID + " INTEGER DEFAULT 0,"
+            + KEY_SMART_PLAYLIST_DOWNLOAD_RULES + " INTEGER DEFAULT 0,"
             + KEY_SMART_PLAYLIST_GENERATED_AT + " INTEGER DEFAULT 0,"
             + KEY_SMART_PLAYLIST_CREATED_AT + " INTEGER NOT NULL,"
             + KEY_SMART_PLAYLIST_UPDATED_AT + " INTEGER NOT NULL)";
@@ -370,6 +378,11 @@ public class PodDBAdapter {
             + "(" + KEY_ID + ") ON DELETE CASCADE,"
             + KEY_SMART_PLAYLIST_EPISODE_ID + " INTEGER REFERENCES " + TABLE_NAME_FEED_ITEMS + "(" + KEY_ID + "),"
             + KEY_SMART_PLAYLIST_POSITION + " INTEGER DEFAULT 0)";
+
+    static final String CREATE_TABLE_SMART_PREFETCHED = "CREATE TABLE IF NOT EXISTS "
+            + TABLE_NAME_SMART_PREFETCHED + " (" + KEY_PREFETCH_EPISODE_ID + " INTEGER PRIMARY KEY,"
+            + KEY_PREFETCH_FETCHED_AT + " INTEGER DEFAULT 0,"
+            + KEY_PREFETCH_DECLINED + " INTEGER DEFAULT 0)";
 
     static final String CREATE_INDEX_SMART_PLAYLIST_EPISODES_PLAYLIST =
             "CREATE INDEX IF NOT EXISTS " + TABLE_NAME_SMART_PLAYLIST_EPISODES + "_playlist ON "
@@ -399,7 +412,8 @@ public class PodDBAdapter {
             // FORK: Smart Playlist tables
             TABLE_NAME_SMART_PLAYLISTS,
             TABLE_NAME_SMART_PLAYLIST_RULES,
-            TABLE_NAME_SMART_PLAYLIST_EPISODES
+            TABLE_NAME_SMART_PLAYLIST_EPISODES,
+            TABLE_NAME_SMART_PREFETCHED
     };
 
     public static final String SELECT_KEY_ITEM_ID = "item_id";
@@ -1833,11 +1847,80 @@ public class PodDBAdapter {
         return db.rawQuery(query, null);
     }
 
+    /**
+     * FORK: every episode a rule would match if its "downloaded" condition were dropped, in the
+     * rule's order and without its limit. Rule-driven downloads walk this to find what a rebuild
+     * would pick next.
+     */
+    public Cursor getSmartPlaylistRuleDownloadCandidatesCursor(SmartPlaylistRule rule) {
+        String whereClause = SmartPlaylistRuleQuery.generateWhereClause(
+                SmartPlaylistRuleQuery.withoutDownloadedFilter(rule));
+        String orderClause = SmartPlaylistRuleQuery.generateOrderClause(rule);
+
+        String query = "SELECT " + KEYS_FEED_ITEM_WITHOUT_DESCRIPTION + ", " + KEYS_FEED_MEDIA
+                + " FROM " + TABLE_NAME_FEED_ITEMS
+                + JOIN_FEED_ITEM_AND_MEDIA
+                + " LEFT JOIN " + TABLE_NAME_FEEDS
+                + " ON " + TABLE_NAME_FEED_ITEMS + "." + KEY_FEED + " = "
+                + TABLE_NAME_FEEDS + "." + KEY_ID;
+
+        if (!android.text.TextUtils.isEmpty(whereClause)) {
+            query += " WHERE " + whereClause;
+        }
+        query += " ORDER BY " + orderClause;
+        return db.rawQuery(query, null);
+    }
+
+    public Cursor getSmartPlaylistEpisodeIdsCursor(long playlistId) {
+        final String query = "SELECT " + KEY_SMART_PLAYLIST_EPISODE_ID
+                + " FROM " + TABLE_NAME_SMART_PLAYLIST_EPISODES
+                + " WHERE " + KEY_SMART_PLAYLIST_ID + " = ?";
+        return db.rawQuery(query, new String[]{String.valueOf(playlistId)});
+    }
+
+    /**
+     * FORK: episodes rule-driven downloads fetched ahead and still own, oldest fetch first.
+     * Declined episodes are not included.
+     */
+    public Cursor getPrefetchedIdsCursor() {
+        final String query = "SELECT " + KEY_PREFETCH_EPISODE_ID + " FROM " + TABLE_NAME_SMART_PREFETCHED
+                + " WHERE " + KEY_PREFETCH_DECLINED + " = 0"
+                + " ORDER BY " + KEY_PREFETCH_FETCHED_AT + " ASC";
+        return db.rawQuery(query, null);
+    }
+
+    public Cursor getDeclinedIdsCursor() {
+        final String query = "SELECT " + KEY_PREFETCH_EPISODE_ID + " FROM " + TABLE_NAME_SMART_PREFETCHED
+                + " WHERE " + KEY_PREFETCH_DECLINED + " = 1";
+        return db.rawQuery(query, null);
+    }
+
+    public void markPrefetched(long episodeId, long fetchedAt) {
+        ContentValues values = new ContentValues();
+        values.put(KEY_PREFETCH_EPISODE_ID, episodeId);
+        values.put(KEY_PREFETCH_FETCHED_AT, fetchedAt);
+        values.put(KEY_PREFETCH_DECLINED, 0);
+        db.insertWithOnConflict(TABLE_NAME_SMART_PREFETCHED, null, values, SQLiteDatabase.CONFLICT_IGNORE);
+    }
+
+    public void markDeclined(long episodeId) {
+        ContentValues values = new ContentValues();
+        values.put(KEY_PREFETCH_EPISODE_ID, episodeId);
+        values.put(KEY_PREFETCH_DECLINED, 1);
+        db.insertWithOnConflict(TABLE_NAME_SMART_PREFETCHED, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public void removePrefetchMarker(long episodeId) {
+        db.delete(TABLE_NAME_SMART_PREFETCHED, KEY_PREFETCH_EPISODE_ID + "=?",
+                new String[]{String.valueOf(episodeId)});
+    }
+
     public long setSmartPlaylist(SmartPlaylist playlist) {
         ContentValues values = new ContentValues();
         values.put(KEY_SMART_PLAYLIST_NAME, playlist.getName());
         values.put(KEY_SMART_PLAYLIST_AUTO_REGENERATE, playlist.isAutoRegenerate() ? 1 : 0);
         values.put(KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID, playlist.getNextPlaylistId());
+        values.put(KEY_SMART_PLAYLIST_DOWNLOAD_RULES, playlist.isDownloadRules() ? 1 : 0);
         values.put(KEY_SMART_PLAYLIST_GENERATED_AT, playlist.getGeneratedAt());
         values.put(KEY_SMART_PLAYLIST_UPDATED_AT, System.currentTimeMillis());
 
@@ -1971,6 +2054,11 @@ public class PodDBAdapter {
             db.execSQL("ALTER TABLE " + TABLE_NAME_SMART_PLAYLISTS + " ADD COLUMN "
                     + KEY_SMART_PLAYLIST_NEXT_PLAYLIST_ID + " INTEGER DEFAULT 0");
         }
+        if (!hasColumn(db, TABLE_NAME_SMART_PLAYLISTS, KEY_SMART_PLAYLIST_DOWNLOAD_RULES)) {
+            db.execSQL("ALTER TABLE " + TABLE_NAME_SMART_PLAYLISTS + " ADD COLUMN "
+                    + KEY_SMART_PLAYLIST_DOWNLOAD_RULES + " INTEGER DEFAULT 0");
+        }
+        db.execSQL(CREATE_TABLE_SMART_PREFETCHED);
         db.execSQL(CREATE_TABLE_SMART_PLAYLIST_RULES);
         db.execSQL(CREATE_TABLE_SMART_PLAYLIST_EPISODES);
         db.execSQL(CREATE_INDEX_SMART_PLAYLIST_EPISODES_PLAYLIST);

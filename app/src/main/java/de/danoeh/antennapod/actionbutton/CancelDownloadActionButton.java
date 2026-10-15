@@ -34,5 +34,6 @@ public class CancelDownloadActionButton extends ItemActionButton {
         DownloadServiceInterface.get().cancel(context, media);
         item.disableAutoDownload();
         DBWriter.setFeedItem(item, false);
+        DBWriter.markDeclined(item.getId());
     }
 }

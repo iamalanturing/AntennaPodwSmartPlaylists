@@ -104,6 +104,7 @@ public abstract class UserPreferences {
     public static final String PREF_AUTODL_GLOBAL = "prefEnableAutoDl";
     public static final String PREF_AUTODL_QUEUE = "prefEnableAutoDlQueue";
     public static final String PREF_ENABLE_AUTODL_ON_BATTERY = "prefEnableAutoDownloadOnBattery";
+    public static final String PREF_SMART_QUEUE_KEEP_FREE_SPACE = "prefSmartQueueKeepFreeSpace";
     private static final String PREF_PROXY_TYPE = "prefProxyType";
     private static final String PREF_PROXY_HOST = "prefProxyHost";
     private static final String PREF_PROXY_PORT = "prefProxyPort";
@@ -577,6 +578,15 @@ public abstract class UserPreferences {
 
     public static boolean isEnableAutodownloadOnBattery() {
         return prefs.getBoolean(PREF_ENABLE_AUTODL_ON_BATTERY, true);
+    }
+
+    /**
+     * FORK: free space, in bytes, below which smart queue downloads stop and their stale
+     * prefetches are cleaned up.
+     */
+    public static long getSmartQueueKeepFreeSpaceBytes() {
+        long megabytes = Long.parseLong(prefs.getString(PREF_SMART_QUEUE_KEEP_FREE_SPACE, "1024"));
+        return megabytes * 1024L * 1024L;
     }
 
     public static int getFastForwardSecs() {
